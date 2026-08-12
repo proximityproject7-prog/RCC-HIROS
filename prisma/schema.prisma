@@ -1,0 +1,364 @@
+// ═══════════════════════════════════════════════════════════════
+// RCC-HIROS — Prisma Schema (SQLite)
+// Merged Employee/User model, RBAC, leaves, evaluations, attendance
+// ═══════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FOUNDATION — Groups & Roles (RBAC)
+// ═══════════════════════════════════════════════════════════════
+
+model Group {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String    @unique
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employees Employee[]
+}
+
+model Role {
+  id                   String  @id @default(cuid())
+  name                 String  @unique
+  description          String?
+  scopeAllProfiling    Boolean @default(false)
+  scopeAllEvaluation   Boolean @default(false)
+  scopeAllLeave        Boolean @default(false)
+  scopeAllReports      Boolean @default(false)
+  scopeAllAttendance   Boolean @default(false)
+  canSelfApproveLeave  Boolean @default(false)
+  isSystem             Boolean @default(false)
+  active               Boolean @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  permissions RolePermission[]
+  employees   Employee[]
+}
+
+model RolePermission {
+  id         String  @id @default(cuid())
+  roleId     String
+  identifier String
+  granted    Boolean @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, identifier])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMPLOYEE (merged with User — auth fields are nullable)
+// ═══════════════════════════════════════════════════════════════
+
+model Employee {
+  id             String   @id @default(cuid())
+  employeeId     String   @unique // "EMP-0001"
+  firstName      String
+  lastName       String
+  middleName     String?
+  email          String   @unique
+  phone          String?
+  address        String?
+  birthday       DateTime?
+  gender         String? // "Male" | "Female"
+  groupId        String?
+  roleId         String?
+  contractType   String   @default("Regular") // "Regular" | "Contractual" | "Part-Time" | ...
+  active         Boolean  @default(true)
+  hireDate       DateTime?
+  salary         Float?     @default(0) // Monthly salary
+
+  // Auth fields (nullable — Employee IS the User)
+  passwordHash     String?
+  mustChangePwd    Boolean   @default(false)
+  failedAttempts   Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  group          Group?    @relation(fields: [groupId], references: [id])
+  role           Role?     @relation(fields: [roleId], references: [id])
+  certificates   EmployeeCertificate[]
+  files          EmployeeFile[]          @relation("EmployeeFiles")
+  filesUploaded  EmployeeFile[]          @relation("FilesUploaded")
+  leaveBalances  LeaveBalance[]
+  leaveRequests  LeaveRequest[]
+  evaluations    Evaluation[]            @relation("EvaluationsReceived")
+  leaveApprovals LeaveApproval[]
+  evaluationsMade Evaluation[]           @relation("EvaluationsMade")
+  attendanceRecords Attendance[]
+  attendanceEdits Attendance[]           @relation("AttendanceEdits")
+  fpassSubmissions FpassSubmission[]
+  auditLogs      AuditLog[]
+}
+
+model EmployeeCertificate {
+  id             String   @id @default(cuid())
+  employeeId     String
+  title          String
+  issuer         String?
+  certificateNo  String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  createdAt      DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model EmployeeFile {
+  id             String   @id @default(cuid())
+  employeeId     String
+  fileName       String
+  originalName   String
+  mimeType       String
+  fileSize       Int
+  description    String?
+  uploadedById   String?
+  createdAt      DateTime @default(now())
+  uploadedAt     DateTime @default(now())
+
+  employee   Employee  @relation("EmployeeFiles", fields: [employeeId], references: [id], onDelete: Cascade)
+  uploadedBy Employee? @relation("FilesUploaded", fields: [uploadedById], references: [id])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEAVE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+
+model LeaveType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  defaultDays Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+}
+
+model LeaveBalance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  leaveTypeId String
+  year        Int
+  totalDays   Float    @default(0)
+  usedDays    Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@unique([employeeId, leaveTypeId, year])
+}
+
+model LeaveRequest {
+  id                  String   @id @default(cuid())
+  requestNo           String   @unique // "LR-0001"
+  employeeId          String
+  leaveTypeId         String
+  startDate           DateTime
+  endDate             DateTime
+  workdays            Float
+  reason              String
+  status              String   @default("pending_l1")
+  // "draft" | "pending_l1" | "pending_l2" | "approved" | "rejected" | "cancelled"
+
+  documentFileName       String?
+  documentOriginalName   String?
+  documentMimeType       String?
+  documentFileSize       Int?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee  Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType        @relation(fields: [leaveTypeId], references: [id])
+  approvals LeaveApproval[]
+}
+
+model LeaveApproval {
+  id            String   @id @default(cuid())
+  leaveRequestId String
+  level         Int      // 1 = L1 (Dean), 2 = L2 (HR/Accountant)
+  approverId    String
+  status        String   // "approved" | "rejected" | "pending"
+  remarks       String?
+  actedAt       DateTime?
+  createdAt     DateTime @default(now())
+
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  approver     Employee     @relation(fields: [approverId], references: [id])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PERFORMANCE EVALUATION
+// ═══════════════════════════════════════════════════════════════
+
+model EvaluationForm {
+  id        String   @id @default(cuid())
+  name      String
+  version   Int      @default(1)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  criteria    EvaluationCriterion[]
+  periods     EvaluationPeriod[]
+  evaluations Evaluation[]
+}
+
+model EvaluationCriterion {
+  id          String   @id @default(cuid())
+  formId      String
+  category    String
+  description String
+  maxScore    Int      @default(5)
+  weight      Float    @default(1.0)
+  sortOrder   Int
+  createdAt   DateTime @default(now())
+
+  form      EvaluationForm         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  responses EvaluationResponse[]
+}
+
+model EvaluationPeriod {
+  id        String   @id @default(cuid())
+  formId    String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("open") // "open" | "closed" | "archived"
+  createdAt DateTime @default(now())
+
+  form        EvaluationForm  @relation(fields: [formId], references: [id])
+  evaluations Evaluation[]
+}
+
+model Evaluation {
+  id          String   @id @default(cuid())
+  periodId    String
+  formId      String
+  evaluatorId String
+  employeeId  String
+  status      String   @default("draft") // "draft" | "submitted" | "acknowledged"
+  totalScore  Float?
+  remarks     String?
+  submittedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  period    EvaluationPeriod        @relation(fields: [periodId], references: [id])
+  form      EvaluationForm          @relation(fields: [formId], references: [id])
+  evaluator Employee                @relation("EvaluationsMade", fields: [evaluatorId], references: [id])
+  employee  Employee                @relation("EvaluationsReceived", fields: [employeeId], references: [id])
+  responses EvaluationResponse[]
+
+  @@unique([periodId, evaluatorId, employeeId])
+}
+
+model EvaluationResponse {
+  id           String   @id @default(cuid())
+  evaluationId String
+  criterionId  String
+  score        Float
+  comments     String?
+  createdAt    DateTime @default(now())
+
+  evaluation Evaluation           @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  criterion  EvaluationCriterion  @relation(fields: [criterionId], references: [id])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ATTENDANCE (with geofence + biometric + manual edits)
+// ═══════════════════════════════════════════════════════════════
+
+model Attendance {
+  id                  String   @id @default(cuid())
+  employeeId          String
+  date                DateTime
+  clockInAt           DateTime?
+  clockOutAt          DateTime?
+  clockInLat          Float?
+  clockInLng          Float?
+  clockInOnPremise    Boolean?
+  clockInDistance     Float?
+  clockOutLat         Float?
+  clockOutLng         Float?
+  clockOutOnPremise   Boolean?
+  clockOutDistance    Float?
+  biometricVerified   Boolean  @default(false)
+  manuallyEdited      Boolean  @default(false)
+  editRemarks         String?
+  editedById          String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  employee Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  editedBy Employee? @relation("AttendanceEdits", fields: [editedById], references: [id])
+
+  @@unique([employeeId, date])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FPASS (FACULTY PERFORMANCE APPRAISAL)
+// ═══════════════════════════════════════════════════════════════
+
+model FpassSubmission {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  schoolYear  String
+  formData    String   // JSON blob with all form fields
+  totalPoints Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, schoolYear])
+  @@index([employeeId])
+  @@index([schoolYear])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUDIT LOG & SYSTEM SETTINGS
+// ═══════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String? // JSON-serialized
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user Employee? @relation(fields: [userId], references: [id])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  category  String   @default("general")
+  updatedAt DateTime @updatedAt
+}
