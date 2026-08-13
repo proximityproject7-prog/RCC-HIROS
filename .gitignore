@@ -1,46 +1,50 @@
-# dependencies
 node_modules/
-
-# next.js
 .next/
 out/
-
-# production
 build/
-
-# misc
+src/generated/
+*.log
+tsconfig.tsbuildinfo
 .DS_Store
 *.pem
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# Environment files
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# prisma
-prisma/migrations/
-
-# database
-db/*.db
-db/*.db-journal
-
-# uploads
+# Secrets and data
+db/
 uploads/
 
-# playwright
+# Worklog
+/worklog/
+/look-back.md
+
+# OpenCode config
+/.opencode/
+
+# Playwright
 .playwright-mcp/
+*.png
+
+# Reference documents
+*.docx
+
+# Prisma
+prisma/migrations/
+
+# Database files
+db/*.db
+db/*.db-journal
 prisma/db/
