@@ -936,7 +936,12 @@ export function LeaveTypeManagementPage() {
             resetForm();
             setShowForm(true);
           }}
-          className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors"
+          disabled={showForm}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
+            showForm
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : "bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90"
+          }`}
         >
           <Plus className="h-4 w-4" /> New Leave Type
         </button>
