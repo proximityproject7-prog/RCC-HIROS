@@ -119,7 +119,7 @@ export default function LoginPage() {
                   setIdentifier(e.target.value);
                   if (error) setError(null);
                 }}
-                placeholder="EMP-0001 or username@rcc.edu.ph"
+                placeholder="username@rcc.edu.ph"
                 className="w-full h-11 px-4 rounded-lg border border-rcc-border bg-rcc-surface text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent focus:border-rcc-accent transition-colors"
                 autoComplete="username"
                 required
