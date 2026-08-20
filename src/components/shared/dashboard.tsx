@@ -75,7 +75,7 @@ export function DynamicDashboard() {
   return (
     <div className="space-y-6">
       <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6">
-        <h1 className="text-2xl font-bold text-rcc-text-primary">Welcome, {user?.name?.split(" ")[0] ?? "User"}</h1>
+        <h1 className="text-xl font-bold text-rcc-text-primary">Welcome, {user?.name?.split(" ")[0] ?? "User"}</h1>
         <p className="text-sm text-rcc-text-muted mt-1">
           You're signed in as <span className="font-medium text-rcc-text-secondary">{user?.roleName}</span>.
           {user?.isSystem && " You have full system access."}
@@ -179,36 +179,36 @@ function TimeAttendanceWidget() {
   const clockedIn = !!today?.clockInAt;
   const clockedOut = !!today?.clockOutAt;
   const statusText = !clockedIn ? "Not Clocked In" : clockedOut ? "Clocked Out" : "Clocked In";
-  const statusColor = !clockedIn ? "rgba(254, 249, 195, 0.7)" : clockedOut ? "#86EFAC" : "#93C5FD";
+  const statusColorClass = !clockedIn ? "text-yellow-50/70" : clockedOut ? "text-green-300" : "text-blue-300";
 
   return (
-    <div className="rounded-lg overflow-hidden shadow-md" style={{ backgroundColor: "#3B2A1A" }}>
+    <div className="bg-stone-800 rounded-lg overflow-hidden shadow-md">
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/10">
-        <div className="flex items-center gap-2"><Clock className="h-4 w-4" style={{ color: "#D4A017" }} /><h2 className="text-sm font-semibold" style={{ color: "#FEF9C3" }}>Time &amp; Attendance</h2></div>
-        {premises?.lat && <div className="flex items-center gap-1 text-xs" style={{ color: "rgba(254, 249, 195, 0.6)" }}><MapPin className="h-3 w-3" />{premises.name}</div>}
+        <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-amber-500" /><h2 className="text-sm font-semibold text-yellow-50">Time &amp; Attendance</h2></div>
+        {premises?.lat && <div className="flex items-center gap-1 text-xs text-yellow-50/60"><MapPin className="h-3 w-3" />{premises.name}</div>}
       </div>
       <div className="px-6 py-5">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <div className="text-4xl font-bold tabular-nums tracking-tight" style={{ color: "#FEF9C3" }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}</div>
-            <div className="text-sm mt-1" style={{ color: "rgba(254, 249, 195, 0.6)" }}>{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</div>
+            <div className="text-4xl font-bold tabular-nums tracking-tight text-yellow-50">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}</div>
+            <div className="text-sm mt-1 text-yellow-50/60">{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</div>
           </div>
-          <div className="rounded-lg px-4 py-3 min-w-[240px]" style={{ backgroundColor: "rgba(0, 0, 0, 0.25)" }}>
-            <div className="text-xs uppercase tracking-wide" style={{ color: "rgba(254, 249, 195, 0.5)" }}>Today's Status</div>
-            <div className="flex items-center gap-2 mt-1"><span className="text-lg font-bold" style={{ color: statusColor }}>{statusText}</span></div>
-            {clockedIn && today?.clockInAt && <div className="text-xs mt-1" style={{ color: "rgba(254, 249, 195, 0.6)" }}>In: {new Date(today.clockInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{clockedOut && today.clockOutAt && <> · Out: {new Date(today.clockOutAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</>}</div>}
-            {clockedIn && today?.clockInOnPremise !== null && today?.clockInOnPremise !== undefined && <div className="text-xs mt-1">{today.clockInOnPremise ? <span className="font-medium" style={{ color: "#86EFAC" }}>✓ On premise</span> : <span className="font-medium" style={{ color: "#FCD34D" }}>⚠ Off premise ({Math.round(today.clockInDistance ?? 0)}m)</span>}</div>}
+          <div className="bg-black/25 rounded-lg px-4 py-3 min-w-[240px]">
+            <div className="text-xs uppercase tracking-wide text-yellow-50/50">Today's Status</div>
+            <div className="flex items-center gap-2 mt-1"><span className={`text-lg font-bold ${statusColorClass}`}>{statusText}</span></div>
+            {clockedIn && today?.clockInAt && <div className="text-xs mt-1 text-yellow-50/60">In: {new Date(today.clockInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{clockedOut && today.clockOutAt && <> · Out: {new Date(today.clockOutAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</>}</div>}
+            {clockedIn && today?.clockInOnPremise !== null && today?.clockInOnPremise !== undefined && <div className="text-xs mt-1">{today.clockInOnPremise ? <span className="font-medium text-green-300">✓ On premise</span> : <span className="font-medium text-yellow-400">⚠ Off premise ({Math.round(today.clockInDistance ?? 0)}m)</span>}</div>}
             <div className="mt-3">
-              {!clockedIn && <button onClick={() => handleAction("clock_in")} disabled={actionLoading} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md w-full justify-center transition-colors disabled:opacity-60" style={{ backgroundColor: "#16A34A", color: "#FFFFFF" }}><LogIn className="h-4 w-4" />{actionLoading ? "Working…" : "Clock In"}</button>}
-              {clockedIn && !clockedOut && <button onClick={() => handleAction("clock_out")} disabled={actionLoading} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md w-full justify-center transition-colors disabled:opacity-60" style={{ backgroundColor: "#DC2626", color: "#FFFFFF" }}><LogOut className="h-4 w-4" />{actionLoading ? "Working…" : "Clock Out"}</button>}
-              {clockedOut && <div className="text-center text-sm font-medium py-2" style={{ color: "#86EFAC" }}>✓ Day Complete</div>}
+              {!clockedIn && <button onClick={() => handleAction("clock_in")} disabled={actionLoading} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md w-full justify-center transition-colors disabled:opacity-60 bg-green-600 text-white"><LogIn className="h-4 w-4" />{actionLoading ? "Working…" : "Clock In"}</button>}
+              {clockedIn && !clockedOut && <button onClick={() => handleAction("clock_out")} disabled={actionLoading} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md w-full justify-center transition-colors disabled:opacity-60 bg-red-600 text-white"><LogOut className="h-4 w-4" />{actionLoading ? "Working…" : "Clock Out"}</button>}
+              {clockedOut && <div className="text-center text-sm font-medium py-2 text-green-300">✓ Day Complete</div>}
             </div>
           </div>
         </div>
-        {locationStatus && <p className="text-xs mt-2" style={{ color: "#93C5FD" }}>{locationStatus}</p>}
-        {error && <p className="text-xs mt-2" style={{ color: "#FCA5A5" }}>{error}</p>}
-        {today?.manuallyEdited && <p className="text-xs mt-2" style={{ color: "#FCD34D" }}>⚠ Record was manually edited. {today.editRemarks && `"${today.editRemarks}"`}</p>}
-        <button onClick={() => setCurrentPage("attendance", "all")} className="text-xs hover:underline mt-3" style={{ color: "#D4A017" }}>View full attendance →</button>
+        {locationStatus && <p className="text-xs mt-2 text-blue-300">{locationStatus}</p>}
+        {error && <p className="text-xs mt-2 text-red-300">{error}</p>}
+        {today?.manuallyEdited && <p className="text-xs mt-2 text-yellow-400">⚠ Record was manually edited. {today.editRemarks && `"${today.editRemarks}"`}</p>}
+        <button onClick={() => setCurrentPage("attendance", "all")} className="text-xs hover:underline mt-3 text-amber-500">View full attendance →</button>
       </div>
     </div>
   );

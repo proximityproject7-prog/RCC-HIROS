@@ -300,8 +300,9 @@ function FpassSubmissionViewPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+        <span className="text-sm text-rcc-text-muted">Loading...</span>
       </div>
     );
   }
@@ -309,8 +310,8 @@ function FpassSubmissionViewPage({
   if (!submission) {
     return (
       <div className="space-y-4">
-        <button onClick={onBack} className="p-2 rounded-md hover:bg-rcc-bg transition-colors">
-          <ArrowLeft className="h-4 w-4 text-rcc-text-muted" />
+        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">Submission not found.</div>
       </div>
@@ -481,8 +482,9 @@ function FpassFormPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+        <span className="text-sm text-rcc-text-muted">Loading...</span>
       </div>
     );
   }
@@ -501,8 +503,8 @@ function FpassFormPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-2 rounded-md hover:bg-rcc-bg transition-colors">
-            <ArrowLeft className="h-4 w-4 text-rcc-text-muted" />
+          <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
+            <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <div>
             <h1 className="text-xl font-bold text-rcc-text-primary">Faculty Performance Appraisal Form</h1>
@@ -1065,8 +1067,9 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+        <span className="text-sm text-rcc-text-muted">Loading...</span>
       </div>
     );
   }
@@ -1083,8 +1086,8 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
       )}
 
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 rounded-md hover:bg-rcc-bg transition-colors">
-          <ArrowLeft className="h-4 w-4 text-rcc-text-muted" />
+        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div>
           <h1 className="text-xl font-bold text-rcc-text-primary">FPASS Group Settings</h1>
@@ -1344,7 +1347,7 @@ function DynamicTable({
                         type={col.type === "number" ? "number" : "text"}
                         value={String(row[col.key] ?? "")}
                         onChange={(e) => onUpdate(row.id, col.key, col.type === "number" ? parseFloat(e.target.value) || 0 : e.target.value)}
-                        className="w-full px-2 py-1 bg-rcc-bg border border-rcc-border rounded text-sm text-rcc-text-primary focus:outline-none focus:ring-1 focus:ring-rcc-accent/40"
+                        className="w-full px-2 py-1 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-1 focus:ring-rcc-accent/40"
                         readOnly={readOnly}
                       />
                     </td>

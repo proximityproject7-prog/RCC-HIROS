@@ -3,11 +3,12 @@
 import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import {
   Plus, Search, Pencil, ArrowLeft, Save, Building2,
-  Users as UsersIcon, AlertTriangle, ToggleLeft, ToggleRight,
+  Users as UsersIcon, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -37,6 +38,13 @@ export function GroupListPage() {
   const [toggleTarget, setToggleTarget] = useState<Group | null>(null);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: "danger" | "warning";
+    onConfirm: () => void;
+  } | null>(null);
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -66,14 +74,15 @@ export function GroupListPage() {
     );
   }, [groups, search]);
 
-  const handleToggleActive = async () => {
-    if (!toggleTarget) return;
+  const handleToggleActive = async (group?: Group) => {
+    const target = group ?? toggleTarget;
+    if (!target) return;
     setToggling(true);
     try {
-      if (toggleTarget.active) {
-        await apiFetch(`/api/groups/${toggleTarget.id}`, { method: "DELETE" });
+      if (target.active) {
+        await apiFetch(`/api/groups/${target.id}`, { method: "DELETE" });
       } else {
-        await apiFetch(`/api/groups/${toggleTarget.id}`, {
+        await apiFetch(`/api/groups/${target.id}`, {
           method: "PATCH",
           body: JSON.stringify({ active: true }),
         });
@@ -160,7 +169,15 @@ export function GroupListPage() {
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => setToggleTarget(group)}
+                        onClick={() => setConfirmState({
+                          open: true,
+                          title: `${group.active ? "Disable" : "Enable"} group \u201c${group.name}\u201d?`,
+                          message: group.active
+                            ? "This group will be hidden from new employee assignments. Existing employees will keep their assignment."
+                            : "This group will become available for new employee assignments.",
+                          variant: "warning",
+                          onConfirm: () => handleToggleActive(group),
+                        })}
                         className={`p-1.5 rounded-md transition-colors ${
                           group.active
                             ? "text-rcc-text-secondary hover:bg-red-50 hover:text-rcc-error"
@@ -219,49 +236,14 @@ export function GroupListPage() {
       )}
 
       {/* Enable/Disable confirmation modal */}
-      {toggleTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-rcc-surface rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                toggleTarget.active ? "bg-red-50" : "bg-green-50"
-              }`}>
-                <AlertTriangle className={`h-5 w-5 ${toggleTarget.active ? "text-rcc-error" : "text-green-600"}`} />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-rcc-text-primary">
-                  {toggleTarget.active ? "Disable" : "Enable"} group &ldquo;{toggleTarget.name}&rdquo;?
-                </h3>
-                <p className="text-sm text-rcc-text-muted mt-1">
-                  {toggleTarget.active
-                    ? "This group will be hidden from new employee assignments. Existing employees will keep their assignment."
-                    : "This group will become available for new employee assignments."}
-                </p>
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setToggleTarget(null)}
-                disabled={toggling}
-                className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleToggleActive}
-                disabled={toggling}
-                className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors disabled:opacity-50 ${
-                  toggleTarget.active
-                    ? "bg-rcc-error text-white hover:bg-red-700"
-                    : "bg-green-600 text-white hover:bg-green-700"
-                }`}
-              >
-                {toggling ? "Processing..." : toggleTarget.active ? "Disable" : "Enable"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmState?.open ?? false}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.message ?? ""}
+        variant={confirmState?.variant ?? "warning"}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

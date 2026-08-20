@@ -206,11 +206,11 @@ export function MyLeavePage() {
           <p className="text-sm text-rcc-text-muted mt-0.5">Submit and track your own leave requests.</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { resetForm(); setShowForm(true); }}
           className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors"
         >
           <Plus className="h-4 w-4" />
-          {showForm ? "Cancel" : "New Request"}
+          New Request
         </button>
       </div>
 
@@ -388,11 +388,11 @@ export function MyLeavePage() {
       </div>
       {/* Request Detail Modal */}
       {viewingRequest && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-rcc-surface rounded-lg shadow-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-rcc-text-primary">Leave Request Details</h3>
-              <button onClick={() => setViewingRequest(null)} className="text-rcc-text-muted hover:text-rcc-text-primary"><X className="h-4 w-4" /></button>
+              <button onClick={() => setViewingRequest(null)} className="p-1.5 rounded-md hover:bg-rcc-bg text-rcc-text-muted hover:text-rcc-text-primary"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-rcc-text-muted">Request No:</span><span className="font-mono text-rcc-text-primary">{viewingRequest.requestNo}</span></div>
@@ -457,12 +457,12 @@ export function MyLeavePage() {
                       },
                     });
                   }}
-                  className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-md hover:bg-red-700"
+                  className="px-4 py-2 text-sm font-medium bg-rcc-error text-white rounded-md hover:bg-red-700"
                 >
                   Cancel Request
                 </button>
               )}
-              <button onClick={() => setViewingRequest(null)} className="px-4 py-2 text-sm font-medium text-rcc-text-secondary hover:bg-rcc-bg rounded-md">Close</button>
+              <button onClick={() => setViewingRequest(null)} className="px-4 py-2 text-sm font-medium text-rcc-text-secondary border border-rcc-border hover:bg-rcc-bg rounded-md">Close</button>
             </div>
           </div>
         </div>
@@ -831,6 +831,7 @@ export function LeaveTypeManagementPage() {
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<LeaveType | null>(null);
   const [toggleTarget, setToggleTarget] = useState<LeaveType | null>(null);
+  const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const [toggling, setToggling] = useState(false);
 
   // Form
@@ -918,6 +919,7 @@ export function LeaveTypeManagementPage() {
     } finally {
       setToggling(false);
       setToggleTarget(null);
+      setToggleConfirmOpen(false);
     }
   };
 
@@ -934,11 +936,7 @@ export function LeaveTypeManagementPage() {
             setShowForm(true);
           }}
           disabled={showForm}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
-            showForm
-              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-              : "bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90"
-          }`}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" /> New Leave Type
         </button>
@@ -1016,7 +1014,7 @@ export function LeaveTypeManagementPage() {
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => setToggleTarget(lt)}
+                          onClick={() => { setToggleTarget(lt); setToggleConfirmOpen(true); }}
                           disabled={toggling}
                           className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${
                             lt.active
@@ -1038,50 +1036,19 @@ export function LeaveTypeManagementPage() {
         </div>
       </div>
 
-      {/* Enable/Disable confirmation modal */}
-      {toggleTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-rcc-surface rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                toggleTarget.active ? "bg-red-50" : "bg-green-50"
-              }`}>
-                <AlertTriangle className={`h-5 w-5 ${toggleTarget.active ? "text-rcc-error" : "text-green-600"}`} />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-rcc-text-primary">
-                  {toggleTarget.active ? "Deactivate" : "Activate"} leave type &ldquo;{toggleTarget.name}&rdquo;?
-                </h3>
-                <p className={`text-sm mt-1 ${toggleTarget.active ? "text-rcc-text-muted" : "text-green-600"}`}>
-                  {toggleTarget.active
-                    ? "This leave type will be hidden from new leave requests. Existing balances will be preserved."
-                    : "This leave type will become available for new leave requests."}
-                </p>
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setToggleTarget(null)}
-                disabled={toggling}
-                className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleToggleActive}
-                disabled={toggling}
-                className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors disabled:opacity-50 ${
-                  toggleTarget.active
-                    ? "bg-rcc-error text-white hover:bg-red-700"
-                    : "bg-green-600 text-white hover:bg-green-700"
-                }`}
-              >
-                {toggling ? "Processing..." : toggleTarget.active ? "Deactivate" : "Activate"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={toggleConfirmOpen}
+        title={`${toggleTarget?.active ? "Deactivate" : "Activate"} leave type "${toggleTarget?.name ?? ""}"?`}
+        message={
+          toggleTarget?.active
+            ? "This leave type will be hidden from new leave requests. Existing balances will be preserved."
+            : "This leave type will become available for new leave requests."
+        }
+        variant={toggleTarget?.active ? "danger" : "warning"}
+        confirmLabel={toggleTarget?.active ? "Deactivate" : "Activate"}
+        onConfirm={handleToggleActive}
+        onCancel={() => { setToggleTarget(null); setToggleConfirmOpen(false); }}
+      />
     </div>
   );
 }

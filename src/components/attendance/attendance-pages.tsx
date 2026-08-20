@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import {
-  Search, Pencil, MapPin, Settings, X, Save, AlertTriangle,
+  ArrowLeft, Search, Pencil, MapPin, Settings, X, Save, AlertTriangle,
   Navigation, ExternalLink, Clock, Clock as ClockOut,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
@@ -241,8 +241,11 @@ export function AttendanceListPage() {
             <tbody className="divide-y divide-rcc-border">
               {loading ? (
                 <tr>
-                  <td colSpan={showEditBtn ? 7 : 6} className="px-4 py-10 text-center text-rcc-text-muted">
-                    Loading attendance...
+                  <td colSpan={showEditBtn ? 7 : 6} className="px-4 py-10 text-center">
+                    <div className="flex items-center justify-center py-12">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+                      <span className="ml-2 text-sm text-rcc-text-muted">Loading...</span>
+                    </div>
                   </td>
                 </tr>
               ) : currentData.length === 0 ? (
@@ -655,7 +658,7 @@ export function PremisesSettingsPage() {
           onClick={() => setCurrentPage("attendance")}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
-          <X className="h-4 w-4" /> Back to attendance
+          <ArrowLeft className="h-4 w-4" /> Back to attendance
         </button>
       </div>
       <div>

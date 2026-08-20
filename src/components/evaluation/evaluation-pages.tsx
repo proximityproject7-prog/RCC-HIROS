@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import {
   Plus, ArrowLeft, AlertTriangle, Pencil,
-  CheckCircle2, FileText, Info, Trash2,
+  CheckCircle2, FileText, Info, Trash2, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
@@ -415,7 +415,7 @@ export function EvaluationFormsPage() {
       )}
 
       {/* Info card */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-5 flex items-start gap-3">
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6 flex items-start gap-3">
         <div className="w-9 h-9 rounded-md bg-rcc-accent/10 text-rcc-accent flex items-center justify-center shrink-0">
           <Info className="h-5 w-5" />
         </div>
@@ -436,7 +436,10 @@ export function EvaluationFormsPage() {
 
       {/* Period cards */}
       {loading ? (
-        <div className="text-center py-12 text-rcc-text-muted">Loading...</div>
+        <div className="flex items-center justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+          <span className="ml-2 text-sm text-rcc-text-muted">Loading...</span>
+        </div>
       ) : periods.length === 0 ? (
         <div className="bg-rcc-surface rounded-lg border border-rcc-border p-8 text-center text-rcc-text-muted">
           No evaluation periods found. Create one to get started.
@@ -625,7 +628,7 @@ export function EvaluationFormsPage() {
       {/* Retention Policy */}
       {has("evaluation.manage_forms") && (
         <div className="bg-rcc-surface rounded-lg border border-rcc-border p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-rcc-text-primary">Retention Policy</h3>
+          <h3 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">Retention Policy</h3>
           <p className="text-xs text-rcc-text-muted">Automatically delete evaluations after a set number of months from their submission date.</p>
           <div className="flex items-center gap-3">
             <span className="text-sm text-rcc-text-secondary">Delete evaluations older than</span>
@@ -1050,7 +1053,7 @@ export function SubmitEvaluationPage() {
 
           {/* Textual Evaluation — A */}
           <div className="bg-rcc-surface rounded-lg border border-rcc-border p-5 space-y-2">
-            <h3 className="text-sm font-semibold text-rcc-text-primary">Textual Evaluation (A)</h3>
+            <h3 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">Textual Evaluation (A)</h3>
             <p className="text-xs text-rcc-text-muted leading-relaxed">
               Please state briefly and sincerely anything about your teacher which is not covered in the preceding items.
             </p>
@@ -1065,7 +1068,7 @@ export function SubmitEvaluationPage() {
 
           {/* Textual Evaluation — B */}
           <div className="bg-rcc-surface rounded-lg border border-rcc-border p-5 space-y-2">
-            <h3 className="text-sm font-semibold text-rcc-text-primary">Textual Evaluation (B)</h3>
+            <h3 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">Textual Evaluation (B)</h3>
             <p className="text-xs text-rcc-text-muted leading-relaxed">
               Please state any recommendations for the improvement of facilities, services, students, faculty or administration in general.
             </p>
@@ -1353,7 +1356,7 @@ function EvaluationDetailsModal({ evaluation, onClose }: { evaluation: Evaluatio
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-md text-rcc-text-muted hover:bg-rcc-bg hover:text-rcc-text-primary transition-colors" aria-label="Close">
-            <ArrowLeft className="h-4 w-4 rotate-180" />
+            <X className="h-4 w-4" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">

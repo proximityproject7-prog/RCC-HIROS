@@ -133,7 +133,7 @@ export default function ChangePasswordModal() {
 
           {/* Error */}
           {error && (
-            <div className="mb-5 flex items-start gap-3 bg-red-50 border border-rcc-error/20 rounded-lg p-3.5">
+            <div className="mb-5 flex items-start gap-3 bg-red-50 border border-red-200 rounded-md p-3">
               <AlertCircle className="h-4 w-4 text-rcc-error shrink-0 mt-0.5" />
               <p className="text-sm font-medium text-rcc-error">{error}</p>
             </div>
@@ -152,13 +152,13 @@ export default function ChangePasswordModal() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-rcc-text-secondary">Current Password</label>
+              <label className="text-xs font-semibold block text-rcc-text-secondary">Current Password</label>
               <div className="relative">
                 <input
                   type={showCurrent ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => { setCurrentPassword(e.target.value); if (error) setError(null); }}
-                  className="w-full h-10 px-3 pr-10 rounded-lg border border-rcc-border bg-rcc-surface text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent focus:border-rcc-accent"
+                  className="w-full px-3 pr-10 rounded-md border border-rcc-border bg-rcc-bg text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
                   placeholder="Enter current password"
                   required
                 />
@@ -169,13 +169,13 @@ export default function ChangePasswordModal() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-rcc-text-secondary">New Password</label>
+              <label className="text-xs font-semibold block text-rcc-text-secondary">New Password</label>
               <div className="relative">
                 <input
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => { setNewPassword(e.target.value); if (error) setError(null); }}
-                  className="w-full h-10 px-3 pr-10 rounded-lg border border-rcc-border bg-rcc-surface text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent focus:border-rcc-accent"
+                  className="w-full px-3 pr-10 rounded-md border border-rcc-border bg-rcc-bg text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
                   placeholder="Enter new password"
                   required
                 />
@@ -186,13 +186,13 @@ export default function ChangePasswordModal() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-rcc-text-secondary">Confirm New Password</label>
+              <label className="text-xs font-semibold block text-rcc-text-secondary">Confirm New Password</label>
               <div className="relative">
                 <input
                   type={showConfirm ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => { setConfirmPassword(e.target.value); if (error) setError(null); }}
-                  className="w-full h-10 px-3 pr-10 rounded-lg border border-rcc-border bg-rcc-surface text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent focus:border-rcc-accent"
+                  className="w-full px-3 pr-10 rounded-md border border-rcc-border bg-rcc-bg text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
                   placeholder="Confirm new password"
                   required
                 />

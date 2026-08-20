@@ -452,7 +452,8 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-sm text-rcc-text-muted">Loading employee...</p>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+        <span className="ml-2 text-sm text-rcc-text-muted">Loading...</span>
       </div>
     );
   }
@@ -912,7 +913,8 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-sm text-rcc-text-muted">Loading employee profile...</p>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+        <span className="ml-2 text-sm text-rcc-text-muted">Loading...</span>
       </div>
     );
   }
@@ -1107,7 +1109,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
                       {(has("profiling.edit") || canSelfEdit) && (
                         <button
                           onClick={() => handleDeleteCert(c.id, c.title)}
-                          className="p-1 rounded text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors"
+                          className="p-1.5 rounded-md text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors"
                           title="Delete certificate"
                           aria-label="Delete certificate"
                         >
@@ -1230,7 +1232,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
       {/* File Viewer Modal */}
       {viewing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-rcc-surface rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-rcc-border">
               <p className="text-sm font-semibold text-rcc-text-primary truncate">{viewing.name}</p>

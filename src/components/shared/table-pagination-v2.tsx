@@ -36,7 +36,7 @@ export function PaginationControls(props: {
       <div className="flex items-center gap-2 text-xs text-rcc-text-muted">
         <span>Rows per page:</span>
         <select value={props.pageSize} onChange={(e) => props.setPageSize(Number(e.target.value))}
-          className="px-2 py-1 bg-rcc-surface border border-rcc-border rounded text-sm text-rcc-text-primary focus:outline-none focus:ring-1 focus:ring-rcc-accent/40">
+          className="px-2 py-1 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-1 focus:ring-rcc-accent/40">
           {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </div>

@@ -85,7 +85,7 @@ export default function LoginPage() {
 
           {/* Error State */}
           {error && (
-            <div className="mb-6 flex items-start gap-3 bg-red-50 border border-rcc-error/20 rounded-lg p-3.5">
+            <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-md p-3">
               <div className="text-rcc-error mt-0.5">
                 {getErrorIcon()}
               </div>
@@ -108,7 +108,7 @@ export default function LoginPage() {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <label htmlFor="identifier" className="text-sm font-medium text-rcc-text-secondary">
+              <label htmlFor="identifier" className="text-xs font-semibold block text-rcc-text-secondary">
                 Employee ID or Email
               </label>
               <input
@@ -120,14 +120,14 @@ export default function LoginPage() {
                   if (error) setError(null);
                 }}
                 placeholder="username@rcc.edu.ph"
-                className="w-full h-11 px-4 rounded-lg border border-rcc-border bg-rcc-surface text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent focus:border-rcc-accent transition-colors"
+                className="w-full px-4 rounded-md border border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
                 autoComplete="username"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="password" className="text-sm font-medium text-rcc-text-secondary">
+              <label htmlFor="password" className="text-xs font-semibold block text-rcc-text-secondary">
                 Password
               </label>
               <div className="relative">
@@ -140,7 +140,7 @@ export default function LoginPage() {
                     if (error) setError(null);
                   }}
                   placeholder="Enter your password"
-                  className="w-full h-11 px-4 pr-11 rounded-lg border border-rcc-border bg-rcc-surface text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent focus:border-rcc-accent transition-colors"
+                  className="w-full px-4 pr-11 rounded-md border border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
                   autoComplete="current-password"
                   required
                 />

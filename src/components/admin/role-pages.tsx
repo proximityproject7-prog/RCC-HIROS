@@ -3,12 +3,13 @@
 import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import {
   Plus, Search, Pencil, ArrowLeft, Save, ShieldCheck,
-  AlertTriangle, Users as UsersIcon, Lock, Unlock, Globe, BadgeCheck,
+  Users as UsersIcon, Lock, Unlock, Globe, BadgeCheck,
   ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   usePagination,
   PaginationControls,
@@ -161,6 +162,13 @@ export function RoleListPage() {
   const [toggleTarget, setToggleTarget] = useState<Role | null>(null);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: "danger" | "warning";
+    onConfirm: () => void;
+  } | null>(null);
 
   const loadRoles = useCallback(async () => {
     setLoading(true);
@@ -191,14 +199,15 @@ export function RoleListPage() {
 
   const { currentData, controls } = usePagination(filtered, { defaultPageSize: 15 });
 
-  const handleToggleActive = async () => {
-    if (!toggleTarget) return;
+  const handleToggleActive = async (role?: Role) => {
+    const target = role ?? toggleTarget;
+    if (!target) return;
     setToggling(true);
     try {
-      if (toggleTarget.active) {
-        await apiFetch(`/api/roles/${toggleTarget.id}`, { method: "DELETE" });
+      if (target.active) {
+        await apiFetch(`/api/roles/${target.id}`, { method: "DELETE" });
       } else {
-        await apiFetch(`/api/roles/${toggleTarget.id}`, {
+        await apiFetch(`/api/roles/${target.id}`, {
           method: "PATCH",
           body: JSON.stringify({ active: true }),
         });
@@ -340,16 +349,24 @@ export function RoleListPage() {
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           {has("roles.delete") && !role.isSystem && (
-                            <button
-                              onClick={() => setToggleTarget(role)}
-                              className={`p-1.5 rounded-md transition-colors ${
-                                role.active
-                                  ? "text-rcc-text-secondary hover:bg-red-50 hover:text-rcc-error"
-                                  : "text-rcc-text-secondary hover:bg-green-50 hover:text-green-600"
-                              }`}
-                              title={role.active ? "Disable role" : "Enable role"}
-                              aria-label={role.active ? "Disable role" : "Enable role"}
-                            >
+                          <button
+                            onClick={() => setConfirmState({
+                              open: true,
+                              title: `${role.active ? "Disable" : "Enable"} role \u201c${role.name}\u201d?`,
+                              message: role.active
+                                ? "This role will be hidden from new employee assignments. Existing employees will keep their role."
+                                : "This role will become available for new employee assignments.",
+                              variant: "warning",
+                              onConfirm: () => handleToggleActive(role),
+                            })}
+                            className={`p-1.5 rounded-md transition-colors ${
+                              role.active
+                                ? "text-rcc-text-secondary hover:bg-red-50 hover:text-rcc-error"
+                                : "text-rcc-text-secondary hover:bg-green-50 hover:text-green-600"
+                            }`}
+                            title={role.active ? "Disable role" : "Enable role"}
+                            aria-label={role.active ? "Disable role" : "Enable role"}
+                          >
                               {role.active ? (
                                 <ToggleRight className="h-3.5 w-3.5" />
                               ) : (
@@ -370,49 +387,14 @@ export function RoleListPage() {
       </div>
 
       {/* Enable/Disable confirmation */}
-      {toggleTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-rcc-surface rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                toggleTarget.active ? "bg-red-50" : "bg-green-50"
-              }`}>
-                <AlertTriangle className={`h-5 w-5 ${toggleTarget.active ? "text-rcc-error" : "text-green-600"}`} />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-rcc-text-primary">
-                  {toggleTarget.active ? "Disable" : "Enable"} role &ldquo;{toggleTarget.name}&rdquo;?
-                </h3>
-                <p className="text-sm text-rcc-text-muted mt-1">
-                  {toggleTarget.active
-                    ? "This role will be hidden from new employee assignments. Existing employees will keep their role."
-                    : "This role will become available for new employee assignments."}
-                </p>
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setToggleTarget(null)}
-                disabled={toggling}
-                className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleToggleActive}
-                disabled={toggling}
-                className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors disabled:opacity-50 ${
-                  toggleTarget.active
-                    ? "bg-rcc-error text-white hover:bg-red-700"
-                    : "bg-green-600 text-white hover:bg-green-700"
-                }`}
-              >
-                {toggling ? "Processing..." : toggleTarget.active ? "Disable" : "Enable"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmState?.open ?? false}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.message ?? ""}
+        variant={confirmState?.variant ?? "warning"}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

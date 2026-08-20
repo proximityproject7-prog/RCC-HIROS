@@ -130,7 +130,7 @@ function MultiSelectGroups({
               placeholder="Search groups..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-2 py-1.5 bg-rcc-bg border border-rcc-border rounded text-sm text-rcc-text-primary focus:outline-none"
+              className="w-full px-2 py-1.5 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none"
             />
           </div>
           <div className="flex items-center justify-between px-2 py-1.5 border-b border-rcc-border">
@@ -855,7 +855,7 @@ function SummaryCard({
           <p className="text-xl font-bold text-rcc-text-primary mt-1 tabular-nums">{value}</p>
         </div>
         <div className="w-9 h-9 rounded-lg bg-rcc-accent/10 flex items-center justify-center">
-          <Icon className="h-4.5 w-4.5 text-rcc-accent" />
+          <Icon className="h-5 w-5 text-rcc-accent" />
         </div>
       </div>
     </div>
