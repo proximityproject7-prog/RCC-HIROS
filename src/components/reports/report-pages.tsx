@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   Search, Download, Users, Building2, TrendingUp, Calendar,
-  Clock, ChevronDown, Check, X, Filter,
+  Clock, ChevronDown, ChevronRight, Check, X, Filter, Mail, Phone,
+  MapPin, Briefcase,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -210,6 +211,7 @@ export function ReportsPage() {
   const [rows, setRows] = useState<UnifiedRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Load groups and roles once
   useEffect(() => {
@@ -251,13 +253,12 @@ export function ReportsPage() {
         const grp = groups.find((g) => g.code === groupCode);
 
         if (rid) {
-          // Specific role selected — fetch employees directly
           const params = new URLSearchParams({ groupCode, roleId: rid });
           const data = await apiFetch<{ employees: { id: string; employeeId: string; firstName: string; middleName: string | null; lastName: string; email: string; gender: string | null; contractType: string; hireDate: string | null; active: boolean; roleName: string | null; certificateCount: number }[] }>(
             `/api/reports/headcount?${params.toString()}`
           );
           for (const e of data.employees ?? []) {
-            merged.set(e.id, {
+            merged.set(e.employeeId, {
               employeeId: e.employeeId,
               name: `${e.firstName} ${e.middleName ? e.middleName + " " : ""}${e.lastName}`,
               groupName: grp?.name ?? groupCode,
@@ -276,7 +277,6 @@ export function ReportsPage() {
             });
           }
         } else {
-          // No role filter — fetch roles first, then employees for each role
           const rolesData = await apiFetch<{ roles: { roleId: string; roleName: string }[] }>(
             `/api/reports/headcount?groupCode=${encodeURIComponent(groupCode)}`
           );
@@ -286,7 +286,7 @@ export function ReportsPage() {
               `/api/reports/headcount?${empParams.toString()}`
             );
             for (const e of empData.employees ?? []) {
-              merged.set(e.id, {
+              merged.set(e.employeeId, {
                 employeeId: e.employeeId,
                 name: `${e.firstName} ${e.middleName ? e.middleName + " " : ""}${e.lastName}`,
                 groupName: grp?.name ?? groupCode,
@@ -316,16 +316,7 @@ export function ReportsPage() {
         );
         const grp = groups.find((g) => g.code === groupCode);
         for (const e of data.byEmployee ?? []) {
-          // Time-of-day filtering (client-side: approximate by name won't work, skip for now)
-          const key = `att-${groupCode}-${e.employeeId}`;
-          // Try to find existing headcount row by employeeId
-          let existing: UnifiedRow | undefined;
-          for (const row of merged.values()) {
-            if (row.employeeId === e.employeeId) {
-              existing = row;
-              break;
-            }
-          }
+          const existing = merged.get(e.employeeId);
           if (existing) {
             existing.clockedIn = e.clockedIn;
             existing.clockedOut = e.clockedOut;
@@ -333,7 +324,7 @@ export function ReportsPage() {
             existing.manuallyEdited = e.manuallyEdited;
             existing.totalRecords = e.total;
           } else {
-            merged.set(key, {
+            merged.set(e.employeeId, {
               employeeId: e.employeeId,
               name: e.name,
               groupName: grp?.name ?? groupCode,
@@ -354,17 +345,13 @@ export function ReportsPage() {
         }
       };
 
-      // Fetch data per selected group in parallel
+      // Always fetch headcount (for role/profile data) + attendance in parallel
       await Promise.all(
         selectedGroups.map(async (gc) => {
-          const tasks: Promise<void>[] = [];
-          if (reportType === "all" || reportType === "headcount") {
-            tasks.push(fetchHeadcount(gc, selectedRole || undefined));
-          }
-          if (reportType === "all" || reportType === "attendance") {
-            tasks.push(fetchAttendance(gc));
-          }
-          await Promise.all(tasks);
+          await Promise.all([
+            fetchHeadcount(gc, selectedRole || undefined),
+            fetchAttendance(gc),
+          ]);
         })
       );
 
@@ -374,7 +361,7 @@ export function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [allRequiredFilled, reportType, dateFrom, dateTo, timeOfDay, selectedGroups, selectedRole, groups]);
+  }, [allRequiredFilled, dateFrom, dateTo, timeOfDay, selectedGroups, selectedRole, groups]);
 
   useEffect(() => {
     fetchReport();
@@ -655,52 +642,140 @@ export function ReportsPage() {
                 <tbody className="divide-y divide-rcc-border">
                   {loading ? (
                     <tr>
-                      <Td colSpan={4 + (showHeadcount ? 4 : 0) + (showAttendance ? 5 : 0)}>
+                      <Td colSpan={5 + (showHeadcount ? 4 : 0) + (showAttendance ? 5 : 0)}>
                         Loading report data...
                       </Td>
                     </tr>
                   ) : pagedRows.length === 0 ? (
                     <tr>
-                      <Td colSpan={4 + (showHeadcount ? 4 : 0) + (showAttendance ? 5 : 0)}>
+                      <Td colSpan={5 + (showHeadcount ? 4 : 0) + (showAttendance ? 5 : 0)}>
                         No records found for the selected filters.
                       </Td>
                     </tr>
                   ) : (
-                    pagedRows.map((r) => (
-                      <tr key={`${r.employeeId}-${r.groupCode}`} className="hover:bg-rcc-bg/30 transition-colors">
-                        <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{r.employeeId}</td>
-                        <td className="px-4 py-3 font-medium text-rcc-text-primary">{r.name}</td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20 font-mono">
-                            {r.groupCode}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-rcc-text-secondary text-xs">{r.roleName}</td>
-                        {showHeadcount && (
-                          <>
-                            <td className="px-4 py-3 text-rcc-text-secondary">{r.gender ?? ""}</td>
-                            <td className="px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20">
-                                {r.contractType}
-                              </span>
+                    pagedRows.flatMap((r) => {
+                      const isExpanded = expandedRow === r.employeeId;
+                      const totalCols = 5 + (showHeadcount ? 4 : 0) + (showAttendance ? 5 : 0);
+                      const rows: React.ReactNode[] = [];
+
+                      // Main row
+                      rows.push(
+                        <tr
+                          key={r.employeeId}
+                          onClick={() => setExpandedRow(isExpanded ? null : r.employeeId)}
+                          className="hover:bg-rcc-bg/30 transition-colors cursor-pointer"
+                        >
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1.5">
+                              <ChevronRight className={`h-3.5 w-3.5 text-rcc-text-muted transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                              <span className="font-mono text-xs text-rcc-text-secondary">{r.employeeId}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-rcc-text-primary">{r.name}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20 font-mono">
+                              {r.groupCode}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-rcc-text-secondary text-xs">{r.roleName}</td>
+                          {showHeadcount && (
+                            <>
+                              <td className="px-4 py-3 text-rcc-text-secondary">{r.gender ?? ""}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20">
+                                  {r.contractType}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-rcc-text-secondary">
+                                {r.hireDate ? new Date(r.hireDate).toLocaleDateString() : ""}
+                              </td>
+                              <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.certificates}</td>
+                            </>
+                          )}
+                          {showAttendance && (
+                            <>
+                              <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium text-right">{r.totalRecords}</td>
+                              <td className="px-4 py-3 text-green-700 tabular-nums text-right">{r.clockedIn}</td>
+                              <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.clockedOut}</td>
+                              <td className="px-4 py-3 text-amber-700 tabular-nums text-right">{r.noClockIn}</td>
+                              <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.manuallyEdited}</td>
+                            </>
+                          )}
+                        </tr>
+                      );
+
+                      // Expanded detail row
+                      if (isExpanded) {
+                        rows.push(
+                          <tr key={`${r.employeeId}-detail`} className="bg-rcc-bg/40">
+                            <td colSpan={totalCols} className="px-6 py-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                                {/* Profile section */}
+                                <div className="space-y-2">
+                                  <h4 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Profile</h4>
+                                  <div className="flex items-center gap-2 text-rcc-text-primary">
+                                    <Mail className="h-3.5 w-3.5 text-rcc-text-muted" />
+                                    <span>{r.email || "—"}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-rcc-text-primary">
+                                    <Users className="h-3.5 w-3.5 text-rcc-text-muted" />
+                                    <span>{r.gender ?? "—"}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-rcc-text-primary">
+                                    <Briefcase className="h-3.5 w-3.5 text-rcc-text-muted" />
+                                    <span>{r.contractType || "—"}</span>
+                                  </div>
+                                </div>
+
+                                {/* Employment section */}
+                                <div className="space-y-2">
+                                  <h4 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Employment</h4>
+                                  <div className="flex items-center gap-2 text-rcc-text-primary">
+                                    <Building2 className="h-3.5 w-3.5 text-rcc-text-muted" />
+                                    <span>{r.groupName} ({r.groupCode})</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-rcc-text-primary">
+                                    <Users className="h-3.5 w-3.5 text-rcc-text-muted" />
+                                    <span>{r.roleName || "—"}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-rcc-text-primary">
+                                    <Calendar className="h-3.5 w-3.5 text-rcc-text-muted" />
+                                    <span>{r.hireDate ? new Date(r.hireDate).toLocaleDateString() : "—"}</span>
+                                  </div>
+                                </div>
+
+                                {/* Attendance summary section */}
+                                {showAttendance && (
+                                  <div className="space-y-2">
+                                    <h4 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Attendance Summary</h4>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="bg-rcc-surface rounded px-3 py-2 border border-rcc-border">
+                                        <p className="text-[10px] text-rcc-text-muted uppercase">Total Records</p>
+                                        <p className="text-lg font-bold text-rcc-text-primary tabular-nums">{r.totalRecords}</p>
+                                      </div>
+                                      <div className="bg-rcc-surface rounded px-3 py-2 border border-rcc-border">
+                                        <p className="text-[10px] text-rcc-text-muted uppercase">Clocked In</p>
+                                        <p className="text-lg font-bold text-green-700 tabular-nums">{r.clockedIn}</p>
+                                      </div>
+                                      <div className="bg-rcc-surface rounded px-3 py-2 border border-rcc-border">
+                                        <p className="text-[10px] text-rcc-text-muted uppercase">Clocked Out</p>
+                                        <p className="text-lg font-bold text-rcc-text-primary tabular-nums">{r.clockedOut}</p>
+                                      </div>
+                                      <div className="bg-rcc-surface rounded px-3 py-2 border border-rcc-border">
+                                        <p className="text-[10px] text-rcc-text-muted uppercase">No Clock-In</p>
+                                        <p className="text-lg font-bold text-amber-700 tabular-nums">{r.noClockIn}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </td>
-                            <td className="px-4 py-3 text-xs text-rcc-text-secondary">
-                              {r.hireDate ? new Date(r.hireDate).toLocaleDateString() : ""}
-                            </td>
-                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.certificates}</td>
-                          </>
-                        )}
-                        {showAttendance && (
-                          <>
-                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium text-right">{r.totalRecords}</td>
-                            <td className="px-4 py-3 text-green-700 tabular-nums text-right">{r.clockedIn}</td>
-                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.clockedOut}</td>
-                            <td className="px-4 py-3 text-amber-700 tabular-nums text-right">{r.noClockIn}</td>
-                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.manuallyEdited}</td>
-                          </>
-                        )}
-                      </tr>
-                    ))
+                          </tr>
+                        );
+                      }
+
+                      return rows;
+                    })
                   )}
                 </tbody>
               </table>
