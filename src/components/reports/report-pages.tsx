@@ -248,24 +248,16 @@ export function ReportsPage() {
       const merged = new Map<string, UnifiedRow>();
 
       const fetchHeadcount = async (groupCode: string, rid?: string) => {
-        const params = new URLSearchParams({ groupCode });
-        if (rid) params.set("roleId", rid);
-        const data = await apiFetch<{ employees: { id: string; employeeId: string; firstName: string; middleName: string | null; lastName: string; email: string; gender: string | null; contractType: string; hireDate: string | null; active: boolean; roleName: string | null; certificateCount: number }[] }>(
-          `/api/reports/headcount?${params.toString()}`
-        );
         const grp = groups.find((g) => g.code === groupCode);
-        for (const e of data.employees ?? []) {
-          const key = e.id;
-          if (merged.has(key)) {
-            const row = merged.get(key)!;
-            row.certificates = e.certificateCount;
-            row.contractType = e.contractType;
-            row.hireDate = e.hireDate;
-            row.gender = e.gender;
-            row.email = e.email;
-            row.roleName = e.roleName ?? row.roleName;
-          } else {
-            merged.set(key, {
+
+        if (rid) {
+          // Specific role selected — fetch employees directly
+          const params = new URLSearchParams({ groupCode, roleId: rid });
+          const data = await apiFetch<{ employees: { id: string; employeeId: string; firstName: string; middleName: string | null; lastName: string; email: string; gender: string | null; contractType: string; hireDate: string | null; active: boolean; roleName: string | null; certificateCount: number }[] }>(
+            `/api/reports/headcount?${params.toString()}`
+          );
+          for (const e of data.employees ?? []) {
+            merged.set(e.id, {
               employeeId: e.employeeId,
               name: `${e.firstName} ${e.middleName ? e.middleName + " " : ""}${e.lastName}`,
               groupName: grp?.name ?? groupCode,
@@ -283,6 +275,37 @@ export function ReportsPage() {
               totalRecords: 0,
             });
           }
+        } else {
+          // No role filter — fetch roles first, then employees for each role
+          const rolesData = await apiFetch<{ roles: { roleId: string; roleName: string }[] }>(
+            `/api/reports/headcount?groupCode=${encodeURIComponent(groupCode)}`
+          );
+          const roleFetches = (rolesData.roles ?? []).map(async (r) => {
+            const empParams = new URLSearchParams({ groupCode, roleId: r.roleId });
+            const empData = await apiFetch<{ employees: { id: string; employeeId: string; firstName: string; middleName: string | null; lastName: string; email: string; gender: string | null; contractType: string; hireDate: string | null; active: boolean; roleName: string | null; certificateCount: number }[] }>(
+              `/api/reports/headcount?${empParams.toString()}`
+            );
+            for (const e of empData.employees ?? []) {
+              merged.set(e.id, {
+                employeeId: e.employeeId,
+                name: `${e.firstName} ${e.middleName ? e.middleName + " " : ""}${e.lastName}`,
+                groupName: grp?.name ?? groupCode,
+                groupCode,
+                roleName: e.roleName ?? r.roleName ?? "",
+                email: e.email,
+                gender: e.gender,
+                contractType: e.contractType,
+                hireDate: e.hireDate,
+                certificates: e.certificateCount,
+                clockedIn: 0,
+                clockedOut: 0,
+                noClockIn: 0,
+                manuallyEdited: 0,
+                totalRecords: 0,
+              });
+            }
+          });
+          await Promise.all(roleFetches);
         }
       };
 
