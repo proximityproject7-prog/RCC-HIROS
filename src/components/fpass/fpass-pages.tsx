@@ -1152,7 +1152,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
                 <p className="text-sm font-medium text-rcc-text-primary">{g.name}</p>
                 <p className="text-xs text-rcc-text-muted font-mono">{g.code}</p>
               </div>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${enabledIds.has(g.id) ? "bg-green-50 text-green-700 border border-green-200" : "bg-rcc-bg text-rcc-text-muted border border-rcc-border"}`}>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${enabledIds.has(g.id) ? "bg-green-50 text-green-700 border border-green-200" : "bg-rcc-bg text-rcc-text-muted border border-rcc-border"}`}>
                 {enabledIds.has(g.id) ? "Enabled" : "Disabled"}
               </span>
             </label>
@@ -1356,7 +1356,7 @@ function DynamicTable({
                     <td className="px-2 py-1.5">
                       <button
                         onClick={() => onRemove(row.id)}
-                        className="p-1 rounded hover:bg-red-50 text-rcc-text-muted hover:text-rcc-error transition-colors"
+                        className="p-1.5 rounded-md hover:bg-red-50 text-rcc-text-muted hover:text-rcc-error transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

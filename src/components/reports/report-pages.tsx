@@ -675,7 +675,7 @@ export function ReportsPage() {
                           </td>
                           <td className="px-4 py-3 font-medium text-rcc-text-primary">{r.name}</td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20 font-mono">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20 font-mono">
                               {r.groupCode}
                             </span>
                           </td>

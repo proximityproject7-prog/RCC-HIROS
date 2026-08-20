@@ -120,7 +120,7 @@ export default function LoginPage() {
                   if (error) setError(null);
                 }}
                 placeholder="username@rcc.edu.ph"
-                className="w-full px-4 rounded-md border border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
+                className="w-full px-4 rounded-md border-2 border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
                 autoComplete="username"
                 required
               />
@@ -140,7 +140,7 @@ export default function LoginPage() {
                     if (error) setError(null);
                   }}
                   placeholder="Enter your password"
-                  className="w-full px-4 pr-11 rounded-md border border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
+                  className="w-full px-4 pr-11 rounded-md border-2 border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
                   autoComplete="current-password"
                   required
                 />

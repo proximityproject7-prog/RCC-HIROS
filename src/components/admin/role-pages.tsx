@@ -302,7 +302,7 @@ export function RoleListPage() {
                           <p className="font-semibold text-rcc-text-primary truncate">
                             {role.name}
                             {role.isSystem && (
-                              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rcc-primary/10 text-rcc-primary border border-rcc-primary/20">
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-primary/10 text-rcc-primary border border-rcc-primary/20">
                                 SYSTEM
                               </span>
                             )}
@@ -416,7 +416,7 @@ function FlagBadge({
     red: "bg-red-50 text-rcc-error border-red-200",
   };
   return (
-    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${colorMap[color]}`}>
+    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-semibold border ${colorMap[color]}`}>
       <Icon className="h-2.5 w-2.5" />
       {children}
     </span>

@@ -99,7 +99,7 @@ function StatusBadge({ status }: { status: string }) {
     muted: "bg-rcc-bg text-rcc-text-muted border-rcc-border",
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${colorMap[info.color]}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${colorMap[info.color]}`}>
       {info.label}
     </span>
   );
@@ -349,7 +349,7 @@ export function MyLeavePage() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setViewingRequest(r)}
-                          className="p-1.5 rounded hover:bg-rcc-bg text-rcc-text-muted hover:text-rcc-text-primary transition-colors"
+                          className="p-1.5 rounded-md hover:bg-rcc-bg text-rcc-text-muted hover:text-rcc-text-primary transition-colors"
                           title="View details"
                         >
                           <Eye className="h-4 w-4" />
@@ -370,7 +370,7 @@ export function MyLeavePage() {
                                 },
                               });
                             }}
-                            className="p-1.5 rounded hover:bg-red-50 text-rcc-text-muted hover:text-rcc-error transition-colors"
+                            className="p-1.5 rounded-md hover:bg-red-50 text-rcc-text-muted hover:text-rcc-error transition-colors"
                             title="Cancel request"
                           >
                             <X className="h-4 w-4" />
@@ -590,7 +590,7 @@ export function LeaveApprovalPage() {
               tab === "l1" ? "border-rcc-accent text-rcc-accent" : "border-transparent text-rcc-text-muted hover:text-rcc-text-primary"
             }`}
           >
-            L1 (Pending Dean) <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700">{l1Reqs.length}</span>
+            L1 (Pending Dean) <span className="ml-1 px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700">{l1Reqs.length}</span>
           </button>
         )}
         {canL2 && (
@@ -600,7 +600,7 @@ export function LeaveApprovalPage() {
               tab === "l2" ? "border-rcc-accent text-rcc-accent" : "border-transparent text-rcc-text-muted hover:text-rcc-text-primary"
             }`}
           >
-            L2 (Pending HR/Final) <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700">{l2Reqs.length}</span>
+            L2 (Pending HR/Final) <span className="ml-1 px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700">{l2Reqs.length}</span>
           </button>
         )}
       </div>

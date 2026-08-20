@@ -182,7 +182,7 @@ function TimeAttendanceWidget() {
   const statusColorClass = !clockedIn ? "text-yellow-50/70" : clockedOut ? "text-green-300" : "text-blue-300";
 
   return (
-    <div className="bg-stone-800 rounded-lg overflow-hidden shadow-md">
+    <div className="bg-rcc-sidebar-bg rounded-lg overflow-hidden shadow-md">
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/10">
         <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-amber-500" /><h2 className="text-sm font-semibold text-yellow-50">Time &amp; Attendance</h2></div>
         {premises?.lat && <div className="flex items-center gap-1 text-xs text-yellow-50/60"><MapPin className="h-3 w-3" />{premises.name}</div>}

@@ -967,11 +967,11 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl font-bold text-rcc-text-primary">{fullName}</h1>
               {employee.active ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> ACTIVE
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-rcc-error border border-red-200">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-rcc-error border border-red-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-rcc-error" /> INACTIVE
                 </span>
               )}

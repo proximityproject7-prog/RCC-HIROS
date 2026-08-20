@@ -200,11 +200,11 @@ export function GroupListPage() {
               <div className="mt-3 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-semibold text-rcc-text-primary">{group.name}</h3>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20">
                     {group.code}
                   </span>
                   {!group.active && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-rcc-error border border-rcc-error/20">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-rcc-error border border-rcc-error/20">
                       INACTIVE
                     </span>
                   )}

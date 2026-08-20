@@ -382,7 +382,7 @@ export function EvaluationFormsPage() {
             onClick={() => setShowAdd(!showAdd)}
             className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors"
           >
-            <Plus className="h-4 w-4" /> {showAdd ? "Cancel" : "New Period"}
+            {showAdd ? "Cancel" : <><Plus className="h-4 w-4" /> New Period</>}
           </button>
         )}
       </div>
@@ -496,18 +496,18 @@ export function EvaluationFormsPage() {
                     {!isEditingAccess && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         {isAllGroups ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">All Groups</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">All Groups</span>
                         ) : groupTags.length > 0 ? groupTags.map((g) => (
-                          <span key={g} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{g}</span>
+                          <span key={g} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">{g}</span>
                         )) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">No Groups</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">No Groups</span>
                         )}
                         {isAllRoles ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">All Roles</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">All Roles</span>
                         ) : roleTags.length > 0 ? roleTags.map((r) => (
-                          <span key={r} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">{r}</span>
+                          <span key={r} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">{r}</span>
                         )) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">No Roles</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">No Roles</span>
                         )}
                       </div>
                     )}
@@ -1301,7 +1301,7 @@ function ResultsTable({ scope }: { scope: string }) {
                       <td className="px-4 py-3 text-rcc-text-secondary">{ev.evaluator?.name ?? ""}</td>
                     )}
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${
                         ev.status === "submitted" ? "bg-green-50 text-green-700 border-green-200"
                         : ev.status === "acknowledged" ? "bg-rcc-accent/10 text-rcc-accent border-rcc-accent/20"
                         : "bg-rcc-bg text-rcc-text-muted border-rcc-border"

@@ -375,22 +375,22 @@ export function AttendanceListPage() {
 function LocationBadge({ onPremise }: { onPremise: boolean | null }) {
   if (onPremise === null) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rcc-bg text-rcc-text-muted border border-rcc-border">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-bg text-rcc-text-muted border border-rcc-border">
         <MapPin className="h-2.5 w-2.5" /> Unknown
       </span>
     );
   }
   if (onPremise) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
         <MapPin className="h-2.5 w-2.5" /> On Premise
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-      <MapPin className="h-2.5 w-2.5" /> Off Premise
-    </span>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+        <MapPin className="h-2.5 w-2.5" /> Off Premise
+      </span>
   );
 }
 
