@@ -47,6 +47,11 @@ interface EvalPeriod {
   status: "open" | "closed";
   createdAt: string;
   evaluationsCount?: number;
+  groupIds?: string[] | null;
+  targetRoleIds?: string[] | null;
+  openedAt?: string | null;
+  closedAt?: string | null;
+  createdBy?: string | null;
 }
 
 interface EvalResponse {
@@ -99,15 +104,15 @@ const EVAL_CATEGORIES = [
 ];
 
 // ═══════════════════════════════════════════════════════════════
-// EvaluationFormsPage — simplified to just period management
+// EvaluationFormsPage — period management with group/role access
 // ═══════════════════════════════════════════════════════════════
 
 export function EvaluationFormsPage() {
   const { has } = usePermissions();
-  const { setCurrentPage } = useAuthStore();
   const [periods, setPeriods] = useState<EvalPeriod[]>([]);
   const [forms, setForms] = useState<EvalForm[]>([]);
-  const [allForms, setAllForms] = useState<EvalForm[]>([]);
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [roles, setRoles] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -122,25 +127,40 @@ export function EvaluationFormsPage() {
   const [cleaningUp, setCleaningUp] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; variant: "danger" | "warning"; onConfirm: () => void } | null>(null);
-  const [showFormSection, setShowFormSection] = useState(false);
-  const [newFormName, setNewFormName] = useState("");
-  const [creatingForm, setCreatingForm] = useState(false);
-  const [togglingFormId, setTogglingFormId] = useState<string | null>(null);
+  const [editingAccessId, setEditingAccessId] = useState<string | null>(null);
+  const [editGroupIds, setEditGroupIds] = useState<string[]>([]);
+  const [editRoleIds, setEditRoleIds] = useState<string[]>([]);
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [p, f, af, r] = await Promise.all([
+      const [p, f, g, r, cl] = await Promise.all([
         apiFetch<{ periods: EvalPeriod[] }>("/api/evaluation-periods"),
         apiFetch<{ forms: EvalForm[] }>("/api/evaluation-forms"),
-        apiFetch<{ forms: EvalForm[] }>("/api/evaluation-forms?scope=all").catch(() => ({ forms: [] })),
+        apiFetch<{ groups: { id: string; name: string }[] }>("/api/groups").catch(() => ({ groups: [] })),
+        apiFetch<{ roles: { id: string; name: string }[] }>("/api/roles").catch(() => ({ roles: [] })),
         apiFetch<{ retentionMonths: number }>("/api/evaluations/cleanup").catch(() => ({ retentionMonths: 12 })),
       ]);
+
+      let formsData = f.forms ?? [];
+
+      // Auto-create default form if none exists
+      if (formsData.length === 0) {
+        await apiFetch("/api/evaluation-forms", {
+          method: "POST",
+          body: JSON.stringify({ name: "RCC Faculty Evaluation Tool" }),
+        });
+        const refetch = await apiFetch<{ forms: EvalForm[] }>("/api/evaluation-forms");
+        formsData = refetch.forms ?? [];
+      }
+
       setPeriods(p.periods ?? []);
-      setForms(f.forms ?? []);
-      setAllForms(af.forms ?? []);
-      setRetentionMonths(r.retentionMonths ?? 12);
+      setForms(formsData);
+      setGroups(g.groups ?? []);
+      setRoles(r.roles ?? []);
+      setRetentionMonths(cl.retentionMonths ?? 12);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -148,9 +168,7 @@ export function EvaluationFormsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const activeForm = forms.find((f) => f.active) ?? forms[0];
 
@@ -186,6 +204,8 @@ export function EvaluationFormsPage() {
           startDate: today.toISOString(),
           endDate: end.toISOString(),
           status: "closed",
+          groupIds: [],
+          targetRoleIds: [],
         }),
       });
       setNewName("");
@@ -236,6 +256,64 @@ export function EvaluationFormsPage() {
     }
   };
 
+  const handleSaveAccess = async (periodId: string) => {
+    setError(null);
+    try {
+      await apiFetch(`/api/evaluation-periods/${periodId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          groupIds: editGroupIds,
+          targetRoleIds: editRoleIds,
+        }),
+      });
+      setEditingAccessId(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save access settings.");
+    }
+  };
+
+  const handleExportArchive = async (period: EvalPeriod) => {
+    setExportingId(period.id);
+    setError(null);
+    try {
+      const data = await apiFetch<{ period: Record<string, unknown>; evaluations: Array<{
+        employee?: { name: string; employeeId: string; groupName: string | null; roleName: string | null } | null;
+        evaluator?: { name: string; employeeId: string } | null;
+        totalScore: number | null;
+        remarks: string | null;
+        submittedAt: string | null;
+        responses: Array<{ category: string; description: string; score: number; maxScore: number; comments: string | null }>;
+      }> }>(`/api/evaluation-periods/${period.id}/archive`);
+
+      // Build CSV
+      const headers = ["Employee Name", "Employee ID", "Group", "Role", "Evaluator", "Score", "Submitted", "Remarks"];
+      const rows = data.evaluations.map((ev) => [
+        ev.employee?.name ?? "",
+        ev.employee?.employeeId ?? "",
+        ev.employee?.groupName ?? "",
+        ev.employee?.roleName ?? "",
+        ev.evaluator?.name ?? "",
+        ev.totalScore?.toFixed(2) ?? "",
+        ev.submittedAt ? new Date(ev.submittedAt).toLocaleDateString() : "",
+        (ev.remarks ?? "").replace(/"/g, '""'),
+      ]);
+
+      const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${period.name.replace(/[^a-zA-Z0-9]/g, "_")}_archive.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setExportingId(null);
+    }
+  };
+
   const handleSaveRetention = async () => {
     setRetentionSaving(true);
     setError(null);
@@ -275,62 +353,14 @@ export function EvaluationFormsPage() {
     });
   };
 
-  const handleCreateForm = async () => {
-    if (!newFormName.trim()) return setError("Form name is required.");
-    setCreatingForm(true);
-    setError(null);
-    try {
-      await apiFetch("/api/evaluation-forms", {
-        method: "POST",
-        body: JSON.stringify({ name: newFormName.trim() }),
-      });
-      setNewFormName("");
-      setShowFormSection(false);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create form.");
-    } finally {
-      setCreatingForm(false);
-    }
+  const startEditAccess = (p: EvalPeriod) => {
+    setEditingAccessId(p.id);
+    setEditGroupIds(p.groupIds ?? []);
+    setEditRoleIds(p.targetRoleIds ?? []);
   };
 
-  const handleToggleForm = async (form: EvalForm) => {
-    setTogglingFormId(form.id);
-    setError(null);
-    try {
-      await apiFetch(`/api/evaluation-forms/${form.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ active: !form.active }),
-      });
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to toggle form.");
-    } finally {
-      setTogglingFormId(null);
-    }
-  };
-
-  const handleDeactivateForm = async (form: EvalForm) => {
-    setConfirmState({
-      open: true,
-      title: `Deactivate "${form.name}"?`,
-      message: "This form will no longer be available for new evaluation periods. Existing evaluations are not affected.",
-      variant: "warning",
-      onConfirm: async () => {
-        setConfirmState(null);
-        setTogglingFormId(form.id);
-        setError(null);
-        try {
-          await apiFetch(`/api/evaluation-forms/${form.id}`, { method: "DELETE" });
-          load();
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to deactivate form.");
-        } finally {
-          setTogglingFormId(null);
-        }
-      },
-    });
-  };
+  const groupNameById = (id: string) => groups.find((g) => g.id === id)?.name ?? id;
+  const roleNameById = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 
   return (
     <div className="space-y-4">
@@ -338,7 +368,7 @@ export function EvaluationFormsPage() {
         <div>
           <h1 className="text-xl font-bold text-rcc-text-primary">Evaluation Management</h1>
           <p className="text-sm text-rcc-text-muted mt-0.5">
-            Toggle evaluation periods on/off. When ON, Deans can evaluate. When OFF, evaluation is closed.
+            Toggle evaluation periods on/off. When ON, authorized users can evaluate. When OFF, evaluation is closed.
           </p>
         </div>
         {has("evaluation.manage_forms") && (
@@ -352,22 +382,25 @@ export function EvaluationFormsPage() {
       </div>
 
       {showAdd && (
-        <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4 flex gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Period name (e.g., 2nd Semester 2026)"
-            className={inputClass}
-            onKeyDown={(e) => e.key === "Enter" && handleAddPeriod()}
-          />
-          <button
-            onClick={handleAddPeriod}
-            disabled={saving || !newName.trim()}
-            className="px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50 shrink-0"
-          >
-            {saving ? "Creating..." : "Create"}
-          </button>
+        <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4 space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Period name (e.g., 1st Semester 2026)"
+              className={inputClass}
+              onKeyDown={(e) => e.key === "Enter" && handleAddPeriod()}
+            />
+            <button
+              onClick={handleAddPeriod}
+              disabled={saving || !newName.trim()}
+              className="px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50 shrink-0"
+            >
+              {saving ? "Creating..." : "Create"}
+            </button>
+          </div>
+          <p className="text-xs text-rcc-text-muted">Leave groups and roles unselected for institution-wide access (all groups, all roles).</p>
         </div>
       )}
 
@@ -395,186 +428,157 @@ export function EvaluationFormsPage() {
         </div>
       </div>
 
-      {/* Evaluation Forms Management */}
-      {has("evaluation.manage_forms") && (
-        <div className="bg-rcc-surface rounded-lg border border-rcc-border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-rcc-text-primary">Evaluation Forms</h3>
-              <p className="text-xs text-rcc-text-muted mt-0.5">Create and manage evaluation forms with criteria.</p>
-            </div>
-            <button
-              onClick={() => setShowFormSection(!showFormSection)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" /> {showFormSection ? "Cancel" : "New Form"}
-            </button>
-          </div>
-
-          {showFormSection && (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newFormName}
-                onChange={(e) => setNewFormName(e.target.value)}
-                placeholder="Form name (e.g., Faculty Evaluation 2026)"
-                className={inputClass}
-                onKeyDown={(e) => e.key === "Enter" && handleCreateForm()}
-              />
-              <button
-                onClick={handleCreateForm}
-                disabled={creatingForm || !newFormName.trim()}
-                className="px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50 shrink-0"
-              >
-                {creatingForm ? "Creating..." : "Create"}
-              </button>
-            </div>
-          )}
-
-          {allForms.length === 0 ? (
-            <p className="text-xs text-rcc-text-muted py-2">No forms created yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {allForms.map((f) => (
-                <div key={f.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-rcc-bg/50 border border-rcc-border/50">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${f.active ? "bg-green-500" : "bg-gray-400"}`} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-rcc-text-primary truncate">{f.name}</p>
-                      <p className="text-xs text-rcc-text-muted">
-                        {f.criteriaCount ?? 0} criteria · v{f.version}
-                        {f.periodsCount ? ` · ${f.periodsCount} period(s)` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleToggleForm(f)}
-                      disabled={togglingFormId === f.id}
-                      className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors disabled:opacity-50 ${
-                        f.active ? "bg-green-500" : "bg-gray-300"
-                      }`}
-                      title={f.active ? "Click to deactivate" : "Click to activate"}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                        f.active ? "translate-x-5" : "translate-x-1"
-                      }`} />
-                    </button>
-                    {!f.active && (
-                      <button
-                        onClick={() => handleDeactivateForm(f)}
-                        disabled={togglingFormId === f.id}
-                        className="p-1 rounded text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-                        title="Permanently deactivate"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Period cards — simple toggle design */}
+      {/* Period cards */}
       {loading ? (
         <div className="text-center py-12 text-rcc-text-muted">Loading...</div>
       ) : periods.length === 0 ? (
         <div className="bg-rcc-surface rounded-lg border border-rcc-border p-8 text-center text-rcc-text-muted">
-          No evaluation periods found.
+          No evaluation periods found. Create one to get started.
         </div>
       ) : (
         <div className="space-y-4">
-          {periods.map((p) => (
-            <div key={p.id} className="bg-rcc-surface rounded-lg border border-rcc-border p-6 flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  {editingPeriodId === p.id ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="px-2 py-1 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleRenamePeriod(p.id);
-                          if (e.key === "Escape") { setEditingPeriodId(null); setEditName(""); }
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => handleRenamePeriod(p.id)}
-                        disabled={!editName.trim()}
-                        className="px-2 py-1 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => { setEditingPeriodId(null); setEditName(""); }}
-                        className="px-2 py-1 rounded-md text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <h3 className="text-lg font-semibold text-rcc-text-primary">{p.name}</h3>
-                      {has("evaluation.manage_forms") && (
-                        <button
-                          onClick={() => { setEditingPeriodId(p.id); setEditName(p.name); }}
-                          className="text-rcc-text-muted hover:text-rcc-primary transition-colors"
-                          title="Rename period"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+          {periods.map((p) => {
+            const isOpen = p.status === "open";
+            const isEditingAccess = editingAccessId === p.id;
+            const groupTags = (p.groupIds ?? []).map(groupNameById);
+            const roleTags = (p.targetRoleIds ?? []).map(roleNameById);
+
+            return (
+              <div key={p.id} className="bg-rcc-surface rounded-lg border border-rcc-border p-6 space-y-4">
+                {/* Header row */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      {editingPeriodId === p.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="px-2 py-1 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleRenamePeriod(p.id);
+                              if (e.key === "Escape") { setEditingPeriodId(null); setEditName(""); }
+                            }}
+                            autoFocus
+                          />
+                          <button onClick={() => handleRenamePeriod(p.id)} disabled={!editName.trim()} className="px-2 py-1 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50">Save</button>
+                          <button onClick={() => { setEditingPeriodId(null); setEditName(""); }} className="px-2 py-1 rounded-md text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg">Cancel</button>
+                        </div>
+                      ) : (
+                        <>
+                          <h3 className="text-lg font-semibold text-rcc-text-primary">{p.name}</h3>
+                          <button onClick={() => { setEditingPeriodId(p.id); setEditName(p.name); }} className="text-rcc-text-muted hover:text-rcc-primary transition-colors" title="Rename period">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       )}
-                    </>
-                  )}
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    p.status === "open" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${p.status === "open" ? "bg-green-500" : "bg-gray-400"}`}></span>
-                    {p.status === "open" ? "Open" : "Closed"}
-                  </span>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${isOpen ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? "bg-green-500" : "bg-gray-400"}`}></span>
+                        {isOpen ? "Open" : "Closed"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-rcc-text-muted mt-1">
+                      {isOpen ? "Evaluation is active. Authorized users can submit evaluations." : "Evaluation is closed."}
+                    </p>
+                    {/* Group & Role tags */}
+                    {!isEditingAccess && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {groupTags.length > 0 ? groupTags.map((g) => (
+                          <span key={g} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{g}</span>
+                        )) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">All Groups</span>
+                        )}
+                        {roleTags.length > 0 ? roleTags.map((r) => (
+                          <span key={r} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">{r}</span>
+                        )) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">All Roles</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleToggle(p)}
+                      disabled={togglingId === p.id}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${isOpen ? "bg-green-500" : "bg-gray-300"}`}
+                      title={isOpen ? "Click to close evaluation" : "Click to open evaluation"}
+                    >
+                      <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${isOpen ? "translate-x-7" : "translate-x-1"}`} />
+                    </button>
+                  </div>
                 </div>
-                <p className="text-sm text-rcc-text-muted mt-1">
-                  {p.status === "open"
-                    ? "Evaluation is active. Deans can submit evaluations."
-                    : "Evaluation is closed. Deans cannot submit."}
-                </p>
-                {p.evaluationsCount !== undefined && p.evaluationsCount > 0 && (
-                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-xs text-rcc-text-muted">{p.evaluationsCount} evaluation(s) submitted</p>
-                    {has("evaluation.reset") && (
-                      <button
-                        onClick={() => handleResetPeriod(p.id, p.name)}
-                        disabled={resettingPeriodId === p.id}
-                        className="text-xs text-red-600 hover:underline disabled:opacity-50"
-                      >
-                        {resettingPeriodId === p.id ? "Clearing..." : "Clear this period"}
-                      </button>
+
+                {/* Access editing */}
+                {isEditingAccess ? (
+                  <div className="bg-rcc-bg/50 rounded-md border border-rcc-border p-4 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-rcc-text-primary mb-1.5">Groups (leave empty for all):</p>
+                      <div className="flex flex-wrap gap-2">
+                        {groups.map((g) => (
+                          <label key={g.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rcc-surface border border-rcc-border text-xs cursor-pointer hover:bg-rcc-bg transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={editGroupIds.includes(g.id)}
+                              onChange={(e) => {
+                                setEditGroupIds(e.target.checked ? [...editGroupIds, g.id] : editGroupIds.filter((id) => id !== g.id));
+                              }}
+                              className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
+                            />
+                            {g.name}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-rcc-text-primary mb-1.5">Roles (leave empty for all):</p>
+                      <div className="flex flex-wrap gap-2">
+                        {roles.map((r) => (
+                          <label key={r.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rcc-surface border border-rcc-border text-xs cursor-pointer hover:bg-rcc-bg transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={editRoleIds.includes(r.id)}
+                              onChange={(e) => {
+                                setEditRoleIds(e.target.checked ? [...editRoleIds, r.id] : editRoleIds.filter((id) => id !== r.id));
+                              }}
+                              className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
+                            />
+                            {r.name}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button onClick={() => handleSaveAccess(p.id)} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90">Save Access</button>
+                      <button onClick={() => setEditingAccessId(null)} className="px-3 py-1.5 rounded-md text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Action buttons row */
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {has("evaluation.manage_forms") && (
+                      <button onClick={() => startEditAccess(p)} className="text-xs text-rcc-primary hover:underline font-medium">Edit Access</button>
+                    )}
+                    {p.evaluationsCount !== undefined && p.evaluationsCount > 0 && (
+                      <>
+                        <span className="text-xs text-rcc-text-muted">{p.evaluationsCount} evaluation(s) submitted</span>
+                        {has("evaluation.manage_forms") && (
+                          <button onClick={() => handleExportArchive(p)} disabled={exportingId === p.id} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium disabled:opacity-50">
+                            <FileText className="h-3 w-3" /> {exportingId === p.id ? "Exporting..." : "Export CSV"}
+                          </button>
+                        )}
+                        {has("evaluation.reset") && (
+                          <button onClick={() => handleResetPeriod(p.id, p.name)} disabled={resettingPeriodId === p.id} className="text-xs text-red-600 hover:underline disabled:opacity-50">
+                            {resettingPeriodId === p.id ? "Clearing..." : "Clear this period"}
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => handleToggle(p)}
-                  disabled={togglingId === p.id}
-                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${
-                    p.status === "open" ? "bg-green-500" : "bg-gray-300"
-                  }`}
-                  title={p.status === "open" ? "Click to close evaluation" : "Click to open evaluation"}
-                >
-                  <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${
-                    p.status === "open" ? "translate-x-7" : "translate-x-1"
-                  }`} />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -594,24 +598,14 @@ export function EvaluationFormsPage() {
               className="w-20 px-2 py-1 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary text-center"
             />
             <span className="text-sm text-rcc-text-secondary">months</span>
-            <button
-              onClick={handleSaveRetention}
-              disabled={retentionSaving}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50"
-            >
+            <button onClick={handleSaveRetention} disabled={retentionSaving} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 disabled:opacity-50">
               {retentionSaving ? "Saving..." : "Save"}
             </button>
-            <button
-              onClick={handleCleanup}
-              disabled={cleaningUp}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg disabled:opacity-50"
-            >
+            <button onClick={handleCleanup} disabled={cleaningUp} className="px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg disabled:opacity-50">
               {cleaningUp ? "Cleaning..." : "Run Cleanup Now"}
             </button>
           </div>
-          {cleanupResult && (
-            <p className="text-xs text-green-700 font-medium">{cleanupResult}</p>
-          )}
+          {cleanupResult && <p className="text-xs text-green-700 font-medium">{cleanupResult}</p>}
         </div>
       )}
 

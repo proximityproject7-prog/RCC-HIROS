@@ -415,6 +415,10 @@ async function main() {
       startDate: new Date("2026-06-01T00:00:00.000Z"),
       endDate: new Date("2026-10-31T00:00:00.000Z"),
       status: "open",
+      openedAt: new Date(),
+      groupIds: null, // null = all groups
+      targetRoleIds: null, // null = all roles
+      createdBy: admin.id,
     },
   });
   console.log(`  Period: ${evalPeriod.name} (${evalPeriod.status})`);

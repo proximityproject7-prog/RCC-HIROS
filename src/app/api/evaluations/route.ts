@@ -238,6 +238,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Period group/role scope validation
+    if (!user.isSystem && !user.scopeAllEvaluation) {
+      // Check group scope
+      if (period.groupIds) {
+        try {
+          const allowedGroups: string[] = JSON.parse(period.groupIds);
+          if (allowedGroups.length > 0 && employee.groupId && !allowedGroups.includes(employee.groupId)) {
+            return NextResponse.json(
+              { error: "This period is not available for the employee's group" },
+              { status: 403 }
+            );
+          }
+        } catch { /* invalid JSON — treat as no restriction */ }
+      }
+      // Check role scope
+      if (period.targetRoleIds) {
+        try {
+          const allowedRoles: string[] = JSON.parse(period.targetRoleIds);
+          if (allowedRoles.length > 0) {
+            const evaluator = await db.employee.findUnique({ where: { id: user.id }, select: { roleId: true } });
+            if (evaluator?.roleId && !allowedRoles.includes(evaluator.roleId)) {
+              return NextResponse.json(
+                { error: "You do not have the required role to evaluate for this period" },
+                { status: 403 }
+              );
+            }
+          }
+        } catch { /* invalid JSON — treat as no restriction */ }
+      }
+    }
+
     const criterionIds = new Set(form.criteria.map((c) => c.id));
     const invalidResponses = responses.filter(
       (r) => !criterionIds.has(r.criterionId)

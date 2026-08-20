@@ -242,13 +242,22 @@ model EvaluationCriterion {
 }
 
 model EvaluationPeriod {
-  id        String   @id @default(cuid())
-  formId    String
-  name      String
-  startDate DateTime
-  endDate   DateTime
-  status    String   @default("open") // "open" | "closed" | "archived"
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  formId        String
+  name          String
+  startDate     DateTime
+  endDate       DateTime
+  status        String    @default("closed") // "open" | "closed"
+  createdAt     DateTime  @default(now())
+
+  // Access control — JSON arrays of IDs, null = all
+  groupIds      String?   // JSON array of group IDs
+  targetRoleIds String?   // JSON array of role IDs
+
+  // Tracking
+  openedAt      DateTime?
+  closedAt      DateTime?
+  createdBy     String?
 
   form        EvaluationForm  @relation(fields: [formId], references: [id])
   evaluations Evaluation[]
