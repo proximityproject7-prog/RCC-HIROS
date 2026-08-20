@@ -46,6 +46,8 @@ async function main() {
       lastName: "Administrator",
       email: "admin@rcc.edu.ph",
       roleId: role.id,
+      contractType: "Regular",
+      hireDate: new Date("2021-01-01"),
       active: true,
       passwordHash: hash,
       mustChangePwd: false,

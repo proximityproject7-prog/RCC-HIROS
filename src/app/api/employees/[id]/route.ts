@@ -226,19 +226,10 @@ export async function PATCH(
       }
     } else {
       // Self-edit / editAll mode — only basic info
-      const SELF_EDITABLE = new Set(["email", "phone", "address", "birthday", "gender"]);
+      const SELF_EDITABLE = new Set(["phone", "address", "birthday", "gender"]);
       for (const key of SELF_EDITABLE) {
         if (body[key] !== undefined) {
-          if (key === "email" && typeof body.email === "string" && body.email.trim()) {
-            const emailLower = body.email.trim().toLowerCase();
-            if (emailLower !== employee.email) {
-              const dup = await db.employee.findUnique({ where: { email: emailLower } });
-              if (dup && dup.id !== id) {
-                return NextResponse.json({ error: "Email already exists" }, { status: 409 });
-              }
-              data.email = emailLower;
-            }
-          } else if (key === "phone") {
+          if (key === "phone") {
             data.phone = (body.phone as string | null)?.trim() || null;
           } else if (key === "address") {
             data.address = (body.address as string | null)?.trim() || null;

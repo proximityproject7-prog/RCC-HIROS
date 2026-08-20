@@ -105,7 +105,7 @@ async function main() {
 
   const jeremiah = await db.employee.upsert({
     where: { email: "jeremiah.sawal@rcc.edu.ph" },
-    update: {},
+    update: { hireDate: new Date("2023-06-15"), contractType: "Regular" },
     create: {
       employeeId: "EMP-0001",
       firstName: "Jeremiah",
@@ -117,6 +117,7 @@ async function main() {
       groupId: hrGroup.id,
       roleId: hrRole.id,
       contractType: "Regular",
+      hireDate: new Date("2023-06-15"),
       active: true,
       passwordHash,
     },
@@ -124,7 +125,7 @@ async function main() {
 
   const neil = await db.employee.upsert({
     where: { email: "neil.datu@rcc.edu.ph" },
-    update: {},
+    update: { hireDate: new Date("2022-08-01"), contractType: "Regular" },
     create: {
       employeeId: "EMP-0003",
       firstName: "Neil",
@@ -136,6 +137,7 @@ async function main() {
       groupId: ccsGroup.id,
       roleId: deanRole.id,
       contractType: "Regular",
+      hireDate: new Date("2022-08-01"),
       active: true,
       passwordHash,
     },
@@ -143,7 +145,7 @@ async function main() {
 
   const asgar = await db.employee.upsert({
     where: { email: "asgar.batuaan@rcc.edu.ph" },
-    update: {},
+    update: { hireDate: new Date("2024-01-10"), contractType: "Contractual" },
     create: {
       employeeId: "EMP-0009",
       firstName: "Asgar",
@@ -154,7 +156,8 @@ async function main() {
       gender: "Male",
       groupId: ccsGroup.id,
       roleId: profRole.id,
-      contractType: "Regular",
+      contractType: "Contractual",
+      hireDate: new Date("2024-01-10"),
       active: true,
       passwordHash,
     },

@@ -866,7 +866,8 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     setEditSaving(true);
     try {
       const body: Record<string, string | null> = {};
-      if (editForm.email.trim()) body.email = editForm.email.trim();
+      // Email cannot be changed via self-edit — only admins with profiling.edit can change it
+      if (!canSelfEdit && editForm.email.trim()) body.email = editForm.email.trim();
       if (editForm.phone !== employee?.phone) body.phone = editForm.phone.trim() || null;
       if (editForm.address !== employee?.address) body.address = editForm.address.trim() || null;
       if (editForm.birthday !== (employee?.birthday ? employee.birthday.slice(0, 10) : "")) body.birthday = editForm.birthday || null;
@@ -1043,7 +1044,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           )}
           {editing ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
-              <EditField icon={Mail} label="Email" type="email" value={editForm.email} onChange={(v) => setEditForm(f => ({ ...f, email: v }))} />
+              <EditField icon={Mail} label="Email" type="email" value={editForm.email} onChange={(v) => setEditForm(f => ({ ...f, email: v }))} disabled={canSelfEdit} />
               <EditField icon={Phone} label="Phone" type="text" value={editForm.phone} onChange={(v) => setEditForm(f => ({ ...f, phone: v }))} />
               <EditField icon={MapPin} label="Address" type="text" value={editForm.address} onChange={(v) => setEditForm(f => ({ ...f, address: v }))} />
               <EditField icon={Calendar} label="Birthday" type="date" value={editForm.birthday} onChange={(v) => setEditForm(f => ({ ...f, birthday: v }))} />
@@ -1388,12 +1389,14 @@ function EditField({
   type,
   value,
   onChange,
+  disabled,
 }: {
   icon: typeof Mail;
   label: string;
   type: string;
   value: string;
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-start gap-2.5">
@@ -1401,7 +1404,7 @@ function EditField({
       <div className="min-w-0 flex-1">
         <dt className="text-xs font-semibold text-rcc-text-muted uppercase tracking-wide mb-1">{label}</dt>
         {type === "select" ? (
-          <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40">
+          <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 disabled:opacity-50 disabled:cursor-not-allowed">
             {["", "Male", "Female"].map((o) => (
               <option key={o} value={o}>{o || "-"}</option>
             ))}
@@ -1411,8 +1414,12 @@ function EditField({
             type={type}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
+            disabled={disabled}
+            className="w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 disabled:opacity-50 disabled:cursor-not-allowed"
           />
+        )}
+        {disabled && (
+          <p className="text-[10px] text-rcc-text-muted mt-1">Only administrators can change this field.</p>
         )}
       </div>
     </div>
