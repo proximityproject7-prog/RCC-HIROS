@@ -65,8 +65,11 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
 
+    const { searchParams } = new URL(request.url);
+    const scope = searchParams.get("scope") || "active";
+
     const forms = await db.evaluationForm.findMany({
-      where: { active: true },
+      where: scope === "all" ? {} : { active: true },
       include: {
         _count: {
           select: { criteria: true, periods: true },

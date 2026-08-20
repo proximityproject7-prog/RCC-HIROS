@@ -346,6 +346,79 @@ async function main() {
   });
   console.log("  Premises geofence config set\n");
 
+  // ── Evaluation Form + 34 Criteria ──
+  console.log("Creating evaluation form + criteria...");
+  const evalForm = await db.evaluationForm.create({
+    data: {
+      id: "eval-form-faculty-2026",
+      name: "RCC Faculty Evaluation Tool",
+      version: 1,
+      active: true,
+    },
+  });
+
+  const criteriaDefs: Array<{ category: string; description: string; sortOrder: number }> = [
+    { category: "I. Communication Skills", description: "Pronounces words clearly and distinctly.", sortOrder: 1 },
+    { category: "I. Communication Skills", description: "Speaks clearly enough to be understood easily.", sortOrder: 2 },
+    { category: "I. Communication Skills", description: "Has good command of English or Filipino.", sortOrder: 3 },
+    { category: "I. Communication Skills", description: "Has a well-modulated voice.", sortOrder: 4 },
+    { category: "II. Instructional Skills", description: "Uses a variety of methods and techniques to facilitate learning.", sortOrder: 5 },
+    { category: "II. Instructional Skills", description: "Presents the subject matter clearly and systematically.", sortOrder: 6 },
+    { category: "II. Instructional Skills", description: "Adjusts to the students' learning pace.", sortOrder: 7 },
+    { category: "II. Instructional Skills", description: "Provokes critical, creative, and reflective thinking.", sortOrder: 8 },
+    { category: "II. Instructional Skills", description: "Encourages students' active participation.", sortOrder: 9 },
+    { category: "II. Instructional Skills", description: "Uses teaching aids like illustrations, diagrams, etc.", sortOrder: 10 },
+    { category: "II. Instructional Skills", description: "Elicits correct responses through skillful questioning.", sortOrder: 11 },
+    { category: "III. Knowledge of Subject-Matter", description: "Discusses the lesson with mastery.", sortOrder: 12 },
+    { category: "III. Knowledge of Subject-Matter", description: "Follows the course syllabus.", sortOrder: 13 },
+    { category: "III. Knowledge of Subject-Matter", description: "Relates subject matter to other subjects.", sortOrder: 14 },
+    { category: "III. Knowledge of Subject-Matter", description: "Relates to the vision, mission, and objectives of the college.", sortOrder: 15 },
+    { category: "III. Knowledge of Subject-Matter", description: "Integrates values in the lessons.", sortOrder: 16 },
+    { category: "IV. Classroom Management", description: "Maintains class discipline.", sortOrder: 17 },
+    { category: "IV. Classroom Management", description: "Room is clean and orderly.", sortOrder: 18 },
+    { category: "IV. Classroom Management", description: "Comes to class on time.", sortOrder: 19 },
+    { category: "IV. Classroom Management", description: "Dismisses class on time.", sortOrder: 20 },
+    { category: "IV. Classroom Management", description: "Is always present in class.", sortOrder: 21 },
+    { category: "IV. Classroom Management", description: "Enforces school rules consistently.", sortOrder: 22 },
+    { category: "V. Professional Qualities", description: "Respects students' opinions.", sortOrder: 23 },
+    { category: "V. Professional Qualities", description: "Maintains good working relations with students.", sortOrder: 24 },
+    { category: "V. Professional Qualities", description: "Is fair in giving grades.", sortOrder: 25 },
+    { category: "V. Professional Qualities", description: "Is firm and consistent but reasonable.", sortOrder: 26 },
+    { category: "V. Professional Qualities", description: "Returns corrected papers promptly.", sortOrder: 27 },
+    { category: "VI. Personal Qualities", description: "Dresses neatly and appropriately.", sortOrder: 28 },
+    { category: "VI. Personal Qualities", description: "Demonstrates calmness and poise.", sortOrder: 29 },
+    { category: "VI. Personal Qualities", description: "Is physically and mentally fit to teach.", sortOrder: 30 },
+    { category: "VII. Classwork Design", description: "Presents an instructional plan geared towards learning outcomes.", sortOrder: 31 },
+    { category: "VII. Classwork Design", description: "Uses modules to organize classwork content.", sortOrder: 32 },
+    { category: "VII. Classwork Design", description: "Provides equal access of learning materials.", sortOrder: 33 },
+    { category: "VII. Classwork Design", description: "Organizes assignments and due dates.", sortOrder: 34 },
+  ];
+
+  await db.evaluationCriterion.createMany({
+    data: criteriaDefs.map((c) => ({
+      formId: evalForm.id,
+      category: c.category,
+      description: c.description,
+      maxScore: 5,
+      weight: 1.0,
+      sortOrder: c.sortOrder,
+    })),
+  });
+  console.log(`  Form: ${evalForm.name} (${criteriaDefs.length} criteria)`);
+
+  // ── Evaluation Period ──
+  console.log("Creating evaluation period...");
+  const evalPeriod = await db.evaluationPeriod.create({
+    data: {
+      formId: evalForm.id,
+      name: "1st Semester 2026",
+      startDate: new Date("2026-06-01T00:00:00.000Z"),
+      endDate: new Date("2026-10-31T00:00:00.000Z"),
+      status: "open",
+    },
+  });
+  console.log(`  Period: ${evalPeriod.name} (${evalPeriod.status})`);
+
   // ── Summary ──
   console.log("========================================");
   console.log("  FULL RESEED COMPLETE");
@@ -362,6 +435,7 @@ async function main() {
   console.log("\nGroups: HR, CCS, CBA, COE");
   console.log("Roles: System Admin, HR Personnel, Dean, Professor, Staff");
   console.log(`Attendance: ${attData.length} records, Certificates: ${certs.length}`);
+  console.log(`Evaluation: ${evalForm.name} (${criteriaDefs.length} criteria), Period: ${evalPeriod.name}`);
 }
 
 main().catch(console.error).finally(() => db.$disconnect());
