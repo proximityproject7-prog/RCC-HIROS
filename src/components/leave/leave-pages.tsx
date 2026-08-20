@@ -207,7 +207,8 @@ export function MyLeavePage() {
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors"
+          disabled={showForm}
+          className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="h-4 w-4" />
           New Request
