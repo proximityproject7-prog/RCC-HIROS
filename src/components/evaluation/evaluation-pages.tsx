@@ -592,7 +592,12 @@ export function SubmitEvaluationPage() {
           setRemarksB("");
         }
       } catch {
-        // ignore — treat as no existing
+        if (cancelled) return;
+        setExistingEval(null);
+        setScores({});
+        setComments({});
+        setRemarks("");
+        setRemarksB("");
       }
     })();
     return () => {

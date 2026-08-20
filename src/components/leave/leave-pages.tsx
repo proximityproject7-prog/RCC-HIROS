@@ -86,11 +86,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString();
-  } catch {
-    return iso;
-  }
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString();
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -536,8 +533,8 @@ export function LeaveApprovalPage() {
 
   const handleAction = async () => {
     if (!actionTarget) return;
-    if (actionTarget.action !== "recall" && !remarks.trim()) {
-      setError("Remarks are required for approve / reject actions.");
+    if (actionTarget.action === "reject" && !remarks.trim()) {
+      setError("Remarks are required for rejections.");
       return;
     }
     setActing(true);
@@ -1183,7 +1180,7 @@ export function AllLeavePage() {
             </thead>
             <tbody className="divide-y divide-rcc-border">
               {loading ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
               ) : currentData.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">No leave requests found.</td></tr>
               ) : (

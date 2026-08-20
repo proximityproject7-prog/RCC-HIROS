@@ -266,6 +266,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (!leaveType.active) {
+      return NextResponse.json(
+        { error: "Leave type is inactive and cannot be requested" },
+        { status: 400 }
+      );
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);

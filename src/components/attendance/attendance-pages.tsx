@@ -136,7 +136,7 @@ export function AttendanceListPage() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.set("scope", canViewAll ? "all" : "all"); // server-side enforces group scoping
+      params.set("scope", canViewAll ? "all" : "mine");
       if (date) params.set("date", date);
       if (groupId) params.set("groupId", groupId);
       if (roleId) params.set("roleId", roleId);

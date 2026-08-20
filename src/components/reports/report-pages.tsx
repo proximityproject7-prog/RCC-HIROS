@@ -258,7 +258,7 @@ export function ReportsPage() {
             `/api/reports/headcount?${params.toString()}`
           );
           for (const e of data.employees ?? []) {
-            merged.set(e.employeeId, {
+            const hcFields = {
               employeeId: e.employeeId,
               name: `${e.firstName} ${e.middleName ? e.middleName + " " : ""}${e.lastName}`,
               groupName: grp?.name ?? groupCode,
@@ -269,12 +269,13 @@ export function ReportsPage() {
               contractType: e.contractType,
               hireDate: e.hireDate,
               certificates: e.certificateCount,
-              clockedIn: 0,
-              clockedOut: 0,
-              noClockIn: 0,
-              manuallyEdited: 0,
-              totalRecords: 0,
-            });
+            };
+            const existing = merged.get(e.employeeId);
+            if (existing) {
+              Object.assign(existing, hcFields);
+            } else {
+              merged.set(e.employeeId, { ...hcFields, clockedIn: 0, clockedOut: 0, noClockIn: 0, manuallyEdited: 0, totalRecords: 0 });
+            }
           }
         } else {
           const rolesData = await apiFetch<{ roles: { roleId: string; roleName: string }[] }>(
@@ -286,7 +287,7 @@ export function ReportsPage() {
               `/api/reports/headcount?${empParams.toString()}`
             );
             for (const e of empData.employees ?? []) {
-              merged.set(e.employeeId, {
+              const hcFields = {
                 employeeId: e.employeeId,
                 name: `${e.firstName} ${e.middleName ? e.middleName + " " : ""}${e.lastName}`,
                 groupName: grp?.name ?? groupCode,
@@ -297,12 +298,13 @@ export function ReportsPage() {
                 contractType: e.contractType,
                 hireDate: e.hireDate,
                 certificates: e.certificateCount,
-                clockedIn: 0,
-                clockedOut: 0,
-                noClockIn: 0,
-                manuallyEdited: 0,
-                totalRecords: 0,
-              });
+              };
+              const existing = merged.get(e.employeeId);
+              if (existing) {
+                Object.assign(existing, hcFields);
+              } else {
+                merged.set(e.employeeId, { ...hcFields, clockedIn: 0, clockedOut: 0, noClockIn: 0, manuallyEdited: 0, totalRecords: 0 });
+              }
             }
           });
           await Promise.all(roleFetches);

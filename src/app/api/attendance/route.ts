@@ -99,7 +99,16 @@ export async function GET(request: NextRequest) {
     if (groupId) where.employee = { ...(where.employee as object || {}), groupId };
     if (roleId)
       where.employee = { ...(where.employee as object || {}), roleId };
-    if (employeeId) where.employeeId = employeeId;
+    if (employeeId) {
+      // Verify the requested employee belongs to the user's group when not system/scopeAll
+      if (!user.isSystem && !user.scopeAllAttendance && user.groupId) {
+        const emp = await db.employee.findUnique({ where: { id: employeeId }, select: { groupId: true } });
+        if (!emp || emp.groupId !== user.groupId) {
+          return NextResponse.json({ attendance: [] });
+        }
+      }
+      where.employeeId = employeeId;
+    }
 
     // Status filter on attendance records
     if (status && status !== "no_clock_in") {
