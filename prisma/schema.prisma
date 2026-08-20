@@ -250,9 +250,10 @@ model EvaluationPeriod {
   status        String    @default("closed") // "open" | "closed"
   createdAt     DateTime  @default(now())
 
-  // Access control — JSON arrays of IDs, null = all
-  groupIds      String?   // JSON array of group IDs
-  targetRoleIds String?   // JSON array of role IDs
+  // Access control — JSON arrays of IDs
+  // null = institution-wide (all groups/roles); "[]" = no one; "[id]" = restricted
+  groupIds      String?   // JSON array of group IDs, or null for all
+  targetRoleIds String?   // JSON array of role IDs, or null for all
 
   // Tracking
   openedAt      DateTime?

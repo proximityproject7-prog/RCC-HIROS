@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return auth.response;
 
     const body = await request.json();
-    const { formId, name, startDate, endDate, status = "closed", groupIds, targetRoleIds } = body as {
+    const { formId, name, startDate, endDate, status = "closed", groupIds, targetRoleIds, allGroups, allRoles } = body as {
       formId?: string;
       name?: string;
       startDate?: string;
@@ -102,6 +102,8 @@ export async function POST(request: NextRequest) {
       status?: string;
       groupIds?: string[];
       targetRoleIds?: string[];
+      allGroups?: boolean;
+      allRoles?: boolean;
     };
 
     if (!formId || !name || !startDate || !endDate) {
@@ -157,8 +159,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const groupIdsJson = Array.isArray(groupIds) && groupIds.length > 0 ? JSON.stringify(groupIds) : null;
-    const targetRoleIdsJson = Array.isArray(targetRoleIds) && targetRoleIds.length > 0 ? JSON.stringify(targetRoleIds) : null;
+    const groupIdsJson = allGroups === true
+      ? null
+      : Array.isArray(groupIds)
+        ? JSON.stringify(groupIds)
+        : JSON.stringify([]);
+    const targetRoleIdsJson = allRoles === true
+      ? null
+      : Array.isArray(targetRoleIds)
+        ? JSON.stringify(targetRoleIds)
+        : JSON.stringify([]);
 
     // If opening, close any currently open period
     if (status === "open") {

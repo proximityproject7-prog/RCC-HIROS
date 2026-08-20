@@ -130,6 +130,8 @@ export function EvaluationFormsPage() {
   const [editingAccessId, setEditingAccessId] = useState<string | null>(null);
   const [editGroupIds, setEditGroupIds] = useState<string[]>([]);
   const [editRoleIds, setEditRoleIds] = useState<string[]>([]);
+  const [editAllGroups, setEditAllGroups] = useState(true);
+  const [editAllRoles, setEditAllRoles] = useState(true);
   const [exportingId, setExportingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -204,8 +206,8 @@ export function EvaluationFormsPage() {
           startDate: today.toISOString(),
           endDate: end.toISOString(),
           status: "closed",
-          groupIds: [],
-          targetRoleIds: [],
+          allGroups: true,
+          allRoles: true,
         }),
       });
       setNewName("");
@@ -262,8 +264,10 @@ export function EvaluationFormsPage() {
       await apiFetch(`/api/evaluation-periods/${periodId}`, {
         method: "PATCH",
         body: JSON.stringify({
-          groupIds: editGroupIds,
-          targetRoleIds: editRoleIds,
+          allGroups: editAllGroups,
+          allRoles: editAllRoles,
+          groupIds: editAllGroups ? [] : editGroupIds,
+          targetRoleIds: editAllRoles ? [] : editRoleIds,
         }),
       });
       setEditingAccessId(null);
@@ -357,6 +361,8 @@ export function EvaluationFormsPage() {
     setEditingAccessId(p.id);
     setEditGroupIds(p.groupIds ?? []);
     setEditRoleIds(p.targetRoleIds ?? []);
+    setEditAllGroups(p.groupIds === null);
+    setEditAllRoles(p.targetRoleIds === null);
   };
 
   const groupNameById = (id: string) => groups.find((g) => g.id === id)?.name ?? id;
@@ -400,7 +406,7 @@ export function EvaluationFormsPage() {
               {saving ? "Creating..." : "Create"}
             </button>
           </div>
-          <p className="text-xs text-rcc-text-muted">Leave groups and roles unselected for institution-wide access (all groups, all roles).</p>
+          <p className="text-xs text-rcc-text-muted">New periods default to institution-wide access. You can restrict access after creation using Edit Access.</p>
         </div>
       )}
 
@@ -440,6 +446,8 @@ export function EvaluationFormsPage() {
           {periods.map((p) => {
             const isOpen = p.status === "open";
             const isEditingAccess = editingAccessId === p.id;
+            const isAllGroups = p.groupIds === null;
+            const isAllRoles = p.targetRoleIds === null;
             const groupTags = (p.groupIds ?? []).map(groupNameById);
             const roleTags = (p.targetRoleIds ?? []).map(roleNameById);
 
@@ -484,15 +492,19 @@ export function EvaluationFormsPage() {
                     {/* Group & Role tags */}
                     {!isEditingAccess && (
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {groupTags.length > 0 ? groupTags.map((g) => (
+                        {isAllGroups ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">All Groups</span>
+                        ) : groupTags.length > 0 ? groupTags.map((g) => (
                           <span key={g} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{g}</span>
                         )) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">All Groups</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">No Groups</span>
                         )}
-                        {roleTags.length > 0 ? roleTags.map((r) => (
+                        {isAllRoles ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">All Roles</span>
+                        ) : roleTags.length > 0 ? roleTags.map((r) => (
                           <span key={r} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">{r}</span>
                         )) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">All Roles</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">No Roles</span>
                         )}
                       </div>
                     )}
@@ -513,40 +525,68 @@ export function EvaluationFormsPage() {
                 {isEditingAccess ? (
                   <div className="bg-rcc-bg/50 rounded-md border border-rcc-border p-4 space-y-3">
                     <div>
-                      <p className="text-xs font-semibold text-rcc-text-primary mb-1.5">Groups (leave empty for all):</p>
-                      <div className="flex flex-wrap gap-2">
-                        {groups.map((g) => (
-                          <label key={g.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rcc-surface border border-rcc-border text-xs cursor-pointer hover:bg-rcc-bg transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={editGroupIds.includes(g.id)}
-                              onChange={(e) => {
-                                setEditGroupIds(e.target.checked ? [...editGroupIds, g.id] : editGroupIds.filter((id) => id !== g.id));
-                              }}
-                              className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
-                            />
-                            {g.name}
-                          </label>
-                        ))}
+                      <div className="flex items-center gap-3 mb-1.5">
+                        <p className="text-xs font-semibold text-rcc-text-primary">Groups</p>
+                        <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editAllGroups}
+                            onChange={(e) => { setEditAllGroups(e.target.checked); if (e.target.checked) setEditGroupIds([]); }}
+                            className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
+                          />
+                          All Groups
+                        </label>
                       </div>
+                      {!editAllGroups && (
+                        <div className="flex flex-wrap gap-2">
+                          {groups.map((g) => (
+                            <label key={g.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rcc-surface border border-rcc-border text-xs cursor-pointer hover:bg-rcc-bg transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={editGroupIds.includes(g.id)}
+                                onChange={(e) => {
+                                  setEditGroupIds(e.target.checked ? [...editGroupIds, g.id] : editGroupIds.filter((id) => id !== g.id));
+                                }}
+                                className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
+                              />
+                              {g.name}
+                            </label>
+                          ))}
+                          {editGroupIds.length === 0 && <span className="text-[10px] text-rcc-text-muted italic">No groups selected — no one will be authorized</span>}
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-rcc-text-primary mb-1.5">Roles (leave empty for all):</p>
-                      <div className="flex flex-wrap gap-2">
-                        {roles.map((r) => (
-                          <label key={r.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rcc-surface border border-rcc-border text-xs cursor-pointer hover:bg-rcc-bg transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={editRoleIds.includes(r.id)}
-                              onChange={(e) => {
-                                setEditRoleIds(e.target.checked ? [...editRoleIds, r.id] : editRoleIds.filter((id) => id !== r.id));
-                              }}
-                              className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
-                            />
-                            {r.name}
-                          </label>
-                        ))}
+                      <div className="flex items-center gap-3 mb-1.5">
+                        <p className="text-xs font-semibold text-rcc-text-primary">Roles</p>
+                        <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editAllRoles}
+                            onChange={(e) => { setEditAllRoles(e.target.checked); if (e.target.checked) setEditRoleIds([]); }}
+                            className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
+                          />
+                          All Roles
+                        </label>
                       </div>
+                      {!editAllRoles && (
+                        <div className="flex flex-wrap gap-2">
+                          {roles.map((r) => (
+                            <label key={r.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rcc-surface border border-rcc-border text-xs cursor-pointer hover:bg-rcc-bg transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={editRoleIds.includes(r.id)}
+                                onChange={(e) => {
+                                  setEditRoleIds(e.target.checked ? [...editRoleIds, r.id] : editRoleIds.filter((id) => id !== r.id));
+                                }}
+                                className="rounded border-rcc-border text-rcc-primary focus:ring-rcc-accent/40"
+                              />
+                              {r.name}
+                            </label>
+                          ))}
+                          {editRoleIds.length === 0 && <span className="text-[10px] text-rcc-text-muted italic">No roles selected — no one will be authorized</span>}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 pt-1">
                       <button onClick={() => handleSaveAccess(p.id)} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90">Save Access</button>

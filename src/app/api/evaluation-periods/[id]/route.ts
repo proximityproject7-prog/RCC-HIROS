@@ -37,13 +37,15 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { name, startDate, endDate, status, groupIds, targetRoleIds } = body as {
+    const { name, startDate, endDate, status, groupIds, targetRoleIds, allGroups, allRoles } = body as {
       name?: string;
       startDate?: string;
       endDate?: string;
       status?: string;
       groupIds?: string[] | null;
       targetRoleIds?: string[] | null;
+      allGroups?: boolean;
+      allRoles?: boolean;
     };
 
     const data: Prisma.EvaluationPeriodUncheckedUpdateInput = {};
@@ -64,26 +66,30 @@ export async function PATCH(
     }
 
     // Handle group/role updates
-    if (groupIds !== undefined) {
-      if (Array.isArray(groupIds) && groupIds.length > 0) {
-        const validGroups = await db.group.findMany({ where: { id: { in: groupIds }, active: true } });
-        if (validGroups.length !== groupIds.length) {
-          return NextResponse.json({ error: "One or more invalid group IDs" }, { status: 400 });
+    if (allGroups !== undefined || groupIds !== undefined) {
+      if (allGroups === true) {
+        data.groupIds = null;
+      } else if (Array.isArray(groupIds)) {
+        if (groupIds.length > 0) {
+          const validGroups = await db.group.findMany({ where: { id: { in: groupIds }, active: true } });
+          if (validGroups.length !== groupIds.length) {
+            return NextResponse.json({ error: "One or more invalid group IDs" }, { status: 400 });
+          }
         }
         data.groupIds = JSON.stringify(groupIds);
-      } else {
-        data.groupIds = null;
       }
     }
-    if (targetRoleIds !== undefined) {
-      if (Array.isArray(targetRoleIds) && targetRoleIds.length > 0) {
-        const validRoles = await db.role.findMany({ where: { id: { in: targetRoleIds }, active: true } });
-        if (validRoles.length !== targetRoleIds.length) {
-          return NextResponse.json({ error: "One or more invalid role IDs" }, { status: 400 });
+    if (allRoles !== undefined || targetRoleIds !== undefined) {
+      if (allRoles === true) {
+        data.targetRoleIds = null;
+      } else if (Array.isArray(targetRoleIds)) {
+        if (targetRoleIds.length > 0) {
+          const validRoles = await db.role.findMany({ where: { id: { in: targetRoleIds }, active: true } });
+          if (validRoles.length !== targetRoleIds.length) {
+            return NextResponse.json({ error: "One or more invalid role IDs" }, { status: 400 });
+          }
         }
         data.targetRoleIds = JSON.stringify(targetRoleIds);
-      } else {
-        data.targetRoleIds = null;
       }
     }
 
