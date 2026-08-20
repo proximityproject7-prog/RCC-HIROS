@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth-token";
+import { Prisma } from "@/generated/prisma/client";
 
 // ═══════════════════════════════════════════════════════════════
 // /api/evaluation-periods/[id]
@@ -45,7 +46,7 @@ export async function PATCH(
       targetRoleIds?: string[] | null;
     };
 
-    const data: Record<string, unknown> = {};
+    const data: Prisma.EvaluationPeriodUncheckedUpdateInput = {};
     if (typeof name === "string" && name.trim()) data.name = name.trim();
     if (startDate) {
       const d = new Date(startDate);
@@ -71,7 +72,7 @@ export async function PATCH(
         }
         data.groupIds = JSON.stringify(groupIds);
       } else {
-        data.groupIds = null; // null = all groups
+        data.groupIds = null;
       }
     }
     if (targetRoleIds !== undefined) {
@@ -82,7 +83,7 @@ export async function PATCH(
         }
         data.targetRoleIds = JSON.stringify(targetRoleIds);
       } else {
-        data.targetRoleIds = null; // null = all roles
+        data.targetRoleIds = null;
       }
     }
 
@@ -94,7 +95,6 @@ export async function PATCH(
       data.status = status;
 
       if (status === "open") {
-        // Close all other open periods, set openedAt
         await db.evaluationPeriod.updateMany({
           where: { id: { not: id }, status: "open" },
           data: { status: "closed", closedAt: new Date() },
@@ -102,7 +102,6 @@ export async function PATCH(
         data.openedAt = new Date();
         data.closedAt = null;
       } else {
-        // Closing: set closedAt
         data.closedAt = new Date();
         data.openedAt = null;
       }
