@@ -126,6 +126,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Hide system admin evaluations from non-system-admin users
+    if (!user.isSystem) {
+      // Exclude evaluations where employee is system admin
+      where.employee = { ...(where.employee as object || {}), role: { isSystem: false } };
+    }
+
     const evaluations = await db.evaluation.findMany({
       where,
        

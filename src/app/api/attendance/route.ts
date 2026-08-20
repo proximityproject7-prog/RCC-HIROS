@@ -120,6 +120,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Hide system admin from attendance records for non-system-admin users
+    if (!user.isSystem) {
+      const empFilter = (where.employee as Record<string, unknown>) || {};
+      where.employee = { ...empFilter, role: { isSystem: false } };
+    }
+
     let records = await db.attendance.findMany({
       where,
       include: {
@@ -166,6 +172,11 @@ export async function GET(request: NextRequest) {
       if (groupId) empWhere.groupId = groupId;
       if (roleId) empWhere.roleId = roleId;
       if (employeeId) empWhere.id = employeeId;
+
+      // Hide system admin from no_clock_in list for non-system-admin users
+      if (!user.isSystem) {
+        empWhere.role = { isSystem: false };
+      }
 
       const employees = await db.employee.findMany({
         where: empWhere,

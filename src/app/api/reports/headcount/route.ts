@@ -59,8 +59,10 @@ export async function GET(request: NextRequest) {
         where: { active: true },
         include: {
           employees: {
-            where:
-              activeFilter !== undefined ? { active: activeFilter } : undefined,
+            where: {
+              ...(activeFilter !== undefined ? { active: activeFilter } : {}),
+              ...(user.isSystem ? {} : { role: { isSystem: false } }),
+            },
             select: {
               id: true,
               gender: true,
@@ -139,6 +141,7 @@ export async function GET(request: NextRequest) {
         where: {
           groupId: group.id,
           ...(activeFilter !== undefined ? { active: activeFilter } : {}),
+          ...(user.isSystem ? {} : { role: { isSystem: false } }),
         },
         select: {
           id: true,
@@ -200,25 +203,26 @@ export async function GET(request: NextRequest) {
     // Level 3: groupCode + roleId → individual employees
     // ───────────────────────────────────────────────────────────
     const employees = await db.employee.findMany({
-      where: {
-        groupId: group.id,
-        roleId,
-        ...(activeFilter !== undefined ? { active: activeFilter } : {}),
-      },
-      select: {
-        id: true,
-        employeeId: true,
-        firstName: true,
-        middleName: true,
-        lastName: true,
-        email: true,
-        gender: true,
-        contractType: true,
-        hireDate: true,
-        active: true,
-        role: { select: { id: true, name: true } },
-        _count: { select: { certificates: true } },
-      },
+        where: {
+          groupId: group.id,
+          roleId,
+          ...(activeFilter !== undefined ? { active: activeFilter } : {}),
+          ...(user.isSystem ? {} : { role: { isSystem: false } }),
+        },
+        select: {
+          id: true,
+          employeeId: true,
+          firstName: true,
+          middleName: true,
+          lastName: true,
+          email: true,
+          gender: true,
+          contractType: true,
+          hireDate: true,
+          active: true,
+          role: { select: { id: true, name: true } },
+          _count: { select: { certificates: true } },
+        },
       orderBy: [{ employeeId: "asc" }],
     });
 

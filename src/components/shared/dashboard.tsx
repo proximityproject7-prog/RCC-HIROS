@@ -90,23 +90,6 @@ export function DynamicDashboard() {
         </div>
       )}
 
-      <div>
-        <h2 className="text-sm font-semibold text-rcc-text-muted uppercase tracking-wide mb-3">Your Modules</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {visibleModules.filter((m) => m.key !== "dashboard").map((m) => {
-            const Icon = ICONS[m.icon] || LayoutDashboard;
-            return (
-              <button key={m.key} onClick={() => setCurrentPage(m.key)} className="text-left bg-rcc-surface rounded-lg border border-rcc-border p-5 hover:border-rcc-accent hover:shadow-sm transition-all group">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-lg bg-rcc-accent/10 flex items-center justify-center group-hover:bg-rcc-accent/20 transition-colors"><Icon className="h-5 w-5 text-rcc-accent" /></div>
-                  <h3 className="font-semibold text-rcc-text-primary">{m.label}</h3>
-                </div>
-                <p className="text-xs text-rcc-text-muted">{m.description}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

@@ -218,6 +218,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Hide system admin leave requests from non-system-admin users
+    if (!user.isSystem) {
+      where.employee = { ...(where.employee as object || {}), role: { isSystem: false } };
+    }
+
     const requests = await db.leaveRequest.findMany({
       where,
        

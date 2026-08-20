@@ -89,6 +89,10 @@ export async function GET(request: NextRequest) {
     // Fetch all active employees in scope (for headcount baseline)
     const empWhere: Record<string, unknown> = { active: true };
     if (groupFilter) empWhere.groupId = groupFilter;
+    // Hide system admin from attendance report baseline for non-system-admin users
+    if (!user.isSystem) {
+      empWhere.role = { isSystem: false };
+    }
     const employees = await db.employee.findMany({
       where: empWhere,
       select: {

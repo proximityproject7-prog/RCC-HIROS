@@ -68,11 +68,16 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    // Hide system admin employees from non-system-admin users
+    if (!auth.user.isSystem) {
+      where.role = { ...(where.role as object || {}), isSystem: false };
+    }
+
     const employees = await db.employee.findMany({
       where,
       include: {
         group: true,
-        role: { select: { id: true, name: true } },
+        role: { select: { id: true, name: true, isSystem: true } },
         _count: { select: { certificates: true } },
       },
       orderBy: [{ employeeId: "asc" }],

@@ -43,13 +43,17 @@ export async function GET(request: NextRequest) {
             lastName: true,
             middleName: true,
             group: { select: { id: true, name: true, code: true } },
+            role: { select: { id: true, name: true, isSystem: true } },
           },
         },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    return NextResponse.json({ submissions });
+    // Filter out system admin submissions for non-system-admin users
+    const filteredSubmissions = user.isSystem ? submissions : submissions.filter(s => !s.employee?.role?.isSystem);
+
+    return NextResponse.json({ submissions: filteredSubmissions });
   } catch (error) {
     console.error("[API /fpass] Error:", error);
     return NextResponse.json(
