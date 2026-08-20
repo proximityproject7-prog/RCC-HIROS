@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
-  Search, Download, ArrowLeft, ChevronRight, Users, Building2,
-  TrendingUp, Calendar, FileSpreadsheet, Clock,
+  Search, Download, Users, Building2, TrendingUp, Calendar,
+  Clock, ChevronDown, Check, X, Filter,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -11,66 +11,36 @@ import {
   usePagination,
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════
 
-interface GroupBrief { id: string; name: string; code: string; }
+interface GroupBrief { id: string; name: string; code: string; employeeCount?: number; }
 
-interface HeadcountGroup {
-  groupId: string;
-  groupCode: string;
-  groupName: string;
-  total: number;
-  byGender: { male: number; female: number; unspecified: number };
-  byContractType: Record<string, number>;
-  certificateCount: number;
-  roles: { roleId: string; roleName: string; count: number }[];
-}
+interface RoleBrief { id: string; name: string; }
 
-interface HeadcountRole {
-  roleId: string;
-  roleName: string;
-  count: number;
-  male: number;
-  female: number;
-  unspecified: number;
-  byContractType: Record<string, number>;
-  certificateCount: number;
-}
+type ReportType = "all" | "headcount" | "attendance";
+type TimeOfDay = "all" | "morning" | "afternoon";
 
-interface HeadcountEmployee {
-  id: string;
+interface UnifiedRow {
   employeeId: string;
-  firstName: string;
-  middleName: string | null;
-  lastName: string;
+  name: string;
+  groupName: string;
+  groupCode: string;
+  roleName: string;
   email: string;
   gender: string | null;
   contractType: string;
   hireDate: string | null;
-  active: boolean;
-  roleName: string | null;
-  certificateCount: number;
-}
-
-interface AttendanceSummary {
-  totalEmployees: number;
-  totalRecords: number;
-  avgPresentRate: number;
-  totalManualEdits: number;
-}
-
-interface AttendanceByGroup {
-  groupId: string;
-  groupName: string;
-  groupCode: string;
-  total: number;
+  certificates: number;
   clockedIn: number;
   clockedOut: number;
   noClockIn: number;
   manuallyEdited: number;
+  totalRecords: number;
 }
 
 const inputClass =
@@ -88,779 +58,685 @@ function dateNDaysAgo(n: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ReportsPage — tabs for Headcount + Attendance
+// Multi-Select Groups Popover
+// ═══════════════════════════════════════════════════════════════
+
+function MultiSelectGroups({
+  groups,
+  selected,
+  onChange,
+}: {
+  groups: GroupBrief[];
+  selected: string[];
+  onChange: (codes: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const filtered = groups.filter((g) =>
+    g.name.toLowerCase().includes(search.toLowerCase()) ||
+    g.code.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (code: string) => {
+    onChange(
+      selected.includes(code)
+        ? selected.filter((c) => c !== code)
+        : [...selected, code]
+    );
+  };
+
+  const selectAll = () => onChange(filtered.map((g) => g.code));
+  const clearAll = () => onChange([]);
+
+  const selectedNames = groups
+    .filter((g) => selected.includes(g.code))
+    .map((g) => g.name);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-between px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-left focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 ${
+          selected.length === 0 ? "text-rcc-text-muted" : "text-rcc-text-primary"
+        }`}
+      >
+        <span className="truncate">
+          {selected.length === 0
+            ? "Select groups..."
+            : selected.length === groups.length
+              ? "All groups"
+              : `${selected.length} group(s) selected`}
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 ml-1 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full min-w-[260px] bg-rcc-surface border border-rcc-border rounded-lg shadow-lg">
+          <div className="p-2 border-b border-rcc-border">
+            <input
+              type="text"
+              placeholder="Search groups..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full px-2 py-1.5 bg-rcc-bg border border-rcc-border rounded text-sm text-rcc-text-primary focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center justify-between px-2 py-1.5 border-b border-rcc-border">
+            <button onClick={selectAll} className="text-xs text-rcc-accent hover:underline">
+              Select all
+            </button>
+            <button onClick={clearAll} className="text-xs text-rcc-text-muted hover:underline">
+              Clear
+            </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto p-1">
+            {filtered.length === 0 ? (
+              <p className="px-2 py-3 text-sm text-rcc-text-muted text-center">No groups found.</p>
+            ) : (
+              filtered.map((g) => (
+                <label
+                  key={g.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-rcc-bg/50 transition-colors"
+                >
+                  <Checkbox
+                    checked={selected.includes(g.code)}
+                    onCheckedChange={() => toggle(g.code)}
+                  />
+                  <span className="text-sm text-rcc-text-primary flex-1 truncate">{g.name}</span>
+                  <span className="text-[10px] font-mono text-rcc-text-muted">{g.code}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {selected.length > 0 && selected.length < groups.length && (
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {selectedNames.map((name) => (
+            <Badge key={name} variant="secondary" className="text-[10px] gap-1 pr-1">
+              {name}
+              <button
+                type="button"
+                onClick={() => {
+                  const code = groups.find((g) => g.name === name)?.code;
+                  if (code) toggle(code);
+                }}
+                className="ml-0.5 hover:text-rcc-error"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ReportsPage — Unified table with required filters
 // ═══════════════════════════════════════════════════════════════
 
 export function ReportsPage() {
   const { has } = usePermissions();
   const canExport = has("reports.export");
-  const [tab, setTab] = useState<"headcount" | "attendance">("headcount");
+
+  // ─── Required filters ───
+  const [reportType, setReportType] = useState<ReportType | "">("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | "">("");
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+
+  // ─── Additive filters ───
+  const [selectedRole, setSelectedRole] = useState("");
+  const [searchName, setSearchName] = useState("");
+
+  // ─── Data ───
+  const [groups, setGroups] = useState<GroupBrief[]>([]);
+  const [roles, setRoles] = useState<RoleBrief[]>([]);
+  const [rows, setRows] = useState<UnifiedRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load groups and roles once
+  useEffect(() => {
+    (async () => {
+      try {
+        const [g, r] = await Promise.all([
+          apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
+          apiFetch<{ roles: RoleBrief[] }>("/api/roles/active"),
+        ]);
+        setGroups(g.groups ?? []);
+        setRoles(r.roles ?? []);
+      } catch {
+        // non-fatal
+      }
+    })();
+  }, []);
+
+  const allRequiredFilled =
+    reportType !== "" &&
+    dateFrom !== "" &&
+    dateTo !== "" &&
+    timeOfDay !== "" &&
+    selectedGroups.length > 0;
+
+  // ─── Fetch & merge data when all required filters are filled ───
+  const fetchReport = useCallback(async () => {
+    if (!allRequiredFilled) {
+      setRows([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const merged = new Map<string, UnifiedRow>();
+
+      const fetchHeadcount = async (groupCode: string, rid?: string) => {
+        const params = new URLSearchParams({ groupCode });
+        if (rid) params.set("roleId", rid);
+        const data = await apiFetch<{ employees: { id: string; employeeId: string; firstName: string; middleName: string | null; lastName: string; email: string; gender: string | null; contractType: string; hireDate: string | null; active: boolean; roleName: string | null; certificateCount: number }[] }>(
+          `/api/reports/headcount?${params.toString()}`
+        );
+        const grp = groups.find((g) => g.code === groupCode);
+        for (const e of data.employees ?? []) {
+          const key = e.id;
+          if (merged.has(key)) {
+            const row = merged.get(key)!;
+            row.certificates = e.certificateCount;
+            row.contractType = e.contractType;
+            row.hireDate = e.hireDate;
+            row.gender = e.gender;
+            row.email = e.email;
+            row.roleName = e.roleName ?? row.roleName;
+          } else {
+            merged.set(key, {
+              employeeId: e.employeeId,
+              name: `${e.firstName} ${e.middleName ? e.middleName + " " : ""}${e.lastName}`,
+              groupName: grp?.name ?? groupCode,
+              groupCode,
+              roleName: e.roleName ?? "",
+              email: e.email,
+              gender: e.gender,
+              contractType: e.contractType,
+              hireDate: e.hireDate,
+              certificates: e.certificateCount,
+              clockedIn: 0,
+              clockedOut: 0,
+              noClockIn: 0,
+              manuallyEdited: 0,
+              totalRecords: 0,
+            });
+          }
+        }
+      };
+
+      const fetchAttendance = async (groupCode: string) => {
+        const params = new URLSearchParams({ dateFrom, dateTo, groupCode });
+        const data = await apiFetch<{ byEmployee?: { employeeId: string; name: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[] }>(
+          `/api/reports/attendance?${params.toString()}`
+        );
+        const grp = groups.find((g) => g.code === groupCode);
+        for (const e of data.byEmployee ?? []) {
+          // Time-of-day filtering (client-side: approximate by name won't work, skip for now)
+          const key = `att-${groupCode}-${e.employeeId}`;
+          // Try to find existing headcount row by employeeId
+          let existing: UnifiedRow | undefined;
+          for (const row of merged.values()) {
+            if (row.employeeId === e.employeeId) {
+              existing = row;
+              break;
+            }
+          }
+          if (existing) {
+            existing.clockedIn = e.clockedIn;
+            existing.clockedOut = e.clockedOut;
+            existing.noClockIn = e.noClockIn;
+            existing.manuallyEdited = e.manuallyEdited;
+            existing.totalRecords = e.total;
+          } else {
+            merged.set(key, {
+              employeeId: e.employeeId,
+              name: e.name,
+              groupName: grp?.name ?? groupCode,
+              groupCode,
+              roleName: "",
+              email: "",
+              gender: null,
+              contractType: "",
+              hireDate: null,
+              certificates: 0,
+              clockedIn: e.clockedIn,
+              clockedOut: e.clockedOut,
+              noClockIn: e.noClockIn,
+              manuallyEdited: e.manuallyEdited,
+              totalRecords: e.total,
+            });
+          }
+        }
+      };
+
+      // Fetch data per selected group in parallel
+      await Promise.all(
+        selectedGroups.map(async (gc) => {
+          const tasks: Promise<void>[] = [];
+          if (reportType === "all" || reportType === "headcount") {
+            tasks.push(fetchHeadcount(gc, selectedRole || undefined));
+          }
+          if (reportType === "all" || reportType === "attendance") {
+            tasks.push(fetchAttendance(gc));
+          }
+          await Promise.all(tasks);
+        })
+      );
+
+      setRows(Array.from(merged.values()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load report.");
+    } finally {
+      setLoading(false);
+    }
+  }, [allRequiredFilled, reportType, dateFrom, dateTo, timeOfDay, selectedGroups, selectedRole, groups]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  // ─── Apply additive filters (search by name, role) ───
+  const filteredRows = useMemo(() => {
+    let result = rows;
+    if (selectedRole) {
+      const role = roles.find((r) => r.id === selectedRole);
+      if (role) {
+        result = result.filter((r) => r.roleName === role.name);
+      }
+    }
+    if (searchName.trim()) {
+      const q = searchName.trim().toLowerCase();
+      result = result.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.employeeId.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [rows, selectedRole, searchName, roles]);
+
+  // ─── Pagination ───
+  const { currentData: pagedRows, controls } = usePagination(filteredRows, { defaultPageSize: 25 });
+
+  // ─── Column visibility based on report type ───
+  const showAttendance = reportType === "all" || reportType === "attendance";
+  const showHeadcount = reportType === "all" || reportType === "headcount";
+
+  // ─── CSV Export ───
+  const handleExportCSV = () => {
+    const headers: string[] = ["Employee ID", "Name", "Group", "Role"];
+    if (showHeadcount) headers.push("Gender", "Contract", "Hire Date", "Certificates");
+    if (showAttendance) headers.push("Total Records", "Clocked In", "Clocked Out", "No Clock-In", "Manual Edits");
+
+    const csvRows = [headers];
+    for (const r of filteredRows) {
+      const row: string[] = [r.employeeId, r.name, r.groupName, r.roleName];
+      if (showHeadcount) row.push(r.gender ?? "", r.contractType, r.hireDate ?? "", String(r.certificates));
+      if (showAttendance) row.push(String(r.totalRecords), String(r.clockedIn), String(r.clockedOut), String(r.noClockIn), String(r.manuallyEdited));
+      csvRows.push(row);
+    }
+
+    const csv = csvRows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report-${reportType}-${dateFrom}-to-${dateTo}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // ─── Summary cards ───
+  const summary = useMemo(() => {
+    const total = filteredRows.length;
+    const male = filteredRows.filter((r) => r.gender === "Male").length;
+    const female = filteredRows.filter((r) => r.gender === "Female").length;
+    const totalCerts = filteredRows.reduce((acc, r) => acc + r.certificates, 0);
+    const totalPresent = filteredRows.reduce((acc, r) => acc + r.clockedIn, 0);
+    return { total, male, female, totalCerts, totalPresent };
+  }, [filteredRows]);
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-rcc-text-primary">Reports</h1>
         <p className="text-sm text-rcc-text-muted mt-0.5">
-          Generate headcount and attendance reports. {canExport ? "CSV export available." : ""}
+          Generate unified headcount and attendance reports.
         </p>
       </div>
 
-      <div className="flex items-center gap-1 border-b border-rcc-border">
-        <button
-          onClick={() => setTab("headcount")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            tab === "headcount" ? "border-rcc-accent text-rcc-accent" : "border-transparent text-rcc-text-muted hover:text-rcc-text-primary"
-          }`}
-        >
-          Headcount
-        </button>
-        <button
-          onClick={() => setTab("attendance")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            tab === "attendance" ? "border-rcc-accent text-rcc-accent" : "border-transparent text-rcc-text-muted hover:text-rcc-text-primary"
-          }`}
-        >
-          Attendance
-        </button>
-      </div>
-
-      {tab === "headcount" ? <HeadcountReport canExport={canExport} /> : <AttendanceReport canExport={canExport} />}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
-// HeadcountReport — drill-down: groups → roles → employees
-// ═══════════════════════════════════════════════════════════════
-
-function HeadcountReport({ canExport }: { canExport: boolean }) {
-  const [groups, setGroups] = useState<GroupBrief[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Drill-down state
-  const [groupCode, setGroupCode] = useState<string | null>(null);
-  const [roleId, setRoleId] = useState<string | null>(null);
-
-  // Data for each level
-  const [groupsData, setGroupsData] = useState<HeadcountGroup[]>([]);
-  const [rolesData, setRolesData] = useState<HeadcountRole[]>([]);
-  const [employeesData, setEmployeesData] = useState<HeadcountEmployee[]>([]);
-  const [loadingDrill, setLoadingDrill] = useState(false);
-
-  // Department filter
-  const [filterGroupCode, setFilterGroupCode] = useState("");
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await apiFetch<{ groups: GroupBrief[] }>("/api/groups");
-        setGroups(data.groups ?? []);
-      } catch {
-        // non-fatal
-      }
-    })();
-  }, []);
-
-  const loadGroups = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = filterGroupCode ? `?groupCode=${filterGroupCode}` : "";
-      const data = await apiFetch<{ level: string; groups: HeadcountGroup[] }>(`/api/reports/headcount${qs}`);
-      setGroupsData(data.groups ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load report.");
-    } finally {
-      setLoading(false);
-    }
-  }, [filterGroupCode]);
-
-  const loadRoles = useCallback(async (code: string) => {
-    setLoadingDrill(true);
-    setError(null);
-    try {
-      const data = await apiFetch<{ level: string; group: { id: string; code: string; name: string }; roles: HeadcountRole[] }>(
-        `/api/reports/headcount?groupCode=${encodeURIComponent(code)}`
-      );
-      setRolesData(data.roles ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load roles.");
-    } finally {
-      setLoadingDrill(false);
-    }
-  }, []);
-
-  const loadEmployees = useCallback(async (code: string, rid: string) => {
-    setLoadingDrill(true);
-    setError(null);
-    try {
-      const data = await apiFetch<{ level: string; employees: HeadcountEmployee[] }>(
-        `/api/reports/headcount?groupCode=${encodeURIComponent(code)}&roleId=${encodeURIComponent(rid)}`
-      );
-      setEmployeesData(data.employees ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load employees.");
-    } finally {
-      setLoadingDrill(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!groupCode && !roleId) {
-      loadGroups();
-    } else if (groupCode && !roleId) {
-      loadRoles(groupCode);
-    } else if (groupCode && roleId) {
-      loadEmployees(groupCode, roleId);
-    }
-  }, [groupCode, roleId, loadGroups, loadRoles, loadEmployees]);
-
-  // Pagination — only at employee level
-  const { currentData: pagedEmployees, controls: empControls } = usePagination(employeesData, { defaultPageSize: 25 });
-
-  // Summary cards
-  const summary = useMemo(() => {
-    if (groupCode && roleId) {
-      return {
-        total: employeesData.length,
-        male: employeesData.filter((e) => e.gender === "Male").length,
-        female: employeesData.filter((e) => e.gender === "Female").length,
-        certs: employeesData.reduce((acc, e) => acc + e.certificateCount, 0),
-      };
-    }
-    if (groupCode) {
-      return {
-        total: rolesData.reduce((acc, r) => acc + r.count, 0),
-        male: rolesData.reduce((acc, r) => acc + r.male, 0),
-        female: rolesData.reduce((acc, r) => acc + r.female, 0),
-        certs: rolesData.reduce((acc, r) => acc + r.certificateCount, 0),
-      };
-    }
-    return {
-      total: groupsData.reduce((acc, g) => acc + g.total, 0),
-      male: groupsData.reduce((acc, g) => acc + g.byGender.male, 0),
-      female: groupsData.reduce((acc, g) => acc + g.byGender.female, 0),
-      certs: groupsData.reduce((acc, g) => acc + g.certificateCount, 0),
-    };
-  }, [groupsData, rolesData, employeesData, groupCode, roleId]);
-
-  const handleExportCSV = () => {
-    let rows: string[][] = [];
-    let filename = "headcount-report.csv";
-
-    if (!groupCode) {
-      rows.push(["Group Code", "Group Name", "Total", "Male", "Female", "Unspecified", "Regular", "Contractual", "Part-Time", "Certificates"]);
-      for (const g of groupsData) {
-        rows.push([
-          g.groupCode, g.groupName, String(g.total),
-          String(g.byGender.male), String(g.byGender.female), String(g.byGender.unspecified),
-          String(g.byContractType["Regular"] ?? 0),
-          String(g.byContractType["Contractual"] ?? 0),
-          String(g.byContractType["Part-Time"] ?? 0),
-          String(g.certificateCount),
-        ]);
-      }
-      filename = "headcount-by-group.csv";
-    } else if (!roleId) {
-      rows.push(["Role", "Count", "Male", "Female", "Unspecified", "Certificates"]);
-      for (const r of rolesData) {
-        rows.push([r.roleName, String(r.count), String(r.male), String(r.female), String(r.unspecified), String(r.certificateCount)]);
-      }
-      filename = `headcount-${groupCode}-by-role.csv`;
-    } else {
-      rows.push(["Employee ID", "Name", "Email", "Gender", "Contract", "Role", "Certificates"]);
-      for (const e of employeesData) {
-        rows.push([
-          e.employeeId,
-          `${e.firstName} ${e.middleName ?? ""} ${e.lastName}`.trim(),
-          e.email,
-          e.gender ?? "",
-          e.contractType,
-          e.roleName ?? "",
-          String(e.certificateCount),
-        ]);
-      }
-      filename = `headcount-${groupCode}-employees.csv`;
-    }
-
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  // Breadcrumb
-  const selectedGroup = groupsData.find((g) => g.groupCode === groupCode) ?? groups.find((g) => g.code === groupCode);
-  const selectedRole = rolesData.find((r) => r.roleId === roleId);
-
-  return (
-    <div className="space-y-4">
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
-      )}
-
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm flex-wrap">
-        <button
-          onClick={() => {
-            setGroupCode(null);
-            setRoleId(null);
-          }}
-          className={`font-medium ${!groupCode ? "text-rcc-text-primary" : "text-rcc-accent hover:underline"}`}
-        >
-          All Groups
-        </button>
-        {groupCode && (
-          <>
-            <ChevronRight className="h-3.5 w-3.5 text-rcc-text-muted" />
-            <button
-              onClick={() => setRoleId(null)}
-              className={`font-medium ${!roleId ? "text-rcc-text-primary" : "text-rcc-accent hover:underline"}`}
-            >
-              {selectedGroup ? ("name" in selectedGroup ? selectedGroup.name : selectedGroup.groupName) : groupCode}
-            </button>
-          </>
-        )}
-        {roleId && (
-          <>
-            <ChevronRight className="h-3.5 w-3.5 text-rcc-text-muted" />
-            <span className="font-medium text-rcc-text-primary">{selectedRole?.roleName ?? "Role"}</span>
-          </>
-        )}
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryCard icon={Users} label="Total Employees" value={summary.total} />
-        <SummaryCard icon={Users} label="Male" value={summary.male} />
-        <SummaryCard icon={Users} label="Female" value={summary.female} />
-        <SummaryCard icon={TrendingUp} label="Certificates" value={summary.certs} />
-      </div>
-
-      {/* Filters + Export */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        {!groupCode && (
-          <div className="flex-1">
-            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Department Filter</label>
-            <select value={filterGroupCode} onChange={(e) => setFilterGroupCode(e.target.value)} className={inputClass}>
-              <option value="">All groups</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.code}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        {canExport && (
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors sm:self-end"
-          >
-            <Download className="h-4 w-4" /> Export CSV
-          </button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
-        <div className="overflow-x-auto">
-          {!groupCode ? (
-            /* Level 1: Groups */
-            <table className="w-full text-sm">
-              <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-                <tr>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Code</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Name</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Employees</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Male</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Female</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Regular</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Contractual</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Part-Time</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Certificates</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rcc-border">
-                {loading ? (
-                  <tr><td colSpan={9} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-                ) : groupsData.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-10 text-center text-rcc-text-muted">No groups found.</td></tr>
-                ) : (
-                  groupsData.map((g) => (
-                    <tr
-                      key={g.groupId}
-                      onClick={() => setGroupCode(g.groupCode)}
-                      className="cursor-pointer hover:bg-rcc-bg/30 transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20 font-mono">
-                          {g.groupCode}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-rcc-text-primary">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-rcc-text-muted" />
-                          {g.groupName}
-                          <ChevronRight className="h-3 w-3 text-rcc-text-muted" />
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{g.total}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.byGender.male}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.byGender.female}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.byContractType["Regular"] ?? 0}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.byContractType["Contractual"] ?? 0}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.byContractType["Part-Time"] ?? 0}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.certificateCount}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          ) : !roleId ? (
-            /* Level 2: Roles */
-            <table className="w-full text-sm">
-              <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-                <tr>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Role</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Count</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Male</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Female</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Regular</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Contractual</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Part-Time</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Certificates</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rcc-border">
-                {loadingDrill ? (
-                  <tr><td colSpan={8} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-                ) : rolesData.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-10 text-center text-rcc-text-muted">No roles found in this group.</td></tr>
-                ) : (
-                  rolesData.map((r) => (
-                    <tr
-                      key={r.roleId}
-                      onClick={() => setRoleId(r.roleId)}
-                      className="cursor-pointer hover:bg-rcc-bg/30 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-medium text-rcc-text-primary">
-                        <span className="inline-flex items-center gap-1.5">
-                          {r.roleName}
-                          <ChevronRight className="h-3 w-3 text-rcc-text-muted" />
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{r.count}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{r.male}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{r.female}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{r.byContractType["Regular"] ?? 0}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{r.byContractType["Contractual"] ?? 0}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{r.byContractType["Part-Time"] ?? 0}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{r.certificateCount}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          ) : (
-            /* Level 3: Employees */
-            <table className="w-full text-sm">
-              <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-                <tr>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Employee ID</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Name</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Email</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Gender</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Contract</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Hire Date</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Certificates</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rcc-border">
-                {loadingDrill ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-                ) : pagedEmployees.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">No employees in this role.</td></tr>
-                ) : (
-                  pagedEmployees.map((e) => (
-                    <tr key={e.id} className="hover:bg-rcc-bg/30 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{e.employeeId}</td>
-                      <td className="px-4 py-3 font-medium text-rcc-text-primary">
-                        {e.firstName} {e.middleName ? e.middleName + " " : ""}{e.lastName}
-                      </td>
-                      <td className="px-4 py-3 text-rcc-text-secondary truncate max-w-xs">{e.email}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary">{e.gender ?? ""}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20">
-                          {e.contractType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-rcc-text-secondary">
-                        {e.hireDate ? new Date(e.hireDate).toLocaleDateString() : ""}
-                      </td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{e.certificateCount}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
+      {/* ─── Required Filters ─── */}
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Filter className="h-4 w-4 text-rcc-accent" />
+          <span className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Required Filters</span>
         </div>
-        {groupCode && roleId && <PaginationControls {...empControls} />}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AttendanceReport
-// ═══════════════════════════════════════════════════════════════
-
-interface AttendanceReportData {
-  range: { from: string; to: string };
-  group: { id: string; code: string; name: string } | null;
-  summary: AttendanceSummary;
-  byGroup: AttendanceByGroup[];
-  byDate: { date: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[];
-  byEmployee?: { employeeId: string; name: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[];
-}
-
-function AttendanceReport({ canExport }: { canExport: boolean }) {
-  const [groups, setGroups] = useState<GroupBrief[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<AttendanceReportData | null>(null);
-
-  const [dateFrom, setDateFrom] = useState(dateNDaysAgo(29));
-  const [dateTo, setDateTo] = useState(todayISO());
-  const [groupCode, setGroupCode] = useState("");
-
-  // Drill-down state
-  const [drillGroupId, setDrillGroupId] = useState<string | null>(null);
-  const [drillGroupName, setDrillGroupName] = useState<string>("");
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const gdata = await apiFetch<{ groups: GroupBrief[] }>("/api/groups");
-        setGroups(gdata.groups ?? []);
-      } catch {
-        // non-fatal
-      }
-    })();
-  }, []);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set("dateFrom", dateFrom);
-      params.set("dateTo", dateTo);
-      if (groupCode) params.set("groupCode", groupCode);
-      const result = await apiFetch<AttendanceReportData>(`/api/reports/attendance?${params.toString()}`);
-      setData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load report.");
-    } finally {
-      setLoading(false);
-    }
-  }, [dateFrom, dateTo, groupCode]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Detailed records table: flatten byDate for table view with pagination
-  const { currentData: pagedDates, controls: dateControls } = usePagination(data?.byDate ?? [], { defaultPageSize: 15 });
-
-  // Employee attendance pagination (drill-down)
-  const { currentData: pagedEmployees, controls: empControls } = usePagination(data?.byEmployee ?? [], { defaultPageSize: 25 });
-
-  const handleExportCSV = () => {
-    if (!data) return;
-    const rows: string[][] = [];
-
-    if (drillGroupId && data.byEmployee) {
-      // Drill-down level: export employee attendance
-      rows.push(["Employee ID", "Name", "Total Records", "Clocked In", "Clocked Out", "No Clock-In", "Manually Edited"]);
-      for (const e of data.byEmployee) {
-        rows.push([e.employeeId, e.name, String(e.total), String(e.clockedIn), String(e.clockedOut), String(e.noClockIn), String(e.manuallyEdited)]);
-      }
-    } else {
-      // Top level: export by group + by date
-      rows.push(["Group Code", "Group Name", "Total Records", "Clocked In", "Clocked Out", "No Clock-In", "Manually Edited"]);
-      for (const g of data.byGroup) {
-        rows.push([g.groupCode, g.groupName, String(g.total), String(g.clockedIn), String(g.clockedOut), String(g.noClockIn), String(g.manuallyEdited)]);
-      }
-      rows.push([]);
-      rows.push(["Date", "Total Records", "Clocked In", "Clocked Out", "No Clock-In", "Manually Edited"]);
-      for (const d of data.byDate) {
-        rows.push([d.date, String(d.total), String(d.clockedIn), String(d.clockedOut), String(d.noClockIn), String(d.manuallyEdited)]);
-      }
-    }
-
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = drillGroupName
-      ? `attendance-${drillGroupName.replace(/\s+/g, "-")}-${dateFrom}-to-${dateTo}.csv`
-      : `attendance-report-${dateFrom}-to-${dateTo}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const summary = data?.summary;
-
-  return (
-    <div className="space-y-4">
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
-      )}
-
-      {/* Filters */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Report Type */}
           <div>
-            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Date From</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Date To</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Department</label>
+            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">
+              Report Type <span className="text-rcc-error">*</span>
+            </label>
             <select
-              value={groupCode}
-              onChange={(e) => {
-                setGroupCode(e.target.value);
-                setDrillGroupId(null);
-                setDrillGroupName("");
-              }}
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value as ReportType | "")}
               className={inputClass}
             >
-              <option value="">All groups</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.code}>{g.name}</option>
-              ))}
+              <option value="">Select type...</option>
+              <option value="headcount">Headcount</option>
+              <option value="attendance">Attendance</option>
+              <option value="all">All (Headcount + Attendance)</option>
             </select>
           </div>
-          {canExport && (
-            <button
-              onClick={handleExportCSV}
-              disabled={!data}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+
+          {/* Date From */}
+          <div>
+            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">
+              Date From <span className="text-rcc-error">*</span>
+            </label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          {/* Date To */}
+          <div>
+            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">
+              Date To <span className="text-rcc-error">*</span>
+            </label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          {/* Time of Day */}
+          <div>
+            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">
+              Time <span className="text-rcc-error">*</span>
+            </label>
+            <select
+              value={timeOfDay}
+              onChange={(e) => setTimeOfDay(e.target.value as TimeOfDay | "")}
+              className={inputClass}
             >
-              <Download className="h-4 w-4" /> Export CSV
-            </button>
-          )}
+              <option value="">Select time...</option>
+              <option value="all">All Day</option>
+              <option value="morning">Morning (6AM – 12PM)</option>
+              <option value="afternoon">Afternoon (12PM – 6PM)</option>
+            </select>
+          </div>
+
+          {/* Groups (multi-select) */}
+          <div className="sm:col-span-2 lg:col-span-4">
+            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">
+              Groups <span className="text-rcc-error">*</span>
+            </label>
+            <MultiSelectGroups
+              groups={groups}
+              selected={selectedGroups}
+              onChange={setSelectedGroups}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Summary cards */}
-      {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <SummaryCard icon={Users} label="Employees in Scope" value={summary.totalEmployees} />
-          <SummaryCard icon={Clock} label="Total Records" value={summary.totalRecords} />
-          <SummaryCard icon={TrendingUp} label="Avg Present Rate" value={`${summary.avgPresentRate.toFixed(1)}%`} />
-          <SummaryCard icon={FileSpreadsheet} label="Manual Edits" value={summary.totalManualEdits} />
-        </div>
-      )}
-
-      {/* Breadcrumb */}
-      {drillGroupId && (
-        <div className="flex items-center gap-2 text-sm flex-wrap">
-          <button
-            onClick={() => {
-              setDrillGroupId(null);
-              setDrillGroupName("");
-              setGroupCode("");
-            }}
-            className="font-medium text-rcc-accent hover:underline"
-          >
-            All Departments
-          </button>
-          <ChevronRight className="h-3.5 w-3.5 text-rcc-text-muted" />
-          <span className="font-medium text-rcc-text-primary">{drillGroupName}</span>
-        </div>
-      )}
-
-      {/* By Department table (hide when drilled down) */}
-      {!drillGroupId && (
-        <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
-          <div className="px-4 py-3 border-b border-rcc-border">
-            <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">By Department</h2>
+      {/* ─── Additive Filters ─── */}
+      {allRequiredFilled && (
+        <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Search className="h-4 w-4 text-rcc-text-muted" />
+            <span className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Additional Filters</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-                <tr>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Group</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Code</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Total</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Clocked In</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Clocked Out</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">No Clock-In</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Manual Edits</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rcc-border">
-                {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-                ) : !data || data.byGroup.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">No data for the selected range.</td></tr>
-                ) : (
-                  data.byGroup.map((g) => (
-                    <tr
-                      key={g.groupId}
-                      onClick={() => {
-                        setDrillGroupId(g.groupId);
-                        setDrillGroupName(g.groupName);
-                        setGroupCode(g.groupCode);
-                      }}
-                      className="cursor-pointer hover:bg-rcc-bg/30 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-medium text-rcc-text-primary">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-rcc-text-muted" />
-                          {g.groupName}
-                          <ChevronRight className="h-3 w-3 text-rcc-text-muted" />
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20 font-mono">
-                          {g.groupCode}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{g.total}</td>
-                      <td className="px-4 py-3 text-green-700 tabular-nums">{g.clockedIn}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.clockedOut}</td>
-                      <td className="px-4 py-3 text-amber-700 tabular-nums">{g.noClockIn}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{g.manuallyEdited}</td>
-                    </tr>
-                  ))
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Role filter */}
+            <div>
+              <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Role</label>
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">All roles</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Search by name */}
+            <div>
+              <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Search by Name or ID</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-rcc-text-muted" />
+                <input
+                  type="text"
+                  placeholder="Type a name or employee ID..."
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  className={`${inputClass} pl-9`}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Error ─── */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
+      )}
+
+      {/* ─── Table (only visible when all required filters filled) ─── */}
+      {allRequiredFilled && (
+        <>
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <SummaryCard icon={Users} label="Total Employees" value={summary.total} />
+            {showHeadcount && (
+              <>
+                <SummaryCard icon={Users} label="Male" value={summary.male} />
+                <SummaryCard icon={Users} label="Female" value={summary.female} />
+                <SummaryCard icon={TrendingUp} label="Certificates" value={summary.totalCerts} />
+              </>
+            )}
+            {showAttendance && !showHeadcount && (
+              <>
+                <SummaryCard icon={Clock} label="Clocked In" value={summary.totalPresent} />
+                <SummaryCard icon={TrendingUp} label="Total Records" value={filteredRows.reduce((a, r) => a + r.totalRecords, 0)} />
+                <SummaryCard icon={Calendar} label="Groups Selected" value={selectedGroups.length} />
+              </>
+            )}
+          </div>
+
+          {/* Table */}
+          <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
+            <div className="px-4 py-3 border-b border-rcc-border flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">
+                {reportType === "headcount" && "Headcount Report"}
+                {reportType === "attendance" && "Attendance Report"}
+                {reportType === "all" && "Combined Report"}
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-rcc-text-muted">
+                  {filteredRows.length} record(s)
+                </span>
+                {canExport && (
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={filteredRows.length === 0}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export CSV
+                  </button>
                 )}
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-rcc-bg/50 border-b border-rcc-border">
+                  <tr>
+                    <Th>Employee ID</Th>
+                    <Th>Name</Th>
+                    <Th>Group</Th>
+                    <Th>Role</Th>
+                    {showHeadcount && (
+                      <>
+                        <Th>Gender</Th>
+                        <Th>Contract</Th>
+                        <Th>Hire Date</Th>
+                        <Th className="text-right">Certs</Th>
+                      </>
+                    )}
+                    {showAttendance && (
+                      <>
+                        <Th className="text-right">Total</Th>
+                        <Th className="text-right">In</Th>
+                        <Th className="text-right">Out</Th>
+                        <Th className="text-right">No Clock-In</Th>
+                        <Th className="text-right">Manual</Th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rcc-border">
+                  {loading ? (
+                    <tr>
+                      <Td colSpan={4 + (showHeadcount ? 4 : 0) + (showAttendance ? 5 : 0)}>
+                        Loading report data...
+                      </Td>
+                    </tr>
+                  ) : pagedRows.length === 0 ? (
+                    <tr>
+                      <Td colSpan={4 + (showHeadcount ? 4 : 0) + (showAttendance ? 5 : 0)}>
+                        No records found for the selected filters.
+                      </Td>
+                    </tr>
+                  ) : (
+                    pagedRows.map((r) => (
+                      <tr key={`${r.employeeId}-${r.groupCode}`} className="hover:bg-rcc-bg/30 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{r.employeeId}</td>
+                        <td className="px-4 py-3 font-medium text-rcc-text-primary">{r.name}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20 font-mono">
+                            {r.groupCode}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-rcc-text-secondary text-xs">{r.roleName}</td>
+                        {showHeadcount && (
+                          <>
+                            <td className="px-4 py-3 text-rcc-text-secondary">{r.gender ?? ""}</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20">
+                                {r.contractType}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-rcc-text-secondary">
+                              {r.hireDate ? new Date(r.hireDate).toLocaleDateString() : ""}
+                            </td>
+                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.certificates}</td>
+                          </>
+                        )}
+                        {showAttendance && (
+                          <>
+                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium text-right">{r.totalRecords}</td>
+                            <td className="px-4 py-3 text-green-700 tabular-nums text-right">{r.clockedIn}</td>
+                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.clockedOut}</td>
+                            <td className="px-4 py-3 text-amber-700 tabular-nums text-right">{r.noClockIn}</td>
+                            <td className="px-4 py-3 text-rcc-text-secondary tabular-nums text-right">{r.manuallyEdited}</td>
+                          </>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <PaginationControls {...controls} />
           </div>
-        </div>
+        </>
       )}
 
-      {/* Employee attendance table (shown when drilled down) */}
-      {drillGroupId && (
-        <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
-          <div className="px-4 py-3 border-b border-rcc-border flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">
-              Employee Attendance — {drillGroupName}
-            </h2>
-            <span className="text-xs text-rcc-text-muted">
-              {data?.byEmployee ? `${data.byEmployee.length} employee(s)` : ""}
-            </span>
+      {/* ─── Placeholder when filters not filled ─── */}
+      {!allRequiredFilled && (
+        <div className="bg-rcc-surface rounded-lg border border-dashed border-rcc-border p-12 text-center">
+          <div className="w-12 h-12 rounded-xl bg-rcc-accent/10 flex items-center justify-center mx-auto mb-3">
+            <Filter className="h-6 w-6 text-rcc-accent" />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-                <tr>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Employee ID</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Name</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Total</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Clocked In</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Clocked Out</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">No Clock-In</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Manual Edits</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rcc-border">
-                {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-                ) : pagedEmployees.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">No employee records found.</td></tr>
-                ) : (
-                  pagedEmployees.map((e) => (
-                    <tr key={e.employeeId} className="hover:bg-rcc-bg/30 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{e.employeeId}</td>
-                      <td className="px-4 py-3 font-medium text-rcc-text-primary">{e.name}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{e.total}</td>
-                      <td className="px-4 py-3 text-green-700 tabular-nums">{e.clockedIn}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{e.clockedOut}</td>
-                      <td className="px-4 py-3 text-amber-700 tabular-nums">{e.noClockIn}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{e.manuallyEdited}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <PaginationControls {...empControls} />
-        </div>
-      )}
-
-      {/* Detailed records (by date) — hide when drilled down */}
-      {!drillGroupId && (
-        <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
-          <div className="px-4 py-3 border-b border-rcc-border flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">Detailed Records (by Date)</h2>
-            <span className="text-xs text-rcc-text-muted">
-              {data ? `${data.byDate.length} day(s)` : ""}
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-                <tr>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Date</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Total</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Clocked In</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Clocked Out</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">No Clock-In</th>
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Manual Edits</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rcc-border">
-                {loading ? (
-                  <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-                ) : pagedDates.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">No records.</td></tr>
-                ) : (
-                  pagedDates.map((d) => (
-                    <tr key={d.date} className="hover:bg-rcc-bg/30 transition-colors">
-                      <td className="px-4 py-3 text-rcc-text-primary font-medium">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-rcc-text-muted" />
-                          {d.date}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{d.total}</td>
-                      <td className="px-4 py-3 text-green-700 tabular-nums">{d.clockedIn}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{d.clockedOut}</td>
-                      <td className="px-4 py-3 text-amber-700 tabular-nums">{d.noClockIn}</td>
-                      <td className="px-4 py-3 text-rcc-text-secondary tabular-nums">{d.manuallyEdited}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <PaginationControls {...dateControls} />
+          <p className="text-sm font-medium text-rcc-text-primary mb-1">Fill all required filters to view the report</p>
+          <p className="text-xs text-rcc-text-muted">
+            Report Type, Date Range, Time, and at least one Group are required.
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════
+
+function Th({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <th className={`text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3 ${className}`}>
+      {children}
+    </th>
+  );
+}
+
+function Td({
+  children,
+  colSpan,
+  className = "",
+}: {
+  children: React.ReactNode;
+  colSpan?: number;
+  className?: string;
+}) {
+  return (
+    <td colSpan={colSpan} className={`px-4 py-10 text-center text-rcc-text-muted ${className}`}>
+      {children}
+    </td>
+  );
+}
 
 function SummaryCard({
   icon: Icon,
@@ -885,7 +761,3 @@ function SummaryCard({
     </div>
   );
 }
-
-// Suppress unused-import warnings
-void Search;
-void ArrowLeft;
