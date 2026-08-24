@@ -50,6 +50,7 @@ export async function GET(
         scopeAllLeave: role.scopeAllLeave,
         scopeAllReports: role.scopeAllReports,
         scopeAllAttendance: role.scopeAllAttendance,
+        scopeGroupAttendance: role.scopeGroupAttendance,
         canSelfApproveLeave: role.canSelfApproveLeave,
         isSystem: role.isSystem,
         active: role.active,
@@ -100,6 +101,7 @@ export async function PATCH(
       scopeAllLeave,
       scopeAllReports,
       scopeAllAttendance,
+      scopeGroupAttendance,
       canSelfApproveLeave,
       active,
       permissions,
@@ -111,6 +113,7 @@ export async function PATCH(
       scopeAllLeave?: boolean;
       scopeAllReports?: boolean;
       scopeAllAttendance?: boolean;
+      scopeGroupAttendance?: boolean;
       canSelfApproveLeave?: boolean;
       active?: boolean;
       permissions?: string[];
@@ -144,6 +147,8 @@ export async function PATCH(
     if (scopeAllReports !== undefined) data.scopeAllReports = !!scopeAllReports;
     if (scopeAllAttendance !== undefined)
       data.scopeAllAttendance = !!scopeAllAttendance;
+    if (scopeGroupAttendance !== undefined)
+      data.scopeGroupAttendance = !!scopeGroupAttendance;
     if (canSelfApproveLeave !== undefined)
       data.canSelfApproveLeave = !!canSelfApproveLeave;
     if (active !== undefined) data.active = !!active;
@@ -226,6 +231,7 @@ export async function PATCH(
             scopeAllLeave: updated.scopeAllLeave,
             scopeAllReports: updated.scopeAllReports,
             scopeAllAttendance: updated.scopeAllAttendance,
+            scopeGroupAttendance: updated.scopeGroupAttendance,
             canSelfApproveLeave: updated.canSelfApproveLeave,
             isSystem: updated.isSystem,
             active: updated.active,

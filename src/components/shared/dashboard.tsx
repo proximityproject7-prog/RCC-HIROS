@@ -148,13 +148,16 @@ function TimeAttendanceWidget() {
     setActionLoading(true); setError(null);
     try {
       const loc = await captureLocation();
+      if (loc.lat === undefined || loc.lng === undefined) {
+        setError("Location access is required to clock in/out. Please enable location permissions and try again.");
+        return;
+      }
       const d = new Date();
       const clientDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
       const body: Record<string, unknown> = { action, clientDate };
       if (loc.lat !== undefined) { body.lat = loc.lat; body.lng = loc.lng; }
-      const result = await apiFetch<{ attendance: TodayAttendance; premises?: { onPremise: boolean | null; distance: number | null } }>("/api/attendance", { method: "POST", body: JSON.stringify(body) });
+      const result = await apiFetch<{ attendance: TodayAttendance }>("/api/attendance", { method: "POST", body: JSON.stringify(body) });
       setToday(result.attendance);
-      if (result.premises && result.premises.onPremise === false) setError(`Off premise. ${Math.round(result.premises.distance ?? 0)}m from ${premises?.name ?? "school"}.`);
     } catch (e) { setError(e instanceof Error ? e.message : "Failed"); }
     finally { setActionLoading(false); }
   }

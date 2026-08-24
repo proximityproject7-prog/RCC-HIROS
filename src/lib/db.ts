@@ -1,8 +1,13 @@
 import { PrismaClient } from "../generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
-const adapter = new PrismaBetterSqlite3({
-  url: process.env.DATABASE_URL || "file:./db/custom.db",
+const adapter = new PrismaMariaDb({
+  host: "localhost",
+  port: 3306,
+  user: "root",
+  password: "",
+  database: "rcc_hiros",
+  connectionLimit: 10,
 });
 
 // ═══════════════════════════════════════════════════════════════

@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       scopeAllLeave: role.scopeAllLeave,
       scopeAllReports: role.scopeAllReports,
       scopeAllAttendance: role.scopeAllAttendance,
+      scopeGroupAttendance: role.scopeGroupAttendance,
       canSelfApproveLeave: role.canSelfApproveLeave,
       isSystem: role.isSystem,
       active: role.active,
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
       scopeAllLeave = false,
       scopeAllReports = false,
       scopeAllAttendance = false,
+      scopeGroupAttendance = false,
       canSelfApproveLeave = false,
       permissions = [],
     } = body as {
@@ -84,6 +86,7 @@ export async function POST(request: NextRequest) {
       scopeAllLeave?: boolean;
       scopeAllReports?: boolean;
       scopeAllAttendance?: boolean;
+      scopeGroupAttendance?: boolean;
       canSelfApproveLeave?: boolean;
       permissions?: string[];
     };
@@ -125,6 +128,7 @@ export async function POST(request: NextRequest) {
         scopeAllLeave: !!scopeAllLeave,
         scopeAllReports: !!scopeAllReports,
         scopeAllAttendance: !!scopeAllAttendance,
+        scopeGroupAttendance: !!scopeGroupAttendance,
         canSelfApproveLeave: !!canSelfApproveLeave,
         isSystem: false, // Never allow creating system roles via API
         permissions: {
@@ -158,6 +162,7 @@ export async function POST(request: NextRequest) {
           scopeAllLeave: role.scopeAllLeave,
           scopeAllReports: role.scopeAllReports,
           scopeAllAttendance: role.scopeAllAttendance,
+          scopeGroupAttendance: role.scopeGroupAttendance,
           canSelfApproveLeave: role.canSelfApproveLeave,
           isSystem: role.isSystem,
           active: role.active,

@@ -4,14 +4,18 @@ import {
   requireAuth,
   requirePermission,
 } from "@/lib/auth-token";
-import { evaluateGeofence } from "@/lib/geolocation";
+import {
+  evaluateGeofence,
+  getPremisesConfig,
+  formatDistance,
+} from "@/lib/geolocation";
 
 // ═══════════════════════════════════════════════════════════════
 // GET  /api/attendance  attendance.view
 //   Filters: date, dateFrom, dateTo, groupId, roleId, status,
 //            employeeId, scope=mine|all
 //   status "no_clock_in" → diff active employees against records.
-//   Group scoping based on scopeAllAttendance.
+//   Group scoping based on scopeAllAttendance / scopeGroupAttendance.
 //
 // POST /api/attendance  attendance.clock_in
 //   { action: clock_in|clock_out, lat?, lng? }
@@ -50,8 +54,8 @@ export async function GET(request: NextRequest) {
         user.scopeAllAttendance
       ) {
         effectiveScope = "all";
-      } else if (user.groupId) {
-        // Limited to own group — keep "all" semantics but force groupId
+      } else if (user.scopeGroupAttendance && user.groupId) {
+        // Group-scoped: keep "all" semantics, forced to own group by scoping below
         effectiveScope = "all";
       } else {
         effectiveScope = "mine";
@@ -300,6 +304,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Geolocation is mandatory for all clock actions
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      return NextResponse.json(
+        { error: "Location access is required to clock in/out. Please enable location permissions and try again." },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
     // Use client-provided date if available (fixes timezone issues)
     // Otherwise fall back to server's local date
@@ -323,13 +335,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Evaluate geofence (if coordinates provided)
+      // Evaluate geofence (coordinates are guaranteed at this point)
       let onPremise: boolean | null = null;
       let distance: number | null = null;
       if (typeof lat === "number" && typeof lng === "number") {
         const geo = await evaluateGeofence(lat, lng);
         onPremise = geo.onPremise;
         distance = geo.distance;
+      }
+
+      if (!onPremise) {
+        const cfg = await getPremisesConfig();
+        return NextResponse.json(
+          { error: `You are ${formatDistance(distance ?? 0)} from ${cfg.label}. Clock-in is only allowed on premises.` },
+          { status: 403 }
+        );
       }
 
       // Use the @@unique([employeeId, date]) compound key for upsert
@@ -393,6 +413,14 @@ export async function POST(request: NextRequest) {
       const geo = await evaluateGeofence(lat, lng);
       onPremise = geo.onPremise;
       distance = geo.distance;
+    }
+
+    if (!onPremise) {
+      const cfg = await getPremisesConfig();
+      return NextResponse.json(
+        { error: `You are ${formatDistance(distance ?? 0)} from ${cfg.label}. Clock-out is only allowed on premises.` },
+        { status: 403 }
+      );
     }
 
     const record = await db.attendance.update({

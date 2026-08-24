@@ -1,9 +1,5 @@
-import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { db } from "../src/lib/db";
 import bcrypt from "bcryptjs";
-
-const adapter = new PrismaBetterSqlite3({ url: "file:./db/custom.db" });
-const db = new PrismaClient({ adapter });
 
 async function main() {
   const role = await db.role.create({

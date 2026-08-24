@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         scopeAllLeave: true,
         scopeAllReports: true,
         scopeAllAttendance: true,
+        scopeGroupAttendance: true,
         canSelfApproveLeave: true,
         isSystem: true,
       },

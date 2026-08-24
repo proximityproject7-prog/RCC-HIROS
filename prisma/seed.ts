@@ -5,10 +5,9 @@
 // employee certificates, system settings, and audit logs.
 // ═══════════════════════════════════════════════════════════════
 
-import { PrismaClient, type EvaluationCriterion } from "@prisma/client";
+import { db as prisma } from "../src/lib/db";
+import type { EvaluationCriterion } from "../src/generated/prisma/client";
 import { hash } from "bcryptjs";
-
-const prisma = new PrismaClient();
 
 const DEFAULT_PASSWORD = "RCC2026!";
 const YEAR = 2026;
@@ -172,6 +171,7 @@ async function upsertRole(
     scopeAllLeave?: boolean;
     scopeAllReports?: boolean;
     scopeAllAttendance?: boolean;
+    scopeGroupAttendance?: boolean;
     canSelfApproveLeave?: boolean;
     isSystem?: boolean;
   },
@@ -186,6 +186,7 @@ async function upsertRole(
       scopeAllLeave: opts.scopeAllLeave ?? false,
       scopeAllReports: opts.scopeAllReports ?? false,
       scopeAllAttendance: opts.scopeAllAttendance ?? false,
+      scopeGroupAttendance: opts.scopeGroupAttendance ?? false,
       canSelfApproveLeave: opts.canSelfApproveLeave ?? false,
       isSystem: opts.isSystem ?? false,
       active: true,
@@ -198,6 +199,7 @@ async function upsertRole(
       scopeAllLeave: opts.scopeAllLeave ?? false,
       scopeAllReports: opts.scopeAllReports ?? false,
       scopeAllAttendance: opts.scopeAllAttendance ?? false,
+      scopeGroupAttendance: opts.scopeGroupAttendance ?? false,
       canSelfApproveLeave: opts.canSelfApproveLeave ?? false,
       isSystem: opts.isSystem ?? false,
       active: true,
@@ -332,6 +334,7 @@ async function main() {
       scopeAllLeave: false,
       scopeAllReports: false,
       scopeAllAttendance: false,
+      scopeGroupAttendance: true,
       canSelfApproveLeave: false,
       isSystem: false,
     },

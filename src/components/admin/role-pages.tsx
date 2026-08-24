@@ -29,6 +29,7 @@ export interface Role {
   scopeAllLeave: boolean;
   scopeAllReports: boolean;
   scopeAllAttendance: boolean;
+  scopeGroupAttendance: boolean;
   canSelfApproveLeave: boolean;
   isSystem: boolean;
   active: boolean;
@@ -328,6 +329,7 @@ export function RoleListPage() {
                       <div className="flex flex-wrap gap-1">
                         {role.scopeAllLeave && <FlagBadge color="amber" icon={Globe}>All Leave</FlagBadge>}
                         {role.scopeAllAttendance && <FlagBadge color="amber" icon={Globe}>All Attendance</FlagBadge>}
+                        {role.scopeGroupAttendance && !role.scopeAllAttendance && <FlagBadge color="amber" icon={Globe}>Group Attendance</FlagBadge>}
                         {role.canSelfApproveLeave && <FlagBadge color="violet" icon={BadgeCheck}>Self-Approve</FlagBadge>}
                         {role.isSystem && <FlagBadge color="primary" icon={Lock}>System</FlagBadge>}
                         {role.active ? (
@@ -438,6 +440,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   const [scopeAllLeave, setScopeAllLeave] = useState(false);
   const [scopeAllReports, setScopeAllReports] = useState(false);
   const [scopeAllAttendance, setScopeAllAttendance] = useState(false);
+  const [scopeGroupAttendance, setScopeGroupAttendance] = useState(false);
   const [canSelfApproveLeave, setCanSelfApproveLeave] = useState(false);
   const [active, setActive] = useState(true);
   const [isSystem, setIsSystem] = useState(false);
@@ -463,6 +466,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         setScopeAllLeave(r.scopeAllLeave);
         setScopeAllReports(r.scopeAllReports);
         setScopeAllAttendance(r.scopeAllAttendance);
+        setScopeGroupAttendance(r.scopeGroupAttendance);
         setCanSelfApproveLeave(r.canSelfApproveLeave);
         setActive(r.active);
         setIsSystem(r.isSystem);
@@ -622,6 +626,12 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
             onChange={setScopeAllAttendance}
             title="All Attendance"
             description="View attendance records across all groups."
+          />
+          <ScopeCard
+            checked={scopeGroupAttendance}
+            onChange={setScopeGroupAttendance}
+            title="Own Group Attendance"
+            description="View attendance records within own group only."
           />
           <ScopeCard
             checked={canSelfApproveLeave}

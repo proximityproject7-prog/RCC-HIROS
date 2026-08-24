@@ -1,8 +1,4 @@
-import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-
-const adapter = new PrismaBetterSqlite3({ url: "file:./db/custom.db" });
-const db = new PrismaClient({ adapter });
+import { db } from "../src/lib/db";
 
 const YEAR = 2026;
 
