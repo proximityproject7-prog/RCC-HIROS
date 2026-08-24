@@ -23,7 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <GeofenceGuard onLogout={logout}>
+    <GeofenceGuard>
       <div className="flex h-screen bg-rcc-bg overflow-hidden">
         <DynamicSidebar />
         <div className="flex-1 flex flex-col overflow-hidden">

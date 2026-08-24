@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { MapPin, LogOut, AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
+import { MapPin, AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 
 // ═══════════════════════════════════════════════════════════════
-// GeofenceGuard — monitors user location and auto-logs out
-// when they leave the configured premises radius.
-// Off-premise state shows as a small collapsible floating
-// widget at the bottom-right corner.
+// GeofenceGuard — monitors user location and shows a small
+// collapsible notification (bottom-right) when they leave the
+// configured premises radius. Off-premise users cannot clock
+// in/out (enforced server-side); no auto-logout.
 // ═══════════════════════════════════════════════════════════════
 
 interface PremisesConfig {
@@ -25,7 +25,6 @@ const DEFAULT_PREMISES: PremisesConfig = {
   label: "Republic Central Colleges",
 };
 
-const AUTO_LOGOUT_SECONDS = 300; // 5 minutes off-premise before auto-logout
 const CHECK_INTERVAL_MS = 15_000; // check every 15 seconds
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -40,19 +39,15 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
 }
 
 interface GeofenceGuardProps {
-  onLogout: () => void;
   children: React.ReactNode;
 }
 
-export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
+export function GeofenceGuard({ children }: GeofenceGuardProps) {
   const [premises, setPremises] = useState<PremisesConfig>(DEFAULT_PREMISES);
   const [offPremise, setOffPremise] = useState(false);
   const [distance, setDistance] = useState<number | null>(null);
-  const [countdown, setCountdown] = useState(AUTO_LOGOUT_SECONDS);
   const [expanded, setExpanded] = useState(false);
   const watchIdRef = useRef<number | null>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const offSinceRef = useRef<number | null>(null);
 
   // Load premises config
   useEffect(() => {
@@ -76,19 +71,11 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
       setDistance(dist);
 
       if (isOff) {
-        if (!offSinceRef.current) {
-          // Just went off-premise
-          offSinceRef.current = Date.now();
-          setCountdown(AUTO_LOGOUT_SECONDS);
-          setExpanded(false);
-        }
         setOffPremise(true);
       } else {
-        // Back on premise — reset everything
-        offSinceRef.current = null;
+        // Back on premise — reset
         setOffPremise(false);
         setExpanded(false);
-        setCountdown(AUTO_LOGOUT_SECONDS);
       }
     },
     [premises]
@@ -113,29 +100,6 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
     };
   }, [handlePosition]);
 
-  // Countdown timer when off-premise (pure updater — no side effects)
-  useEffect(() => {
-    if (offPremise) {
-      countdownRef.current = setInterval(() => {
-        setCountdown((prev) => Math.max(0, prev - 1));
-      }, 1000);
-    }
-
-    return () => {
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-        countdownRef.current = null;
-      }
-    };
-  }, [offPremise]);
-
-  // Fire auto-logout from an effect — never inside a state updater
-  useEffect(() => {
-    if (offPremise && countdown === 0) {
-      onLogout();
-    }
-  }, [offPremise, countdown, onLogout]);
-
   // Also check periodically in case watchPosition doesn't fire
   useEffect(() => {
     const interval = setInterval(() => {
@@ -148,12 +112,6 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
 
     return () => clearInterval(interval);
   }, [handlePosition]);
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${String(s).padStart(2, "0")}`;
-  };
 
   return (
     <>
@@ -177,18 +135,11 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="px-3 py-2.5 space-y-2.5">
+              <div className="px-3 py-2.5">
                 <p className="text-xs text-rcc-text-secondary leading-relaxed">
                   {distance !== null && `${(distance / 1000).toFixed(1)} km away. `}
-                  Auto-logout in{" "}
-                  <span className="font-mono font-semibold text-amber-700">{formatTime(countdown)}</span>
+                  You can't time in or out while off premise.
                 </p>
-                <button
-                  onClick={onLogout}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors"
-                >
-                  <LogOut className="h-3 w-3" /> Sign Out
-                </button>
               </div>
             </div>
           ) : (
