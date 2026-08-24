@@ -50,9 +50,25 @@ interface PermissionDef {
   description: string;
 }
 
+type ScopeKey =
+  | "scopeAllProfiling"
+  | "scopeAllEvaluation"
+  | "scopeAllLeave"
+  | "scopeAllReports"
+  | "scopeAllAttendance"
+  | "scopeGroupAttendance"
+  | "canSelfApproveLeave";
+
+interface ScopeDef {
+  key: ScopeKey;
+  label: string;
+  description: string;
+}
+
 interface PermissionModule {
   label: string;
   permissions: PermissionDef[];
+  scopes?: ScopeDef[];
 }
 
 const PERMISSION_LABELS: Record<string, { label: string; description: string }> = {
@@ -107,22 +123,39 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
   {
     label: "Employee Profiling",
     permissions: ["profiling.view", "profiling.view_inactive", "profiling.create", "profiling.edit", "profiling.delete", "profile.selfEdit", "profile.editAll"],
+    scopes: [
+      { key: "scopeAllProfiling", label: "All Profiling", description: "See employee records across all groups." },
+    ],
   },
   {
     label: "Attendance",
     permissions: ["attendance.view", "attendance.clock_in", "attendance.edit", "attendance.edit_on_premise", "attendance.view_all"],
+    scopes: [
+      { key: "scopeAllAttendance", label: "All Attendance", description: "View attendance records across all groups." },
+      { key: "scopeGroupAttendance", label: "Own Group Attendance", description: "View attendance records within own group only." },
+    ],
   },
   {
     label: "Performance Evaluation",
     permissions: ["evaluation.view", "evaluation.submit", "evaluation.view_results", "evaluation.manage_forms", "evaluation.reset"],
+    scopes: [
+      { key: "scopeAllEvaluation", label: "All Evaluation", description: "View and submit evaluations institution-wide." },
+    ],
   },
   {
     label: "Leave Management",
     permissions: ["leave.request", "leave.approve_l1", "leave.approve_l2", "leave.view_all", "leave.manage_types"],
+    scopes: [
+      { key: "scopeAllLeave", label: "All Leave", description: "Approve and view all leave requests." },
+      { key: "canSelfApproveLeave", label: "Can Self-Approve Leave", description: "Allow approving own leave requests." },
+    ],
   },
   {
     label: "Reports",
     permissions: ["reports.view", "reports.export"],
+    scopes: [
+      { key: "scopeAllReports", label: "All Reports", description: "Access reports across all groups." },
+    ],
   },
   {
     label: "Roles & Permissions",
@@ -143,6 +176,7 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
     label: PERMISSION_LABELS[id]?.label ?? id,
     description: PERMISSION_LABELS[id]?.description ?? "",
   })),
+  scopes: m.scopes,
 }));
 
 // Validate that all PERMISSIONS exist in the matrix.
@@ -491,6 +525,16 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
     });
   };
 
+  const scopeState: Record<ScopeKey, [boolean, (v: boolean) => void]> = {
+    scopeAllProfiling: [scopeAllProfiling, setScopeAllProfiling],
+    scopeAllEvaluation: [scopeAllEvaluation, setScopeAllEvaluation],
+    scopeAllLeave: [scopeAllLeave, setScopeAllLeave],
+    scopeAllReports: [scopeAllReports, setScopeAllReports],
+    scopeAllAttendance: [scopeAllAttendance, setScopeAllAttendance],
+    scopeGroupAttendance: [scopeGroupAttendance, setScopeGroupAttendance],
+    canSelfApproveLeave: [canSelfApproveLeave, setCanSelfApproveLeave],
+  };
+
   const handleSave = async () => {
     setError(null);
     if (!name.trim()) {
@@ -507,6 +551,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         scopeAllLeave,
         scopeAllReports,
         scopeAllAttendance,
+        scopeGroupAttendance,
         canSelfApproveLeave,
         active,
         permissions: Array.from(perms),
@@ -549,7 +594,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
           {mode === "create" ? "Create Role" : `Edit Role: ${name}`}
         </h1>
         <p className="text-sm text-rcc-text-muted mt-0.5">
-          Configure name, scope flags, and the permission matrix.
+          Configure name, permissions, and module scope flags.
         </p>
       </div>
 
@@ -584,68 +629,20 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
             />
           </Field>
         </div>
-      </section>
-
-      {/* Scope & Special Permissions */}
-      <section className="bg-rcc-surface rounded-lg border border-rcc-border p-6 space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">
-            Scope &amp; Special Permissions
-          </h2>
-          <p className="text-xs text-rcc-text-muted mt-0.5">
-            Scope flags bypass group-based restrictions for the module.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          <ScopeCard
-            checked={scopeAllProfiling}
-            onChange={setScopeAllProfiling}
-            title="All Profiling"
-            description="See employee records across all groups."
-          />
-          <ScopeCard
-            checked={scopeAllEvaluation}
-            onChange={setScopeAllEvaluation}
-            title="All Evaluation"
-            description="View &amp; submit evaluations institution-wide."
-          />
-          <ScopeCard
-            checked={scopeAllLeave}
-            onChange={setScopeAllLeave}
-            title="All Leave"
-            description="Approve and view all leave requests."
-          />
-          <ScopeCard
-            checked={scopeAllReports}
-            onChange={setScopeAllReports}
-            title="All Reports"
-            description="Access reports across all groups."
-          />
-          <ScopeCard
-            checked={scopeAllAttendance}
-            onChange={setScopeAllAttendance}
-            title="All Attendance"
-            description="View attendance records across all groups."
-          />
-          <ScopeCard
-            checked={scopeGroupAttendance}
-            onChange={setScopeGroupAttendance}
-            title="Own Group Attendance"
-            description="View attendance records within own group only."
-          />
-          <ScopeCard
-            checked={canSelfApproveLeave}
-            onChange={setCanSelfApproveLeave}
-            title="Can Self-Approve Leave"
-            description="Allow approving own leave requests."
-          />
-          <ScopeCard
+        <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors w-fit pr-6 ${
+          active ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"
+        }`}>
+          <input
+            type="checkbox"
             checked={active}
-            onChange={setActive}
-            title="Active"
-            description="Inactive roles cannot be assigned to employees."
+            onChange={(e) => setActive(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
           />
-        </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-rcc-text-primary">Active</p>
+            <p className="text-xs text-rcc-text-muted mt-0.5">Inactive roles cannot be assigned to employees.</p>
+          </div>
+        </label>
         {isSystem && (
           <div className="bg-rcc-primary/5 border border-rcc-primary/20 rounded-md p-3 text-xs text-rcc-text-secondary flex items-center gap-2">
             <Lock className="h-3.5 w-3.5" />
@@ -718,6 +715,35 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
                     </label>
                   ))}
                 </div>
+                {mod.scopes && mod.scopes.length > 0 && (
+                  <div className="bg-amber-50/40 divide-y divide-amber-100 border-t border-amber-100">
+                    {mod.scopes.map((s) => {
+                      const [checked, onChange] = scopeState[s.key];
+                      return (
+                        <label
+                          key={s.key}
+                          className="flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-amber-50/70 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => onChange(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-rcc-text-primary">
+                              {s.label}
+                              <span className="ml-1.5 text-[9px] uppercase tracking-wide font-semibold text-amber-700 bg-amber-100 px-1 py-0.5 rounded align-middle">
+                                Scope
+                              </span>
+                            </p>
+                            <p className="text-xs text-rcc-text-muted">{s.description}</p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -770,36 +796,5 @@ function Field({
       {children}
       {hint && <p className="text-xs text-rcc-text-muted mt-1">{hint}</p>}
     </div>
-  );
-}
-
-function ScopeCard({
-  checked,
-  onChange,
-  title,
-  description,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  title: string;
-  description: string;
-}) {
-  return (
-    <label
-      className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
-        checked ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"
-      }`}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
-      />
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-rcc-text-primary">{title}</p>
-        <p className="text-xs text-rcc-text-muted mt-0.5" dangerouslySetInnerHTML={{ __html: description }} />
-      </div>
-    </label>
   );
 }
