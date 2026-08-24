@@ -108,7 +108,7 @@ function WidgetCard({ icon: Icon, label, value, onClick, highlight }: { icon: Lu
 
 // ─── Time & Attendance Widget ──────────────────────────────────────────────
 interface TodayAttendance { id: string; clockInAt: string | null; clockOutAt: string | null; clockInOnPremise: boolean | null; clockInDistance: number | null; manuallyEdited: boolean; editRemarks: string | null; }
-interface PremisesInfo { lat: number | null; lng: number | null; radiusMeters: number; name: string; }
+interface PremisesInfo { lat: number | null; lng: number | null; radiusMeters: number; label: string; }
 
 function TimeAttendanceWidget() {
   const { setCurrentPage } = useAuthStore();
@@ -171,7 +171,7 @@ function TimeAttendanceWidget() {
     <div className="bg-rcc-sidebar-bg rounded-lg overflow-hidden shadow-md">
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/10">
         <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-amber-500" /><h2 className="text-sm font-semibold text-yellow-50">Time &amp; Attendance</h2></div>
-        {premises?.lat && <div className="flex items-center gap-1 text-xs text-yellow-50/60"><MapPin className="h-3 w-3" />{premises.name}</div>}
+        {premises?.lat && <div className="flex items-center gap-1 text-xs text-yellow-50/60"><MapPin className="h-3 w-3" />{premises.label}</div>}
       </div>
       <div className="px-6 py-5">
         <div className="flex items-start justify-between flex-wrap gap-4">

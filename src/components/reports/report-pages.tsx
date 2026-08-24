@@ -717,15 +717,15 @@ export function ReportsPage() {
                                   <h4 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Profile</h4>
                                   <div className="flex items-center gap-2 text-rcc-text-primary">
                                     <Mail className="h-3.5 w-3.5 text-rcc-text-muted" />
-                                    <span>{r.email || "—"}</span>
+                                    <span>{r.email || "N/A"}</span>
                                   </div>
                                   <div className="flex items-center gap-2 text-rcc-text-primary">
                                     <Users className="h-3.5 w-3.5 text-rcc-text-muted" />
-                                    <span>{r.gender ?? "—"}</span>
+                                    <span>{r.gender ?? "N/A"}</span>
                                   </div>
                                   <div className="flex items-center gap-2 text-rcc-text-primary">
                                     <Briefcase className="h-3.5 w-3.5 text-rcc-text-muted" />
-                                    <span>{r.contractType || "—"}</span>
+                                    <span>{r.contractType || "N/A"}</span>
                                   </div>
                                 </div>
 
@@ -738,11 +738,11 @@ export function ReportsPage() {
                                   </div>
                                   <div className="flex items-center gap-2 text-rcc-text-primary">
                                     <Users className="h-3.5 w-3.5 text-rcc-text-muted" />
-                                    <span>{r.roleName || "—"}</span>
+                                    <span>{r.roleName || "N/A"}</span>
                                   </div>
                                   <div className="flex items-center gap-2 text-rcc-text-primary">
                                     <Calendar className="h-3.5 w-3.5 text-rcc-text-muted" />
-                                    <span>{r.hireDate ? new Date(r.hireDate).toLocaleDateString() : "—"}</span>
+                                    <span>{r.hireDate ? new Date(r.hireDate).toLocaleDateString() : "N/A"}</span>
                                   </div>
                                 </div>
 

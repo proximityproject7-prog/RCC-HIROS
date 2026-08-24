@@ -1315,7 +1315,7 @@ async function main() {
     lat: 15.1428,
     lng: 120.5886,
     radiusMeters: 200,
-    label: "Republic Central Colleges — Angeles",
+    label: "Republic Central Colleges - Angeles",
   });
   await prisma.systemSetting.upsert({
     where: { key: "premises_config" },

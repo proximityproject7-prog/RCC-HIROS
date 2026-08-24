@@ -498,7 +498,7 @@ function EditAttendanceModal({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Clock-In On Premise Override" hint="Blank = no override.">
                 <select value={clockInOnPremise} onChange={(e) => setClockInOnPremise(e.target.value)} className={inputClass}>
-                  <option value="">— No override —</option>
+                  <option value="">No override</option>
                   <option value="true">On Premise</option>
                   <option value="false">Off Premise</option>
                 </select>

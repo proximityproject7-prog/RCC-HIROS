@@ -555,7 +555,7 @@ export function EvaluationFormsPage() {
                               {g.name}
                             </label>
                           ))}
-                          {editGroupIds.length === 0 && <span className="text-[10px] text-rcc-text-muted italic">No groups selected — no one will be authorized</span>}
+                          {editGroupIds.length === 0 && <span className="text-[10px] text-rcc-text-muted italic">No groups selected. No one will be authorized.</span>}
                         </div>
                       )}
                     </div>
@@ -587,7 +587,7 @@ export function EvaluationFormsPage() {
                               {r.name}
                             </label>
                           ))}
-                          {editRoleIds.length === 0 && <span className="text-[10px] text-rcc-text-muted italic">No roles selected — no one will be authorized</span>}
+                          {editRoleIds.length === 0 && <span className="text-[10px] text-rcc-text-muted italic">No roles selected. No one will be authorized.</span>}
                         </div>
                       )}
                     </div>

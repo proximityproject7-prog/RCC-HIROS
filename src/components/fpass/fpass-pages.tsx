@@ -509,7 +509,7 @@ function FpassFormPage({
           <div>
             <h1 className="text-xl font-bold text-rcc-text-primary">Faculty Performance Appraisal Form</h1>
             <p className="text-sm text-rcc-text-muted mt-0.5">
-              {employee?.employeeId} — {formData.header.name || "Loading..."}
+              {employee?.employeeId} - {formData.header.name || "Loading..."}
             </p>
           </div>
         </div>

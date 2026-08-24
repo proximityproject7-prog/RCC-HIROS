@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { MapPin, LogOut, AlertTriangle } from "lucide-react";
+import { MapPin, LogOut, AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 
 // ═══════════════════════════════════════════════════════════════
 // GeofenceGuard — monitors user location and auto-logs out
 // when they leave the configured premises radius.
+// Off-premise state shows as a small collapsible floating
+// widget at the bottom-right corner.
 // ═══════════════════════════════════════════════════════════════
 
 interface PremisesConfig {
@@ -47,7 +49,7 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
   const [offPremise, setOffPremise] = useState(false);
   const [distance, setDistance] = useState<number | null>(null);
   const [countdown, setCountdown] = useState(AUTO_LOGOUT_SECONDS);
-  const [dismissed, setDismissed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const watchIdRef = useRef<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const offSinceRef = useRef<number | null>(null);
@@ -77,15 +79,15 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
         if (!offSinceRef.current) {
           // Just went off-premise
           offSinceRef.current = Date.now();
-          setDismissed(false);
           setCountdown(AUTO_LOGOUT_SECONDS);
+          setExpanded(false);
         }
         setOffPremise(true);
       } else {
         // Back on premise — reset everything
         offSinceRef.current = null;
         setOffPremise(false);
-        setDismissed(false);
+        setExpanded(false);
         setCountdown(AUTO_LOGOUT_SECONDS);
       }
     },
@@ -111,19 +113,11 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
     };
   }, [handlePosition]);
 
-  // Countdown timer when off-premise
+  // Countdown timer when off-premise (pure updater — no side effects)
   useEffect(() => {
-    if (offPremise && !dismissed) {
+    if (offPremise) {
       countdownRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            // Time's up — auto-logout
-            if (countdownRef.current) clearInterval(countdownRef.current);
-            onLogout();
-            return 0;
-          }
-          return prev - 1;
-        });
+        setCountdown((prev) => Math.max(0, prev - 1));
       }, 1000);
     }
 
@@ -133,7 +127,14 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
         countdownRef.current = null;
       }
     };
-  }, [offPremise, dismissed, onLogout]);
+  }, [offPremise]);
+
+  // Fire auto-logout from an effect — never inside a state updater
+  useEffect(() => {
+    if (offPremise && countdown === 0) {
+      onLogout();
+    }
+  }, [offPremise, countdown, onLogout]);
 
   // Also check periodically in case watchPosition doesn't fire
   useEffect(() => {
@@ -154,52 +155,58 @@ export function GeofenceGuard({ onLogout, children }: GeofenceGuardProps) {
     return `${m}:${String(s).padStart(2, "0")}`;
   };
 
-  const handleDismiss = () => setDismissed(true);
-
   return (
     <>
       {children}
 
-      {/* Off-premise warning banner */}
-      {offPremise && !dismissed && (
-        <div className="fixed bottom-0 left-0 right-0 z-[100] animate-slide-up">
-          <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-2xl">
-            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">
-                  You are off premises — {premises.label}
-                </p>
-                <p className="text-xs opacity-90 mt-0.5">
-                  {distance !== null && `${(distance / 1000).toFixed(1)} km away — `}
-                  Please return within school premises. Auto-logout in{" "}
-                  <span className="font-mono font-bold">{formatTime(countdown)}</span>
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
+      {/* Off-premise floating widget (collapsed pill by default) */}
+      {offPremise && (
+        <div className="fixed bottom-4 right-4 z-[100]">
+          {expanded ? (
+            <div className="w-64 bg-rcc-surface border border-amber-300 rounded-lg shadow-xl overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border-b border-amber-200">
+                <div className="flex items-center gap-1.5 text-amber-700">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold">You are off premise</span>
+                </div>
                 <button
-                  onClick={handleDismiss}
-                  className="px-3 py-1.5 text-xs font-semibold bg-white/20 hover:bg-white/30 rounded-md transition-colors"
+                  onClick={() => setExpanded(false)}
+                  className="p-1 rounded-md hover:bg-amber-100 text-amber-700 transition-colors"
+                  aria-label="Collapse"
                 >
-                  Dismiss
+                  <ChevronDown className="h-3.5 w-3.5" />
                 </button>
+              </div>
+              <div className="px-3 py-2.5 space-y-2.5">
+                <p className="text-xs text-rcc-text-secondary leading-relaxed">
+                  {distance !== null && `${(distance / 1000).toFixed(1)} km away. `}
+                  Auto-logout in{" "}
+                  <span className="font-mono font-semibold text-amber-700">{formatTime(countdown)}</span>
+                </p>
                 <button
                   onClick={onLogout}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white text-orange-600 hover:bg-orange-50 rounded-md transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors"
                 >
-                  <LogOut className="h-3.5 w-3.5" /> Sign Out
+                  <LogOut className="h-3 w-3" /> Sign Out
                 </button>
               </div>
             </div>
-          </div>
+          ) : (
+            <button
+              onClick={() => setExpanded(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-lg text-xs font-semibold transition-colors animate-pulse"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              You are off premise
+              <ChevronUp className="h-3 w-3 opacity-80" />
+            </button>
+          )}
         </div>
       )}
 
-      {/* Subtle indicator when on-premise (optional — small dot in corner) */}
+      {/* Subtle indicator when on-premise */}
       {distance !== null && !offPremise && (
-        <div className="fixed bottom-3 right-3 z-[90]" title={`On premises — ${distance}m from center`}>
+        <div className="fixed bottom-3 right-3 z-[90]" title={`On premises (${distance}m from center)`}>
           <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded-full text-[10px] text-green-700 font-medium">
             <MapPin className="h-3 w-3" />
             On Premises
