@@ -29,6 +29,7 @@ export interface AuthUser {
   scopeAllLeave: boolean;
   scopeAllReports: boolean;
   scopeAllAttendance: boolean;
+  scopeGroupAttendance: boolean;
   canSelfApproveLeave: boolean;
   isSystem: boolean;
 

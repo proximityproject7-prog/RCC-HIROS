@@ -100,7 +100,12 @@ export async function GET(request: NextRequest) {
       if (Object.keys(range).length > 0) where.date = range;
     }
 
-    if (groupId) where.employee = { ...(where.employee as object || {}), groupId };
+    // Only institution-wide viewers may filter by an arbitrary group;
+    // group-scoped users stay locked to their own group (forced above).
+    const canViewAllAttendance =
+      user.isSystem || user.scopeAllAttendance || user.permissions.includes("attendance.view_all");
+    if (groupId && canViewAllAttendance)
+      where.employee = { ...(where.employee as object || {}), groupId };
     if (roleId)
       where.employee = { ...(where.employee as object || {}), roleId };
     if (employeeId) {
@@ -173,7 +178,7 @@ export async function GET(request: NextRequest) {
         if (user.groupId) empWhere.groupId = user.groupId;
         else empWhere.id = user.id;
       }
-      if (groupId) empWhere.groupId = groupId;
+      if (groupId && canViewAllAttendance) empWhere.groupId = groupId;
       if (roleId) empWhere.roleId = roleId;
       if (employeeId) empWhere.id = employeeId;
 

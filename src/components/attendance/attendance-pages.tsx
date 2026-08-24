@@ -98,7 +98,7 @@ function osmUrl(lat: number, lng: number): string {
 
 export function AttendanceListPage() {
   const { setCurrentPage } = useAuthStore();
-  const { has, scopeAllAttendance, isSystemAdmin } = usePermissions();
+  const { has, scopeAllAttendance, scopeGroupAttendance, isSystemAdmin } = usePermissions();
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [groups, setGroups] = useState<GroupBrief[]>([]);
@@ -113,8 +113,10 @@ export function AttendanceListPage() {
 
   const [editing, setEditing] = useState<AttendanceRecord | null>(null);
 
-  // Effective scope: "all" if has attendance.view_all / scopeAllAttendance / system
+  // Effective scope: "all" if institution-wide (attendance.view_all / scopeAllAttendance / system)
+  // or group-scoped (scopeGroupAttendance) — the server then enforces the actual range.
   const canViewAll = isSystemAdmin || has("attendance.view_all") || scopeAllAttendance;
+  const canSeeOthers = canViewAll || scopeGroupAttendance;
 
   useEffect(() => {
     (async () => {
@@ -136,7 +138,7 @@ export function AttendanceListPage() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.set("scope", canViewAll ? "all" : "mine");
+      params.set("scope", canSeeOthers ? "all" : "mine");
       if (date) params.set("date", date);
       if (groupId) params.set("groupId", groupId);
       if (roleId) params.set("roleId", roleId);
@@ -148,7 +150,7 @@ export function AttendanceListPage() {
     } finally {
       setLoading(false);
     }
-  }, [canViewAll, date, groupId, roleId, status]);
+  }, [canSeeOthers, date, groupId, roleId, status]);
 
   useEffect(() => {
     loadRecords();
@@ -189,7 +191,13 @@ export function AttendanceListPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Group</label>
-            <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={inputClass}>
+            <select
+              value={canViewAll ? groupId : ""}
+              onChange={(e) => setGroupId(e.target.value)}
+              disabled={!canViewAll}
+              title={canViewAll ? undefined : "You can only view your own group's attendance."}
+              className={`${inputClass} disabled:opacity-60 disabled:cursor-not-allowed`}
+            >
               <option value="">All groups</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>{g.name}</option>

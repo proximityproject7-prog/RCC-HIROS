@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         scopeAllLeave: employee.role.scopeAllLeave,
         scopeAllReports: employee.role.scopeAllReports,
         scopeAllAttendance: employee.role.scopeAllAttendance,
+        scopeGroupAttendance: employee.role.scopeGroupAttendance,
         canSelfApproveLeave: employee.role.canSelfApproveLeave,
         isSystem: employee.role.isSystem,
         groupId: employee.groupId,

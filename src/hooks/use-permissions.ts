@@ -29,6 +29,8 @@ export interface UsePermissionsResult {
   scopeAllLeave: boolean;
   scopeAllReports: boolean;
   scopeAllAttendance: boolean;
+  /** True if the user can view attendance records within their own group. */
+  scopeGroupAttendance: boolean;
   /** Whether the user can self-approve their own leave requests. */
   canSelfApproveLeave: boolean;
   /** Raw permission set (frozen list). */
@@ -70,6 +72,7 @@ export function usePermissions(): UsePermissionsResult {
       scopeAllLeave: user?.scopeAllLeave ?? false,
       scopeAllReports: user?.scopeAllReports ?? false,
       scopeAllAttendance: user?.scopeAllAttendance ?? false,
+      scopeGroupAttendance: user?.scopeGroupAttendance ?? false,
       canSelfApproveLeave: user?.canSelfApproveLeave ?? false,
       permissions,
     };
