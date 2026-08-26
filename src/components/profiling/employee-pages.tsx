@@ -676,8 +676,8 @@ function SectionCard({ title, icon: Icon, canEdit, editing, onEdit, onCancel, on
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-rcc-border">
+    <div className="bg-rcc-surface rounded-lg border-t border-rcc-border overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5">
         <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide flex items-center gap-2">
           <Icon className="h-4 w-4 text-rcc-primary" /> {title}
         </h2>
@@ -1226,7 +1226,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const photoUrl = employee.photo ? `/api/employees/${employeeId}/photo` : null;
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
+    <div className="space-y-5 max-w-5xl mx-auto">
 
       {employeeId !== user?.id && (
         <div className="flex items-center gap-3">
@@ -1248,7 +1248,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         <div className="px-6 pb-5 -mt-12 relative">
           <div className="flex items-end gap-4">
             <div className="relative group">
-              <div className="w-24 h-24 rounded-full border-4 border-rcc-surface bg-rcc-primary/10 text-rcc-primary flex items-center justify-center text-2xl font-bold overflow-hidden shadow-md">
+              <div className="w-24 h-24 rounded-full border-4 border-rcc-surface bg-rcc-surface text-rcc-primary flex items-center justify-center text-2xl font-bold overflow-hidden shadow-md">
                 {photoUrl ? <img src={photoUrl} alt={fullName} className="w-full h-full object-cover" /> : initials}
               </div>
               {canEditProfile && (
