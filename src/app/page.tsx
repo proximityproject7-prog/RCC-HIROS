@@ -101,7 +101,11 @@ export default function HomePage() {
         </PermissionGuard>
       ); break;
     case "fpass":
-      content = (
+      content = currentSubpage === "settings" ? (
+        <PermissionGuard require="fpass.manage" fallback={<PermissionDenied />}>
+          <FpassPage showSettings />
+        </PermissionGuard>
+      ) : (
         <PermissionGuard any={["fpass.fill", "fpass.manage"]} fallback={<PermissionDenied />}>
           <FpassPage
             employeeId={currentSubpage?.startsWith("emp:") ? currentSubpage.slice(4) : undefined}

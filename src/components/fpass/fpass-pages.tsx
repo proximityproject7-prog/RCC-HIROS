@@ -138,12 +138,12 @@ function makeRowId(): string {
 // Main Page
 // ═══════════════════════════════════════════════════════════════
 
-export function FpassPage({ employeeId, submissionId }: { employeeId?: string; submissionId?: string }) {
+export function FpassPage({ employeeId, submissionId, showSettings: showSettingsProp }: { employeeId?: string; submissionId?: string; showSettings?: boolean }) {
   const { has } = usePermissions();
   const canManage = has("fpass.manage");
   const { setCurrentPage } = useAuthStore();
 
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(showSettingsProp ?? false);
 
   // If admin clicks settings, show settings page
   if (showSettings && canManage) {

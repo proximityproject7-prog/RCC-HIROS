@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   Plus, Search, Pencil, ArrowLeft, Save, Users as UsersIcon, Upload,
   FileText, Download, Trash2, Eye, X, Lock, Mail, Phone, MapPin, Calendar,
-  IdCard, Briefcase, Award, Image as ImageIcon, AlertTriangle, Building2,
+  IdCard, Briefcase, Award, Image as ImageIcon, AlertTriangle, Building2, Settings,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
@@ -676,7 +676,7 @@ function SectionCard({ title, icon: Icon, canEdit, editing, onEdit, onCancel, on
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-rcc-surface rounded-lg border-t border-rcc-border overflow-hidden">
+    <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3.5">
         <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide flex items-center gap-2">
           <Icon className="h-4 w-4 text-rcc-primary" /> {title}
@@ -818,6 +818,18 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
+  // Full inline edit form (replaces navigating to EmployeeFormPage)
+  const [showFullEdit, setShowFullEdit] = useState(false);
+  const [fullEditGroups, setFullEditGroups] = useState<GroupBrief[]>([]);
+  const [fullEditRoles, setFullEditRoles] = useState<RoleBrief[]>([]);
+  const [fullEditSaving, setFullEditSaving] = useState(false);
+  const [fullEditError, setFullEditError] = useState<string | null>(null);
+  const [fullEditForm, setFullEditForm] = useState({
+    employeeId: "", firstName: "", middleName: "", lastName: "", email: "",
+    phone: "", address: "", birthday: "", gender: "",
+    groupId: "", roleId: "", contractType: "Regular", hireDate: "", salary: "", active: true,
+  });
+
   // Profile data (LinkedIn-style)
   const canFillProfile = employeeId === user?.id && (user as any)?.canEditProfile;
   const [profileData, setProfileData] = useState<Record<string, any[]>>({});
@@ -833,6 +845,11 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   });
   const [editingScalars, setEditingScalars] = useState(false);
   const [scalarSaving, setScalarSaving] = useState(false);
+
+  // System configuration (visible to roles.edit users)
+  const [configGroups, setConfigGroups] = useState<GroupBrief[]>([]);
+  const [configFpassGroupIds, setConfigFpassGroupIds] = useState<string[]>([]);
+  const [configPremises, setConfigPremises] = useState<{ label: string; lat: number; lng: number; radiusMeters: number } | null>(null);
 
   // Parse profileData JSON
   useEffect(() => {
@@ -886,6 +903,25 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       }
     })();
   }, [employee?.groupId]);
+
+  // Load system configuration for roles.edit users
+  useEffect(() => {
+    if (!has("roles.edit")) return;
+    (async () => {
+      try {
+        const [groupsData, fpassData, premisesData] = await Promise.all([
+          apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
+          apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings"),
+          apiFetch<{ premises: { label: string; lat: number; lng: number; radiusMeters: number } }>("/api/settings/premises"),
+        ]);
+        setConfigGroups(groupsData.groups ?? []);
+        setConfigFpassGroupIds(fpassData.enabledGroupIds ?? []);
+        setConfigPremises(premisesData.premises);
+      } catch {
+        // non-fatal
+      }
+    })();
+  }, [has]);
 
   // Revoke blob URLs when viewer closes
   useEffect(() => {
@@ -1054,6 +1090,77 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     }
   };
 
+  // ── Full inline edit form ────────────────────────────────────
+  const openFullEdit = async () => {
+    if (!employee) return;
+    setFullEditError(null);
+    setFullEditForm({
+      employeeId: employee.employeeId,
+      firstName: employee.firstName,
+      middleName: employee.middleName ?? "",
+      lastName: employee.lastName,
+      email: employee.email,
+      phone: employee.phone ?? "",
+      address: employee.address ?? "",
+      birthday: employee.birthday ? employee.birthday.slice(0, 10) : "",
+      gender: employee.gender ?? "",
+      groupId: employee.groupId ?? "",
+      roleId: employee.roleId ?? "",
+      contractType: employee.contractType ?? "Regular",
+      hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
+      salary: employee.salary != null ? String(employee.salary) : "",
+      active: employee.active,
+    });
+    try {
+      const [groupsData, rolesData] = await Promise.all([
+        apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
+        apiFetch<{ roles: RoleBrief[] }>("/api/roles/active"),
+      ]);
+      setFullEditGroups(groupsData.groups ?? []);
+      setFullEditRoles(rolesData.roles ?? []);
+    } catch {
+      // non-fatal — dropdowns will be empty
+    }
+    setShowFullEdit(true);
+  };
+
+  const saveFullEdit = async () => {
+    setFullEditError(null);
+    if (!fullEditForm.employeeId.trim()) return setFullEditError("Employee ID is required.");
+    if (!fullEditForm.firstName.trim()) return setFullEditError("First name is required.");
+    if (!fullEditForm.lastName.trim()) return setFullEditError("Last name is required.");
+    if (!fullEditForm.email.trim()) return setFullEditError("Email is required.");
+    setFullEditSaving(true);
+    try {
+      await apiFetch(`/api/employees/${employeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          employeeId: fullEditForm.employeeId.trim(),
+          firstName: fullEditForm.firstName.trim(),
+          middleName: fullEditForm.middleName.trim() || null,
+          lastName: fullEditForm.lastName.trim(),
+          email: fullEditForm.email.trim(),
+          phone: fullEditForm.phone.trim() || null,
+          address: fullEditForm.address.trim() || null,
+          birthday: fullEditForm.birthday || null,
+          gender: fullEditForm.gender || null,
+          groupId: fullEditForm.groupId || null,
+          roleId: fullEditForm.roleId || null,
+          contractType: fullEditForm.contractType,
+          hireDate: fullEditForm.hireDate || null,
+          salary: fullEditForm.salary ? parseFloat(fullEditForm.salary) : 0,
+          active: fullEditForm.active,
+        }),
+      });
+      setShowFullEdit(false);
+      loadEmployee();
+    } catch (err) {
+      setFullEditError(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setFullEditSaving(false);
+    }
+  };
+
   // ── Reupload file ────────────────────────────────────────────
   const [reuploading, setReuploading] = useState<string | null>(null);
 
@@ -1161,7 +1268,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     setSectionSaving(true);
     try {
       const updated = { ...profileData, [key]: sectionForm.filter(row =>
-        Object.values(row).some(v => v && v.trim())
+        Object.values(row).some(v => v && String(v).trim())
       ) };
       await apiFetch(`/api/employees/${employeeId}`, {
         method: "PATCH",
@@ -1245,7 +1352,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       {/* Header Card */}
       <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
         <div className="h-28 bg-gradient-to-r from-rcc-primary/20 via-rcc-primary/10 to-rcc-accent/10" />
-        <div className="px-6 pb-5 -mt-12 relative">
+        <div className="px-6 pb-5 -mt-8 relative">
           <div className="flex items-end gap-4">
             <div className="relative group">
               <div className="w-24 h-24 rounded-full border-4 border-rcc-surface bg-rcc-surface text-rcc-primary flex items-center justify-center text-2xl font-bold overflow-hidden shadow-md">
@@ -1279,7 +1386,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             </div>
             <div className="flex items-center gap-2 pb-1">
               {has("profiling.edit") && (
-                <button onClick={() => setCurrentPage("profiling", `edit:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                <button onClick={openFullEdit} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </button>
               )}
@@ -1293,6 +1400,96 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </div>
       </div>
 
+      {/* Full Inline Edit Form */}
+      {showFullEdit && (
+        <div className="space-y-5">
+          {fullEditError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-rcc-error flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" /> {fullEditError}
+              <button onClick={() => setFullEditError(null)} className="ml-auto"><X className="h-4 w-4" /></button>
+            </div>
+          )}
+
+          <SectionCard title="Personal Information" icon={UsersIcon}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Field label="Employee ID" required>
+                <input type="text" value={fullEditForm.employeeId} onChange={(e) => setFullEditForm(f => ({ ...f, employeeId: e.target.value }))} placeholder="EMP-0001" className={`${inputClass} font-mono`} />
+              </Field>
+              <Field label="First Name" required>
+                <input type="text" value={fullEditForm.firstName} onChange={(e) => setFullEditForm(f => ({ ...f, firstName: e.target.value }))} className={inputClass} />
+              </Field>
+              <Field label="Middle Name">
+                <input type="text" value={fullEditForm.middleName} onChange={(e) => setFullEditForm(f => ({ ...f, middleName: e.target.value }))} className={inputClass} />
+              </Field>
+              <Field label="Last Name" required>
+                <input type="text" value={fullEditForm.lastName} onChange={(e) => setFullEditForm(f => ({ ...f, lastName: e.target.value }))} className={inputClass} />
+              </Field>
+              <Field label="Email" required>
+                <input type="email" value={fullEditForm.email} onChange={(e) => setFullEditForm(f => ({ ...f, email: e.target.value }))} className={inputClass} />
+              </Field>
+              <Field label="Phone">
+                <input type="text" value={fullEditForm.phone} onChange={(e) => setFullEditForm(f => ({ ...f, phone: e.target.value }))} className={inputClass} />
+              </Field>
+              <Field label="Birthday">
+                <input type="date" value={fullEditForm.birthday} onChange={(e) => setFullEditForm(f => ({ ...f, birthday: e.target.value }))} className={inputClass} />
+              </Field>
+              <Field label="Gender">
+                <select value={fullEditForm.gender} onChange={(e) => setFullEditForm(f => ({ ...f, gender: e.target.value }))} className={inputClass}>
+                  <option value="">-</option>
+                  {GENDER_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </Field>
+              <Field label="Address" hint="Full home address.">
+                <input type="text" value={fullEditForm.address} onChange={(e) => setFullEditForm(f => ({ ...f, address: e.target.value }))} className={inputClass} />
+              </Field>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Work Assignment" icon={Briefcase}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Field label="Group">
+                <select value={fullEditForm.groupId} onChange={(e) => setFullEditForm(f => ({ ...f, groupId: e.target.value }))} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {fullEditGroups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.code})</option>)}
+                </select>
+              </Field>
+              <Field label="Role">
+                <select value={fullEditForm.roleId} onChange={(e) => setFullEditForm(f => ({ ...f, roleId: e.target.value }))} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {fullEditRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Contract Type">
+                <select value={fullEditForm.contractType} onChange={(e) => setFullEditForm(f => ({ ...f, contractType: e.target.value }))} className={inputClass}>
+                  {CONTRACT_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+              <Field label="Hire Date">
+                <input type="date" value={fullEditForm.hireDate} onChange={(e) => setFullEditForm(f => ({ ...f, hireDate: e.target.value }))} className={inputClass} />
+              </Field>
+              <Field label="Monthly Salary" hint="PHP">
+                <input type="number" value={fullEditForm.salary} onChange={(e) => setFullEditForm(f => ({ ...f, salary: e.target.value }))} min="0" step="0.01" className={inputClass} />
+              </Field>
+              <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors md:col-span-2 ${fullEditForm.active ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"}`}>
+                <input type="checkbox" checked={fullEditForm.active} onChange={(e) => setFullEditForm(f => ({ ...f, active: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40" />
+                <div>
+                  <p className="text-sm font-semibold text-rcc-text-primary">Active Employee</p>
+                  <p className="text-xs text-rcc-text-muted mt-0.5">Inactive employees cannot sign in.</p>
+                </div>
+              </label>
+            </div>
+          </SectionCard>
+
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowFullEdit(false)} className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">Cancel</button>
+            <button onClick={saveFullEdit} disabled={fullEditSaving} className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50">
+              <Save className="h-4 w-4" /> {fullEditSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showFullEdit && (<>
       {/* Personal Information */}
       <SectionCard
         title="Personal Information"
@@ -1350,7 +1547,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       </SectionCard>
 
       {/* Profile Sections (repeatable rows) */}
-      {(Object.keys(SECTION_LABELS) as string[]).map((key) => (
+      {(Object.keys(SECTION_LABELS) as string[]).filter(key => key !== "awards").map((key) => (
         <ProfileSection
           key={key}
           sectionKey={key}
@@ -1369,42 +1566,99 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         />
       ))}
 
-      {/* Certificates */}
-      <SectionCard title="Certificates" icon={Award} canEdit={canEditProfile} noPadding>
+      {/* Achievements & Awards + Certificates combined */}
+      <SectionCard
+        title="Achievements & Awards"
+        icon={Award}
+        canEdit={canEditProfile}
+        editing={editingSection === "awards"}
+        onEdit={() => startEditSection("awards")}
+        onCancel={() => setEditingSection(null)}
+        onSave={() => saveSection("awards")}
+        saving={sectionSaving}
+        noPadding
+      >
         <div className="px-5 pb-4">
-          {(has("profiling.edit") || canSelfEdit) && (
-            <button onClick={() => setCertOpen(true)} className="mb-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
-              <Plus className="h-3 w-3" /> Add Certificate
-            </button>
-          )}
-          {(!employee.certificates || employee.certificates.length === 0) ? (
-            <p className="text-xs text-rcc-text-muted text-center py-4">No certificates yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {employee.certificates.map((c) => (
-                <li key={c.id} className="border border-rcc-border rounded-md p-3 hover:bg-rcc-bg/30 transition-colors">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-rcc-text-primary flex items-center gap-1">
-                        <Award className="h-3.5 w-3.5 text-rcc-accent shrink-0" /> {c.title}
-                      </p>
-                      {c.issuer && <p className="text-xs text-rcc-text-muted mt-0.5">{c.issuer}</p>}
-                      <div className="text-xs text-rcc-text-muted mt-1 space-y-0.5">
-                        {c.certificateNo && <p>No: <span className="font-mono">{c.certificateNo}</span></p>}
-                        {c.issueDate && <p>Issued: {new Date(c.issueDate).toLocaleDateString()}</p>}
-                        {c.expiryDate && <p>Expires: {new Date(c.expiryDate).toLocaleDateString()}</p>}
-                      </div>
-                    </div>
-                    {(has("profiling.edit") || canSelfEdit) && (
-                      <button onClick={() => handleDeleteCert(c.id, c.title)} className="p-1.5 rounded-md text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors" title="Delete certificate">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+          {editingSection === "awards" ? (
+            <div className="space-y-3">
+              {sectionForm.map((row, idx) => (
+                <div key={idx} className="flex items-start gap-2 p-3 border border-rcc-border rounded-md bg-rcc-bg/30">
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {Object.keys(SECTION_EMPTY.awards).map((f) => (
+                      <input key={f} type="text" placeholder={f === "award" ? "Award" : f === "year" ? "Year" : "Granting Institution"} value={row[f] || ""} onChange={(e) => updateSectionRow(idx, f, e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded border border-rcc-border text-sm bg-rcc-surface text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-1 focus:ring-rcc-primary" />
+                    ))}
                   </div>
-                </li>
+                  <button onClick={() => removeSectionRow(idx)} className="mt-1 p-1 rounded text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors" title="Remove row">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
-            </ul>
+              <button onClick={() => addSectionRow("awards")} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium border border-dashed border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                <Plus className="h-3 w-3" /> Add Row
+              </button>
+            </div>
+          ) : (profileData.awards || []).length === 0 ? (
+            <p className="text-xs text-rcc-text-muted text-center py-4">No awards yet. Click Edit to add entries.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-rcc-border">
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Award</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Year</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Granting Institution</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(profileData.awards || []).map((row, idx) => (
+                    <tr key={idx} className="border-b border-rcc-border last:border-0 hover:bg-rcc-bg/30 transition-colors">
+                      <td className="px-3 py-2 text-sm text-rcc-text-primary">{row.award || "-"}</td>
+                      <td className="px-3 py-2 text-sm text-rcc-text-secondary">{row.year || "-"}</td>
+                      <td className="px-3 py-2 text-sm text-rcc-text-secondary">{row.institution || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
+
+          <div className="border-t border-rcc-border mt-4 pt-4">
+            <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">Certificates</h3>
+            {(has("profiling.edit") || canSelfEdit) && (
+              <button onClick={() => setCertOpen(true)} className="mb-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                <Plus className="h-3 w-3" /> Add Certificate
+              </button>
+            )}
+            {(!employee.certificates || employee.certificates.length === 0) ? (
+              <p className="text-xs text-rcc-text-muted text-center py-4">No certificates yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {employee.certificates.map((c) => (
+                  <li key={c.id} className="border border-rcc-border rounded-md p-3 hover:bg-rcc-bg/30 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-rcc-text-primary flex items-center gap-1">
+                          <Award className="h-3.5 w-3.5 text-rcc-accent shrink-0" /> {c.title}
+                        </p>
+                        {c.issuer && <p className="text-xs text-rcc-text-muted mt-0.5">{c.issuer}</p>}
+                        <div className="text-xs text-rcc-text-muted mt-1 space-y-0.5">
+                          {c.certificateNo && <p>No: <span className="font-mono">{c.certificateNo}</span></p>}
+                          {c.issueDate && <p>Issued: {new Date(c.issueDate).toLocaleDateString()}</p>}
+                          {c.expiryDate && <p>Expires: {new Date(c.expiryDate).toLocaleDateString()}</p>}
+                        </div>
+                      </div>
+                      {(has("profiling.edit") || canSelfEdit) && (
+                        <button onClick={() => handleDeleteCert(c.id, c.title)} className="p-1.5 rounded-md text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors" title="Delete certificate">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </SectionCard>
 
@@ -1453,6 +1707,50 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           )}
         </div>
       </SectionCard>
+      </>)}
+
+      {/* System Configuration (visible to roles.edit users) */}
+      {has("roles.edit") && (
+        <SectionCard title="System Configuration" icon={Settings}>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">FPASS Enabled Groups</h3>
+              {configFpassGroupIds.length === 0 ? (
+                <p className="text-xs text-rcc-text-muted">No groups enabled for FPASS.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {configFpassGroupIds.map(id => {
+                    const g = configGroups.find(gr => gr.id === id);
+                    return g ? (
+                      <span key={id} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-rcc-primary/10 text-rcc-primary border border-rcc-primary/20">{g.name}</span>
+                    ) : (
+                      <span key={id} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-rcc-bg text-rcc-text-muted border border-rcc-border">{id}</span>
+                    );
+                  })}
+                </div>
+              )}
+              <button onClick={() => setCurrentPage("fpass", "settings")} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-rcc-primary hover:underline transition-colors">
+                Configure FPASS <span className="text-[10px]">&#8594;</span>
+              </button>
+            </div>
+
+            <div className="border-t border-rcc-border pt-4">
+              <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">Geolocation Premises</h3>
+              {configPremises ? (
+                <div className="text-sm text-rcc-text-primary">
+                  <p className="font-medium">{configPremises.label}</p>
+                  <p className="text-xs text-rcc-text-muted mt-0.5">{configPremises.lat}, {configPremises.lng} &bull; {configPremises.radiusMeters}m radius</p>
+                </div>
+              ) : (
+                <p className="text-xs text-rcc-text-muted">Loading...</p>
+              )}
+              <button onClick={() => setCurrentPage("attendance", "premises")} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-rcc-primary hover:underline transition-colors">
+                Configure Premises <span className="text-[10px]">&#8594;</span>
+              </button>
+            </div>
+          </div>
+        </SectionCard>
+      )}
 
       {/* File Viewer Modal */}
       {viewing && (

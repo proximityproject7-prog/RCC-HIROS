@@ -488,6 +488,11 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // System configuration state (for config panel at bottom)
+  const [cfgGroups, setCfgGroups] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [cfgFpassIds, setCfgFpassIds] = useState<string[]>([]);
+  const [cfgPremises, setCfgPremises] = useState<{ label: string; lat: number; lng: number; radiusMeters: number } | null>(null);
+
   useEffect(() => {
     if (mode !== "edit" || !roleId) return;
     let cancelled = false;
@@ -520,6 +525,24 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
       cancelled = true;
     };
   }, [mode, roleId]);
+
+  // Load system configuration for config panel
+  useEffect(() => {
+    (async () => {
+      try {
+        const [groupsData, fpassData, premisesData] = await Promise.all([
+          apiFetch<{ groups: { id: string; name: string; code: string }[] }>("/api/groups"),
+          apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings"),
+          apiFetch<{ premises: { label: string; lat: number; lng: number; radiusMeters: number } }>("/api/settings/premises"),
+        ]);
+        setCfgGroups(groupsData.groups ?? []);
+        setCfgFpassIds(fpassData.enabledGroupIds ?? []);
+        setCfgPremises(premisesData.premises);
+      } catch {
+        // non-fatal
+      }
+    })();
+  }, []);
 
   const togglePerm = (id: string) => {
     setPerms((prev) => {
@@ -754,6 +777,60 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* System Configuration */}
+      <section className="bg-rcc-surface rounded-lg border border-rcc-border p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">
+          System Configuration
+        </h2>
+        <p className="text-xs text-rcc-text-muted -mt-2">
+          Overview of FPASS and geolocation settings. Configure in their respective modules.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border border-rcc-border rounded-lg p-4 space-y-2">
+            <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">FPASS Enabled Groups</h3>
+            {cfgFpassIds.length === 0 ? (
+              <p className="text-xs text-rcc-text-muted">No groups enabled.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {cfgFpassIds.map(id => {
+                  const g = cfgGroups.find(gr => gr.id === id);
+                  return (
+                    <span key={id} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-rcc-primary/10 text-rcc-primary border border-rcc-primary/20">
+                      {g ? g.name : id}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              onClick={() => setCurrentPage("fpass", "settings")}
+              className="text-xs font-medium text-rcc-primary hover:underline transition-colors"
+            >
+              Configure FPASS &rarr;
+            </button>
+          </div>
+
+          <div className="border border-rcc-border rounded-lg p-4 space-y-2">
+            <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Geolocation Premises</h3>
+            {cfgPremises ? (
+              <div>
+                <p className="text-sm font-medium text-rcc-text-primary">{cfgPremises.label}</p>
+                <p className="text-xs text-rcc-text-muted">{cfgPremises.lat}, {cfgPremises.lng} &bull; {cfgPremises.radiusMeters}m radius</p>
+              </div>
+            ) : (
+              <p className="text-xs text-rcc-text-muted">Loading...</p>
+            )}
+            <button
+              onClick={() => setCurrentPage("attendance", "premises")}
+              className="text-xs font-medium text-rcc-primary hover:underline transition-colors"
+            >
+              Configure Premises &rarr;
+            </button>
+          </div>
         </div>
       </section>
 

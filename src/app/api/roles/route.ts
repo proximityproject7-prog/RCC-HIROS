@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       scopeAllAttendance = false,
       scopeGroupAttendance = false,
       canSelfApproveLeave = false,
+      canEditProfile = false,
       permissions = [],
     } = body as {
       name?: string;

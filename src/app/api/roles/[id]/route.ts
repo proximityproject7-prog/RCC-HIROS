@@ -104,6 +104,7 @@ export async function PATCH(
       scopeAllAttendance,
       scopeGroupAttendance,
       canSelfApproveLeave,
+      canEditProfile,
       active,
       permissions,
     } = body as {
