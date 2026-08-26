@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         scopeAllAttendance: true,
         scopeGroupAttendance: true,
         canSelfApproveLeave: true,
+        canEditProfile: true,
         isSystem: true,
       },
       orderBy: { name: "asc" },

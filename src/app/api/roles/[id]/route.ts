@@ -52,6 +52,7 @@ export async function GET(
         scopeAllAttendance: role.scopeAllAttendance,
         scopeGroupAttendance: role.scopeGroupAttendance,
         canSelfApproveLeave: role.canSelfApproveLeave,
+        canEditProfile: role.canEditProfile,
         isSystem: role.isSystem,
         active: role.active,
         createdAt: role.createdAt.toISOString(),
@@ -115,6 +116,7 @@ export async function PATCH(
       scopeAllAttendance?: boolean;
       scopeGroupAttendance?: boolean;
       canSelfApproveLeave?: boolean;
+      canEditProfile?: boolean;
       active?: boolean;
       permissions?: string[];
     };
@@ -151,6 +153,8 @@ export async function PATCH(
       data.scopeGroupAttendance = !!scopeGroupAttendance;
     if (canSelfApproveLeave !== undefined)
       data.canSelfApproveLeave = !!canSelfApproveLeave;
+    if (canEditProfile !== undefined)
+      data.canEditProfile = !!canEditProfile;
     if (active !== undefined) data.active = !!active;
 
     // Never let API callers change isSystem flag
@@ -233,6 +237,7 @@ export async function PATCH(
             scopeAllAttendance: updated.scopeAllAttendance,
             scopeGroupAttendance: updated.scopeGroupAttendance,
             canSelfApproveLeave: updated.canSelfApproveLeave,
+            canEditProfile: updated.canEditProfile,
             isSystem: updated.isSystem,
             active: updated.active,
             permissions: updated.permissions

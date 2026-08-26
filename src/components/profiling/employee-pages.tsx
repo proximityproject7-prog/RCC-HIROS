@@ -54,6 +54,16 @@ interface Employee {
   roleName: string | null;
   mustChangePwd?: boolean;
   lastLoginAt?: string | null;
+  photo?: string | null;
+  placeOfBirth?: string | null;
+  rank?: string | null;
+  civilStatus?: string | null;
+  citizenship?: string | null;
+  religion?: string | null;
+  height?: string | null;
+  weight?: string | null;
+  bloodType?: string | null;
+  profileData?: string | null;
   certificateCount?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -649,6 +659,128 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SectionCard — collapsible LinkedIn-style card wrapper
+// ═══════════════════════════════════════════════════════════════
+
+function SectionCard({ title, icon: Icon, canEdit, editing, onEdit, onCancel, onSave, saving, editError, noPadding, children }: {
+  title: string;
+  icon: any;
+  canEdit?: boolean;
+  editing?: boolean;
+  onEdit?: () => void;
+  onCancel?: () => void;
+  onSave?: () => void;
+  saving?: boolean;
+  editError?: string | null;
+  noPadding?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-rcc-border">
+        <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide flex items-center gap-2">
+          <Icon className="h-4 w-4 text-rcc-primary" /> {title}
+        </h2>
+        {canEdit && !editing && onEdit && (
+          <button onClick={onEdit} className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+            <Pencil className="h-3 w-3" /> Edit
+          </button>
+        )}
+        {editing && (
+          <div className="flex items-center gap-2">
+            <button onClick={onCancel} className="px-2.5 py-1 rounded text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">Cancel</button>
+            <button onClick={onSave} disabled={saving} className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50">
+              <Save className="h-3 w-3" /> {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        )}
+      </div>
+      {editError && <div className="mx-5 mt-3 bg-red-50 border border-red-200 rounded-md p-2 text-xs text-rcc-error">{editError}</div>}
+      <div className={noPadding ? "" : "p-5"}>{children}</div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ProfileSection — editable repeatable-row section
+// ═══════════════════════════════════════════════════════════════
+
+function ProfileSection({ sectionKey, label, rows, fields, editing, canEdit, onEdit, onCancel, onSave, saving, onAdd, onRemove, onUpdate }: {
+  sectionKey: string;
+  label: string;
+  rows: any[];
+  fields: Record<string, string>;
+  editing: boolean;
+  canEdit: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+  saving: boolean;
+  onAdd: () => void;
+  onRemove: (idx: number) => void;
+  onUpdate: (idx: number, field: string, value: string) => void;
+}) {
+  const fieldLabels: Record<string, string> = {
+    degree: "Degree", dateEarned: "Date Earned", school: "School",
+    position: "Position", year: "Year", organization: "Organization",
+    exam: "Examination", place: "Place", date: "Date", rating: "Rating",
+    award: "Award", institution: "Granting Institution",
+    title: "Title", publication: "Publication", issue: "Issue",
+    scope: "Scope", nature: "Nature of Participation",
+    function: "Function", beneficiaries: "Beneficiaries",
+  };
+  return (
+    <SectionCard title={label} icon={Briefcase} canEdit={canEdit} editing={editing} onEdit={onEdit} onCancel={onCancel} onSave={onSave} saving={saving} noPadding>
+      <div className="px-5 pb-4">
+        {editing ? (
+          <div className="space-y-3">
+            {rows.map((row, idx) => (
+              <div key={idx} className="flex items-start gap-2 p-3 border border-rcc-border rounded-md bg-rcc-bg/30">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Object.keys(fields).map((f) => (
+                    <input key={f} type="text" placeholder={fieldLabels[f] || f} value={row[f] || ""} onChange={(e) => onUpdate(idx, f, e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded border border-rcc-border text-sm bg-rcc-surface text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-1 focus:ring-rcc-primary" />
+                  ))}
+                </div>
+                <button onClick={() => onRemove(idx)} className="mt-1 p-1 rounded text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors" title="Remove row">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            <button onClick={onAdd} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium border border-dashed border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+              <Plus className="h-3 w-3" /> Add Row
+            </button>
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="text-xs text-rcc-text-muted text-center py-4">No data yet. Click Edit to add entries.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-rcc-border">
+                  {Object.keys(fields).map((f) => (
+                    <th key={f} className="px-3 py-2 text-left text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">{fieldLabels[f] || f}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, idx) => (
+                  <tr key={idx} className="border-b border-rcc-border/50 last:border-0 hover:bg-rcc-bg/30 transition-colors">
+                    {Object.keys(fields).map((f) => (
+                      <td key={f} className="px-3 py-2 text-rcc-text-primary">{row[f] || <span className="text-rcc-text-muted">-</span>}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EmployeeProfilePage
 // ═══════════════════════════════════════════════════════════════
 
@@ -685,6 +817,45 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const [editForm, setEditForm] = useState({ email: "", phone: "", address: "", birthday: "", gender: "" });
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+
+  // Profile data (LinkedIn-style)
+  const canFillProfile = employeeId === user?.id && (user as any)?.canEditProfile;
+  const [profileData, setProfileData] = useState<Record<string, any[]>>({});
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [sectionForm, setSectionForm] = useState<any[]>([]);
+  const [sectionSaving, setSectionSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+
+  // Profile scalar field edit state
+  const [profileScalars, setProfileScalars] = useState({
+    placeOfBirth: "", rank: "", civilStatus: "", citizenship: "",
+    religion: "", height: "", weight: "", bloodType: "",
+  });
+  const [editingScalars, setEditingScalars] = useState(false);
+  const [scalarSaving, setScalarSaving] = useState(false);
+
+  // Parse profileData JSON
+  useEffect(() => {
+    if (employee?.profileData) {
+      try { setProfileData(JSON.parse(employee.profileData)); } catch { setProfileData({}); }
+    }
+  }, [employee?.profileData]);
+
+  // Initialize scalar edit form when employee loads
+  useEffect(() => {
+    if (employee) {
+      setProfileScalars({
+        placeOfBirth: employee.placeOfBirth || "",
+        rank: employee.rank || "",
+        civilStatus: employee.civilStatus || "",
+        citizenship: employee.citizenship || "",
+        religion: employee.religion || "",
+        height: employee.height || "",
+        weight: employee.weight || "",
+        bloodType: employee.bloodType || "",
+      });
+    }
+  }, [employee]);
 
   const loadEmployee = useCallback(async () => {
     setLoading(true);
@@ -910,6 +1081,118 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     input.click();
   };
 
+  // ── Photo upload ──────────────────────────────────────────────
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Only JPG, PNG, or WebP images are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Photo exceeds 5MB limit.");
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      await apiFetch(`/api/employees/${employeeId}/photo`, { method: "POST", body: fd, skipJsonHeader: true });
+      loadEmployee();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Photo upload failed.");
+    } finally {
+      setPhotoUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    try {
+      await apiFetch(`/api/employees/${employeeId}/photo`, { method: "DELETE" });
+      loadEmployee();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove photo.");
+    }
+  };
+
+  // ── Profile section editing ────────────────────────────────────
+  const SECTION_LABELS: Record<string, string> = {
+    education: "Educational Background",
+    experience: "Professional Experience",
+    eligibility: "Eligibility",
+    awards: "Achievements & Awards",
+    publications: "Publications & Research",
+    affiliations: "Organizational Affiliations",
+    seminars: "Seminars & Conferences",
+    accomplishments: "Other Accomplishments",
+    community: "Community Involvement",
+  };
+  const SECTION_EMPTY: Record<string, Record<string, string>> = {
+    education: { degree: "", dateEarned: "", school: "" },
+    experience: { position: "", year: "", organization: "" },
+    eligibility: { exam: "", place: "", date: "", rating: "" },
+    awards: { award: "", year: "", institution: "" },
+    publications: { title: "", publication: "", issue: "" },
+    affiliations: { organization: "", position: "", date: "" },
+    seminars: { title: "", scope: "", date: "", nature: "" },
+    accomplishments: { function: "", nature: "" },
+    community: { title: "", beneficiaries: "", date: "", nature: "" },
+  };
+
+  const startEditSection = (key: string) => {
+    setEditingSection(key);
+    setSectionForm([...(profileData[key] || [])]);
+  };
+
+  const addSectionRow = (key: string) => {
+    setSectionForm(prev => [...prev, { ...SECTION_EMPTY[key] }]);
+  };
+
+  const updateSectionRow = (idx: number, field: string, value: string) => {
+    setSectionForm(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  };
+
+  const removeSectionRow = (idx: number) => {
+    setSectionForm(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const saveSection = async (key: string) => {
+    setSectionSaving(true);
+    try {
+      const updated = { ...profileData, [key]: sectionForm.filter(row =>
+        Object.values(row).some(v => v && v.trim())
+      ) };
+      await apiFetch(`/api/employees/${employeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ profileData: JSON.stringify(updated) }),
+      });
+      setProfileData(updated);
+      setEditingSection(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save section.");
+    } finally {
+      setSectionSaving(false);
+    }
+  };
+
+  // ── Profile scalar fields save ─────────────────────────────────
+  const saveScalars = async () => {
+    setScalarSaving(true);
+    try {
+      await apiFetch(`/api/employees/${employeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify(profileScalars),
+      });
+      setEditingScalars(false);
+      loadEmployee();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setScalarSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -937,298 +1220,239 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
   if (!employee) return null;
 
+  const canEditProfile = canFillProfile || has("profiling.edit") || has("profile.editAll");
   const initials = (employee.firstName.charAt(0) + employee.lastName.charAt(0)).toUpperCase();
   const fullName = `${employee.firstName} ${employee.middleName ? employee.middleName + " " : ""}${employee.lastName}`;
+  const photoUrl = employee.photo ? `/api/employees/${employeeId}/photo` : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-4xl mx-auto">
 
       {employeeId !== user?.id && (
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setCurrentPage("profiling")}
-            className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
-          >
+          <button onClick={() => setCurrentPage("profiling")} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
             <ArrowLeft className="h-4 w-4" /> Back to employees
           </button>
         </div>
       )}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-rcc-error flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
+          <button onClick={() => setError(null)} className="ml-auto"><X className="h-4 w-4" /></button>
+        </div>
       )}
 
-      {/* Header card — clean white, NO brown gradient */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="w-20 h-20 rounded-full bg-rcc-primary/10 text-rcc-primary flex items-center justify-center shrink-0 text-2xl font-bold">
-            {initials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-rcc-text-primary">{fullName}</h1>
-              {employee.active ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> ACTIVE
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-rcc-error border border-red-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rcc-error" /> INACTIVE
-                </span>
+      {/* Header Card */}
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
+        <div className="h-28 bg-gradient-to-r from-rcc-primary/20 via-rcc-primary/10 to-rcc-accent/10" />
+        <div className="px-6 pb-5 -mt-12 relative">
+          <div className="flex items-end gap-4">
+            <div className="relative group">
+              <div className="w-24 h-24 rounded-full border-4 border-rcc-surface bg-rcc-primary/10 text-rcc-primary flex items-center justify-center text-2xl font-bold overflow-hidden shadow-md">
+                {photoUrl ? <img src={photoUrl} alt={fullName} className="w-full h-full object-cover" /> : initials}
+              </div>
+              {canEditProfile && (
+                <label className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
+                  <ImageIcon className="h-5 w-5 text-white" />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoUpload} disabled={photoUploading} />
+                </label>
               )}
             </div>
-            <div className="mt-1 flex items-center gap-3 flex-wrap text-sm text-rcc-text-secondary">
-              <span className="inline-flex items-center gap-1">
-                <Briefcase className="h-3.5 w-3.5" /> {employee.roleName ?? "Unassigned"}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <IdCard className="h-3.5 w-3.5" /> <span className="font-mono">{employee.employeeId}</span>
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {has("profiling.edit") && (
-              <button
-                onClick={() => setCurrentPage("profiling", `edit:${employee.id}`)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-              >
-                <Pencil className="h-4 w-4" /> Edit
-              </button>
-            )}
-            {canInlineEdit && !editing && (
-              <button
-                onClick={startEditing}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors"
-              >
-                <Pencil className="h-4 w-4" /> Edit Profile
-              </button>
-            )}
-            {/* FPASS button: visible if own profile + group enabled, or if admin with fpass.manage */}
-            {((employeeId === user?.id && fpassEnabled) || has("fpass.manage")) && (
-              <button
-                onClick={() => setCurrentPage("fpass", `emp:${employee.id}`)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-accent/30 text-rcc-accent hover:bg-rcc-accent/5 transition-colors"
-              >
-                <FileText className="h-4 w-4" /> FPASS
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Personal Info (2/3) */}
-        <div className="lg:col-span-2 bg-rcc-surface rounded-lg border border-rcc-border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">
-              Personal Information
-            </h2>
-            {editing && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={cancelEditing}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveEditing}
-                  disabled={editSaving}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
-                >
-                  <Save className="h-3.5 w-3.5" /> {editSaving ? "Saving..." : "Save"}
-                </button>
+            <div className="flex-1 min-w-0 pb-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-bold text-rcc-text-primary">{fullName}</h1>
+                {employee.active ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> ACTIVE
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-rcc-error border border-red-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rcc-error" /> INACTIVE
+                  </span>
+                )}
               </div>
-            )}
-          </div>
-          {editError && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{editError}</div>
-          )}
-          {editing ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
-              <EditField icon={Mail} label="Email" type="email" value={editForm.email} onChange={(v) => setEditForm(f => ({ ...f, email: v }))} disabled={canSelfEdit} />
-              <EditField icon={Phone} label="Phone" type="text" value={editForm.phone} onChange={(v) => setEditForm(f => ({ ...f, phone: v }))} />
-              <EditField icon={MapPin} label="Address" type="text" value={editForm.address} onChange={(v) => setEditForm(f => ({ ...f, address: v }))} />
-              <EditField icon={Calendar} label="Birthday" type="date" value={editForm.birthday} onChange={(v) => setEditForm(f => ({ ...f, birthday: v }))} />
-              <SelectField icon={UsersIcon} label="Gender" value={editForm.gender} options={["", "Male", "Female"]} onChange={(v) => setEditForm(f => ({ ...f, gender: v }))} />
-              <InfoItem icon={Briefcase} label="Contract" value={employee.contractType} />
-              <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
-              <InfoItem icon={Building2} label="Group" value={employee.group ? `${employee.group.name} (${employee.group.code})` : null} />
-              <InfoItem icon={Briefcase} label="Monthly Salary" value={employee.salary != null ? `₱${Number(employee.salary).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null} />
+              <div className="mt-1 flex items-center gap-3 flex-wrap text-sm text-rcc-text-secondary">
+                <span className="inline-flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {employee.roleName ?? "Unassigned"}</span>
+                {employee.group && <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> {employee.group.name}</span>}
+                <span className="inline-flex items-center gap-1"><IdCard className="h-3.5 w-3.5" /> <span className="font-mono">{employee.employeeId}</span></span>
+              </div>
             </div>
-          ) : (
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
-              <InfoItem icon={Mail} label="Email" value={employee.email} />
-              <InfoItem icon={Phone} label="Phone" value={employee.phone} />
-              <InfoItem icon={MapPin} label="Address" value={employee.address} />
-              <InfoItem icon={Calendar} label="Birthday" value={employee.birthday ? new Date(employee.birthday).toLocaleDateString() : null} />
-              <InfoItem icon={UsersIcon} label="Gender" value={employee.gender} />
-              <InfoItem icon={Briefcase} label="Contract" value={employee.contractType} />
-              <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
-              <InfoItem icon={Building2} label="Group" value={employee.group ? `${employee.group.name} (${employee.group.code})` : null} />
-              <InfoItem icon={Briefcase} label="Monthly Salary" value={employee.salary != null ? `₱${Number(employee.salary).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null} />
-            </dl>
-          )}
-        </div>
-
-        {/* Certificates (1/3) */}
-        <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">
-              Certificates
-            </h2>
-            {(has("profiling.edit") || canSelfEdit) && (
-              <button
-                onClick={() => setCertOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-              >
-                <Plus className="h-3 w-3" /> Add
-              </button>
-            )}
-          </div>
-          <div className="flex-1 max-h-96 overflow-y-auto custom-scrollbar -mr-2 pr-2">
-            {(!employee.certificates || employee.certificates.length === 0) ? (
-              <p className="text-xs text-rcc-text-muted text-center py-6">No certificates yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {employee.certificates.map((c) => (
-                  <li key={c.id} className="border border-rcc-border rounded-md p-3 hover:bg-rcc-bg/30 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-rcc-text-primary truncate flex items-center gap-1">
-                          <Award className="h-3.5 w-3.5 text-rcc-accent shrink-0" />
-                          {c.title}
-                        </p>
-                        {c.issuer && <p className="text-xs text-rcc-text-muted mt-0.5">{c.issuer}</p>}
-                        <div className="text-xs text-rcc-text-muted mt-1 space-y-0.5">
-                          {c.certificateNo && <p>No: <span className="font-mono">{c.certificateNo}</span></p>}
-                          {c.issueDate && <p>Issued: {new Date(c.issueDate).toLocaleDateString()}</p>}
-                          {c.expiryDate && <p>Expires: {new Date(c.expiryDate).toLocaleDateString()}</p>}
-                        </div>
-                      </div>
-                      {(has("profiling.edit") || canSelfEdit) && (
-                        <button
-                          onClick={() => handleDeleteCert(c.id, c.title)}
-                          className="p-1.5 rounded-md text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors"
-                          title="Delete certificate"
-                          aria-label="Delete certificate"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="flex items-center gap-2 pb-1">
+              {has("profiling.edit") && (
+                <button onClick={() => setCurrentPage("profiling", `edit:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </button>
+              )}
+              {((employeeId === user?.id && fpassEnabled) || has("fpass.manage")) && (
+                <button onClick={() => setCurrentPage("fpass", `emp:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-accent/30 text-rcc-accent hover:bg-rcc-accent/5 transition-colors">
+                  <FileText className="h-3.5 w-3.5" /> FPASS
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Personal Information */}
+      <SectionCard
+        title="Personal Information"
+        icon={UsersIcon}
+        canEdit={canEditProfile}
+        editing={editing || editingScalars}
+        onEdit={() => canInlineEdit ? startEditing() : setEditingScalars(true)}
+        onCancel={() => { cancelEditing(); setEditingScalars(false); }}
+        onSave={canInlineEdit ? saveEditing : saveScalars}
+        saving={editSaving || scalarSaving}
+        editError={editError}
+      >
+        {editing ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+            <EditField icon={Mail} label="Email" type="email" value={editForm.email} onChange={(v) => setEditForm(f => ({ ...f, email: v }))} disabled={canSelfEdit} />
+            <EditField icon={Phone} label="Phone" type="text" value={editForm.phone} onChange={(v) => setEditForm(f => ({ ...f, phone: v }))} />
+            <EditField icon={MapPin} label="Address" type="text" value={editForm.address} onChange={(v) => setEditForm(f => ({ ...f, address: v }))} />
+            <EditField icon={Calendar} label="Birthday" type="date" value={editForm.birthday} onChange={(v) => setEditForm(f => ({ ...f, birthday: v }))} />
+            <SelectField icon={UsersIcon} label="Gender" value={editForm.gender} options={["", "Male", "Female"]} onChange={(v) => setEditForm(f => ({ ...f, gender: v }))} />
+            <InfoItem icon={Briefcase} label="Contract" value={employee.contractType} />
+            <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
+            <InfoItem icon={Building2} label="Department" value={employee.group?.name} />
+          </div>
+        ) : editingScalars ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+            <EditField icon={MapPin} label="Place of Birth" type="text" value={profileScalars.placeOfBirth} onChange={(v) => setProfileScalars(s => ({ ...s, placeOfBirth: v }))} />
+            <EditField icon={Briefcase} label="Rank" type="text" value={profileScalars.rank} onChange={(v) => setProfileScalars(s => ({ ...s, rank: v }))} />
+            <SelectField icon={UsersIcon} label="Civil Status" value={profileScalars.civilStatus} options={["", "Single", "Married", "Widowed", "Separated"]} onChange={(v) => setProfileScalars(s => ({ ...s, civilStatus: v }))} />
+            <EditField icon={IdCard} label="Citizenship" type="text" value={profileScalars.citizenship} onChange={(v) => setProfileScalars(s => ({ ...s, citizenship: v }))} />
+            <EditField icon={Building2} label="Religion" type="text" value={profileScalars.religion} onChange={(v) => setProfileScalars(s => ({ ...s, religion: v }))} />
+            <EditField icon={UsersIcon} label="Height" type="text" value={profileScalars.height} onChange={(v) => setProfileScalars(s => ({ ...s, height: v }))} />
+            <EditField icon={UsersIcon} label="Weight" type="text" value={profileScalars.weight} onChange={(v) => setProfileScalars(s => ({ ...s, weight: v }))} />
+            <EditField icon={Award} label="Blood Type" type="text" value={profileScalars.bloodType} onChange={(v) => setProfileScalars(s => ({ ...s, bloodType: v }))} />
+          </div>
+        ) : (
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+            <InfoItem icon={Mail} label="Email" value={employee.email} />
+            <InfoItem icon={Phone} label="Phone" value={employee.phone} />
+            <InfoItem icon={MapPin} label="Address" value={employee.address} />
+            <InfoItem icon={Calendar} label="Birthday" value={employee.birthday ? new Date(employee.birthday).toLocaleDateString() : null} />
+            <InfoItem icon={UsersIcon} label="Gender" value={employee.gender} />
+            <InfoItem icon={MapPin} label="Place of Birth" value={employee.placeOfBirth} />
+            <InfoItem icon={Briefcase} label="Rank" value={employee.rank} />
+            <InfoItem icon={UsersIcon} label="Civil Status" value={employee.civilStatus} />
+            <InfoItem icon={IdCard} label="Citizenship" value={employee.citizenship} />
+            <InfoItem icon={Building2} label="Religion" value={employee.religion} />
+            <InfoItem icon={UsersIcon} label="Height" value={employee.height} />
+            <InfoItem icon={UsersIcon} label="Weight" value={employee.weight} />
+            <InfoItem icon={Award} label="Blood Type" value={employee.bloodType} />
+            <InfoItem icon={Briefcase} label="Contract" value={employee.contractType} />
+            <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
+            <InfoItem icon={Building2} label="Department" value={employee.group?.name} />
+          </dl>
+        )}
+      </SectionCard>
+
+      {/* Profile Sections (repeatable rows) */}
+      {(Object.keys(SECTION_LABELS) as string[]).map((key) => (
+        <ProfileSection
+          key={key}
+          sectionKey={key}
+          label={SECTION_LABELS[key]}
+          rows={editingSection === key ? sectionForm : (profileData[key] || [])}
+          fields={SECTION_EMPTY[key]}
+          editing={editingSection === key}
+          canEdit={canEditProfile}
+          onEdit={() => startEditSection(key)}
+          onCancel={() => setEditingSection(null)}
+          onSave={() => saveSection(key)}
+          saving={sectionSaving}
+          onAdd={() => addSectionRow(key)}
+          onRemove={removeSectionRow}
+          onUpdate={updateSectionRow}
+        />
+      ))}
+
+      {/* Certificates */}
+      <SectionCard title="Certificates" icon={Award} canEdit={canEditProfile} noPadding>
+        <div className="px-5 pb-4">
+          {(has("profiling.edit") || canSelfEdit) && (
+            <button onClick={() => setCertOpen(true)} className="mb-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+              <Plus className="h-3 w-3" /> Add Certificate
+            </button>
+          )}
+          {(!employee.certificates || employee.certificates.length === 0) ? (
+            <p className="text-xs text-rcc-text-muted text-center py-4">No certificates yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {employee.certificates.map((c) => (
+                <li key={c.id} className="border border-rcc-border rounded-md p-3 hover:bg-rcc-bg/30 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-rcc-text-primary flex items-center gap-1">
+                        <Award className="h-3.5 w-3.5 text-rcc-accent shrink-0" /> {c.title}
+                      </p>
+                      {c.issuer && <p className="text-xs text-rcc-text-muted mt-0.5">{c.issuer}</p>}
+                      <div className="text-xs text-rcc-text-muted mt-1 space-y-0.5">
+                        {c.certificateNo && <p>No: <span className="font-mono">{c.certificateNo}</span></p>}
+                        {c.issueDate && <p>Issued: {new Date(c.issueDate).toLocaleDateString()}</p>}
+                        {c.expiryDate && <p>Expires: {new Date(c.expiryDate).toLocaleDateString()}</p>}
+                      </div>
+                    </div>
+                    {(has("profiling.edit") || canSelfEdit) && (
+                      <button onClick={() => handleDeleteCert(c.id, c.title)} className="p-1.5 rounded-md text-rcc-text-muted hover:text-rcc-error hover:bg-red-50 transition-colors" title="Delete certificate">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </SectionCard>
 
       {/* Files & Documents */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">
-            Files &amp; Documents
-          </h2>
-        </div>
-
-        {canManageFiles && (
-          <div className="mb-4 border border-dashed border-rcc-border rounded-md p-4 bg-rcc-bg/30">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors cursor-pointer">
-                <Upload className="h-4 w-4" />
-                {uploading ? "Uploading..." : "Choose File"}
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={handleUploadFile}
-                  disabled={uploading}
-                  accept=".pdf"
-                />
-              </label>
-              <input
-                type="text"
-                value={fileDesc}
-                onChange={(e) => setFileDesc(e.target.value)}
-                placeholder="Optional description..."
-                className={inputClass}
-              />
+      <SectionCard title="Files & Documents" icon={FileText} canEdit={canManageFiles} noPadding>
+        <div className="px-5 pb-4">
+          {canManageFiles && (
+            <div className="mb-4 border border-dashed border-rcc-border rounded-md p-4 bg-rcc-bg/30">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <label className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors cursor-pointer">
+                  <Upload className="h-4 w-4" /> {uploading ? "Uploading..." : "Upload PDF"}
+                  <input type="file" className="hidden" onChange={handleUploadFile} disabled={uploading} accept=".pdf" />
+                </label>
+                <input type="text" value={fileDesc} onChange={(e) => setFileDesc(e.target.value)} placeholder="Optional description..." className={inputClass} />
+              </div>
+              <p className="text-xs text-rcc-text-muted mt-2">Max 10MB. PDF only.</p>
             </div>
-            <p className="text-xs text-rcc-text-muted mt-2">
-              Max 10MB. PDF only.
-            </p>
-          </div>
-        )}
-
-        {(!employee.files || employee.files.length === 0) ? (
-          <p className="text-sm text-rcc-text-muted text-center py-6">No files uploaded yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {employee.files.map((f) => {
-              const Icon = FileText;
-              return (
-                <div key={f.id} className="border border-rcc-border rounded-md p-3 hover:bg-rcc-bg/30 transition-colors">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-md bg-rcc-primary/10 text-rcc-primary flex items-center justify-center shrink-0">
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-rcc-text-primary truncate" title={f.originalName}>
-                        {f.originalName}
-                      </p>
-                      <p className="text-xs text-rcc-text-muted">
-                        {(f.fileSize / 1024).toFixed(1)} KB{f.uploadedBy ? ` · ${f.uploadedBy}` : ""}
-                      </p>
-                      <p className="text-xs text-rcc-text-muted">
-                        Uploaded: {new Date(f.uploadedAt).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })}
-                      </p>
-                      {f.description && (
-                        <p className="text-xs text-rcc-text-secondary mt-1 line-clamp-2">{f.description}</p>
-                      )}
-                    </div>
+          )}
+          {(!employee.files || employee.files.length === 0) ? (
+            <p className="text-xs text-rcc-text-muted text-center py-4">No files uploaded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {employee.files.map((f) => (
+                <div key={f.id} className="flex items-center gap-3 p-3 border border-rcc-border rounded-md hover:bg-rcc-bg/30 transition-colors">
+                  <div className="w-9 h-9 rounded-md bg-rcc-primary/10 text-rcc-primary flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4" />
                   </div>
-                  <div className="mt-3 flex items-center gap-1">
-                    <button
-                      onClick={() => handleViewFile(f)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-rcc-bg hover:text-rcc-primary transition-colors"
-                      title="View"
-                    >
-                      <Eye className="h-3 w-3" /> View
-                    </button>
-                    <button
-                      onClick={() => handleDownloadFile(f)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-rcc-bg hover:text-rcc-primary transition-colors"
-                      title="Download"
-                    >
-                      <Download className="h-3 w-3" /> Download
-                    </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-rcc-text-primary truncate">{f.originalName}</p>
+                    <p className="text-xs text-rcc-text-muted">{(f.fileSize / 1024).toFixed(0)} KB {f.uploadedBy ? `· ${f.uploadedBy}` : ""} · {new Date(f.uploadedAt).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })}</p>
+                    {f.description && <p className="text-xs text-rcc-text-secondary mt-1 line-clamp-1">{f.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleViewFile(f)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-rcc-bg hover:text-rcc-primary transition-colors" title="View"><Eye className="h-3 w-3" /> View</button>
+                    <button onClick={() => handleDownloadFile(f)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-rcc-bg hover:text-rcc-primary transition-colors" title="Download"><Download className="h-3 w-3" /> DL</button>
                     {canManageFiles && (
                       <>
-                        <button
-                          onClick={() => handleReupload(f.id, f.originalName)}
-                          disabled={reuploading === f.id}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-rcc-bg hover:text-rcc-primary transition-colors disabled:opacity-50"
-                          title="Reupload"
-                        >
-                          <Upload className="h-3 w-3" /> {reuploading === f.id ? "..." : "Reupload"}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteFile(f)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-red-50 hover:text-rcc-error transition-colors ml-auto"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                        <button onClick={() => handleReupload(f.id, f.originalName)} disabled={reuploading === f.id} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-rcc-bg hover:text-rcc-primary transition-colors disabled:opacity-50" title="Reupload"><Upload className="h-3 w-3" /> {reuploading === f.id ? "..." : "Re"}</button>
+                        <button onClick={() => handleDeleteFile(f)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rcc-text-secondary hover:bg-red-50 hover:text-rcc-error transition-colors" title="Delete"><Trash2 className="h-3 w-3" /></button>
                       </>
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SectionCard>
 
       {/* File Viewer Modal */}
       {viewing && (

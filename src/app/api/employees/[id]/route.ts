@@ -104,6 +104,16 @@ export async function GET(
         active: employee.active,
         mustChangePwd: employee.mustChangePwd,
         lastLoginAt: employee.lastLoginAt?.toISOString() ?? null,
+        photo: employee.photo ?? null,
+        placeOfBirth: employee.placeOfBirth ?? null,
+        rank: employee.rank ?? null,
+        civilStatus: employee.civilStatus ?? null,
+        citizenship: employee.citizenship ?? null,
+        religion: employee.religion ?? null,
+        height: employee.height ?? null,
+        weight: employee.weight ?? null,
+        bloodType: employee.bloodType ?? null,
+        profileData: employee.profileData ?? null,
         createdAt: employee.createdAt.toISOString(),
         updatedAt: employee.updatedAt.toISOString(),
         certificates: employee.certificates.map((c) => ({
@@ -145,7 +155,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Require either full profiling.edit or profile self-edit permissions
+    // Require either full profiling.edit, profile self-edit, or canEditProfile permissions
     const auth = await requireAnyPermission(request, ["profiling.edit", "profile.editAll", "profile.selfEdit"]);
     if (!auth.ok) return auth.response;
 
@@ -162,8 +172,18 @@ export async function PATCH(
     const isAdminEdit = auth.user.permissions.includes("profiling.edit");
     const isEditAll = auth.user.permissions.includes("profile.editAll");
     const isSelfEdit = auth.user.id === id && auth.user.permissions.includes("profile.selfEdit");
+    // canEditProfile: allow editing profile data (education, experience, etc.)
+    const isProfileOwner = auth.user.id === id;
+    let canFillProfile = false;
+    if (isProfileOwner) {
+      const emp = await db.employee.findUnique({
+        where: { id: auth.user.id },
+        select: { role: { select: { canEditProfile: true } } },
+      });
+      canFillProfile = emp?.role?.canEditProfile ?? false;
+    }
 
-    if (!isAdminEdit && !isEditAll && !isSelfEdit) {
+    if (!isAdminEdit && !isEditAll && !isSelfEdit && !canFillProfile) {
       return NextResponse.json(
         { error: "Forbidden: insufficient permissions" },
         { status: 403 }
@@ -173,14 +193,14 @@ export async function PATCH(
     const body = await request.json();
     const data: Record<string, unknown> = {};
 
-    // Self-edit / editAll: only basic info fields allowed
+    // Full admin edit — all fields
     const canEditAllFields = isAdminEdit;
 
     if (canEditAllFields) {
-      // Full admin edit — all fields
       const {
         employeeId, firstName, middleName, lastName, email, phone, address,
         birthday, gender, groupId, roleId, contractType, hireDate, salary, active, password,
+        placeOfBirth, rank, civilStatus, citizenship, religion, height, weight, bloodType, profileData,
       } = body as Record<string, unknown>;
 
       if (typeof employeeId === "string" && employeeId.trim() && employeeId !== employee.employeeId) {
@@ -216,6 +236,17 @@ export async function PATCH(
       if (salary !== undefined) data.salary = (salary as number | null) ?? null;
       if (active !== undefined) data.active = !!active;
 
+      // Profile fields (LinkedIn-style)
+      if (placeOfBirth !== undefined) data.placeOfBirth = (placeOfBirth as string | null)?.trim() || null;
+      if (rank !== undefined) data.rank = (rank as string | null)?.trim() || null;
+      if (civilStatus !== undefined) data.civilStatus = (civilStatus as string | null)?.trim() || null;
+      if (citizenship !== undefined) data.citizenship = (citizenship as string | null)?.trim() || null;
+      if (religion !== undefined) data.religion = (religion as string | null)?.trim() || null;
+      if (height !== undefined) data.height = (height as string | null)?.trim() || null;
+      if (weight !== undefined) data.weight = (weight as string | null)?.trim() || null;
+      if (bloodType !== undefined) data.bloodType = (bloodType as string | null)?.trim() || null;
+      if (profileData !== undefined) data.profileData = (typeof profileData === "string" ? profileData : JSON.stringify(profileData)) || null;
+
       if (password !== undefined) {
         if (typeof password !== "string" || password.length < 8) {
           return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
@@ -225,7 +256,7 @@ export async function PATCH(
         data.mustChangePwd = true;
       }
     } else {
-      // Self-edit / editAll mode — only basic info
+      // Self-edit / editAll mode — basic info + profile data
       const SELF_EDITABLE = new Set(["phone", "address", "birthday", "gender"]);
       for (const key of SELF_EDITABLE) {
         if (body[key] !== undefined) {
@@ -240,6 +271,21 @@ export async function PATCH(
           }
         }
       }
+
+      // Profile data fields (if canEditProfile scope flag is enabled)
+      if (canFillProfile) {
+        const PROFILE_FIELDS = ["placeOfBirth", "rank", "civilStatus", "citizenship", "religion", "height", "weight", "bloodType", "profileData"];
+        for (const key of PROFILE_FIELDS) {
+          if (body[key] !== undefined) {
+            if (key === "profileData") {
+              data.profileData = (typeof body.profileData === "string" ? body.profileData : JSON.stringify(body.profileData)) || null;
+            } else {
+              data[key] = (body[key] as string | null)?.trim() || null;
+            }
+          }
+        }
+      }
+
       if (Object.keys(data).length === 0) {
         return NextResponse.json({ error: "No editable fields provided" }, { status: 400 });
       }

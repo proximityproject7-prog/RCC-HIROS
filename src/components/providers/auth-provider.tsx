@@ -31,6 +31,7 @@ export interface AuthUser {
   scopeAllAttendance: boolean;
   scopeGroupAttendance: boolean;
   canSelfApproveLeave: boolean;
+  canEditProfile: boolean;
   isSystem: boolean;
 
   // Employee profile

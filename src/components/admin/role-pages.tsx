@@ -31,6 +31,7 @@ export interface Role {
   scopeAllAttendance: boolean;
   scopeGroupAttendance: boolean;
   canSelfApproveLeave: boolean;
+  canEditProfile: boolean;
   isSystem: boolean;
   active: boolean;
   createdAt: string;
@@ -57,7 +58,8 @@ type ScopeKey =
   | "scopeAllReports"
   | "scopeAllAttendance"
   | "scopeGroupAttendance"
-  | "canSelfApproveLeave";
+  | "canSelfApproveLeave"
+  | "canEditProfile";
 
 interface ScopeDef {
   key: ScopeKey;
@@ -125,6 +127,7 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
     permissions: ["profiling.view", "profiling.view_inactive", "profiling.create", "profiling.edit", "profiling.delete", "profile.selfEdit", "profile.editAll"],
     scopes: [
       { key: "scopeAllProfiling", label: "All Profiling", description: "See employee records across all groups." },
+      { key: "canEditProfile", label: "Fill Profile Data", description: "Allow users to fill/edit their own profile sections (education, experience, etc.)." },
     ],
   },
   {
@@ -476,6 +479,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   const [scopeAllAttendance, setScopeAllAttendance] = useState(false);
   const [scopeGroupAttendance, setScopeGroupAttendance] = useState(false);
   const [canSelfApproveLeave, setCanSelfApproveLeave] = useState(false);
+  const [canEditProfile, setCanEditProfile] = useState(false);
   const [active, setActive] = useState(true);
   const [isSystem, setIsSystem] = useState(false);
   const [perms, setPerms] = useState<Set<string>>(new Set());
@@ -502,6 +506,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         setScopeAllAttendance(r.scopeAllAttendance);
         setScopeGroupAttendance(r.scopeGroupAttendance);
         setCanSelfApproveLeave(r.canSelfApproveLeave);
+        setCanEditProfile(r.canEditProfile);
         setActive(r.active);
         setIsSystem(r.isSystem);
         setPerms(new Set(r.permissions));
@@ -533,6 +538,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
     scopeAllAttendance: [scopeAllAttendance, setScopeAllAttendance],
     scopeGroupAttendance: [scopeGroupAttendance, setScopeGroupAttendance],
     canSelfApproveLeave: [canSelfApproveLeave, setCanSelfApproveLeave],
+    canEditProfile: [canEditProfile, setCanEditProfile],
   };
 
   const handleSave = async () => {
@@ -553,6 +559,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         scopeAllAttendance,
         scopeGroupAttendance,
         canSelfApproveLeave,
+        canEditProfile,
         active,
         permissions: Array.from(perms),
       };

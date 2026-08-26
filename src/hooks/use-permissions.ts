@@ -33,6 +33,8 @@ export interface UsePermissionsResult {
   scopeGroupAttendance: boolean;
   /** Whether the user can self-approve their own leave requests. */
   canSelfApproveLeave: boolean;
+  /** Whether the user can fill/edit their own profile data (education, experience, etc.). */
+  canEditProfile: boolean;
   /** Raw permission set (frozen list). */
   permissions: string[];
 }
@@ -74,6 +76,7 @@ export function usePermissions(): UsePermissionsResult {
       scopeAllAttendance: user?.scopeAllAttendance ?? false,
       scopeGroupAttendance: user?.scopeGroupAttendance ?? false,
       canSelfApproveLeave: user?.canSelfApproveLeave ?? false,
+      canEditProfile: user?.canEditProfile ?? false,
       permissions,
     };
   }, [permissions, isSystemAdmin, user]);

@@ -39,6 +39,7 @@ model Role {
   scopeAllAttendance   Boolean @default(false)
   scopeGroupAttendance Boolean @default(false)
   canSelfApproveLeave  Boolean @default(false)
+  canEditProfile       Boolean @default(false)
   isSystem             Boolean @default(false)
   active               Boolean @default(true)
   createdAt            DateTime @default(now())
@@ -82,6 +83,18 @@ model Employee {
   active         Boolean  @default(true)
   hireDate       DateTime?
   salary         Float?     @default(0) // Monthly salary
+
+  // Profile fields (LinkedIn-style profile)
+  photo          String?  // File path to uploaded 2x2 photo
+  placeOfBirth   String?
+  rank           String?
+  civilStatus    String?  // "Single" | "Married" | "Widowed" | "Separated"
+  citizenship    String?
+  religion       String?
+  height         String?
+  weight         String?
+  bloodType      String?
+  profileData    String?  @db.Text // JSON blob for repeatable profile sections
 
   // Auth fields (nullable — Employee IS the User)
   passwordHash     String?
