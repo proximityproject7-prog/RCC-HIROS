@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, requireAnyPermission } from "@/lib/auth-token";
+import { requireAnyPermission } from "@/lib/auth-token";
 import { randomUUID } from "crypto";
 import { mkdir, writeFile, unlink, readFile } from "fs/promises";
 import path from "path";
 
 // ═══════════════════════════════════════════════════════════════
 // /api/employees/[id]/photo
-// GET    requireAuth    — serve profile photo
+// GET    (public)    — serve profile photo
 // POST   profiling.edit|profile.*|canEditProfile — upload 2x2 photo
 // DELETE profiling.edit|profile.* — remove photo
 // ═══════════════════════════════════════════════════════════════
@@ -27,9 +27,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.ok) return auth.response;
-
     const { id } = await params;
     const employee = await db.employee.findUnique({
       where: { id },

@@ -208,6 +208,14 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setCurrentPage("dashboard")}
+          className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+      </div>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-rcc-text-primary">FPASS Submissions</h1>

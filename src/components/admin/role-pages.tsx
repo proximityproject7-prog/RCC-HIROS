@@ -491,7 +491,6 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   // System configuration state (for config panel at bottom)
   const [cfgGroups, setCfgGroups] = useState<{ id: string; name: string; code: string }[]>([]);
   const [cfgFpassIds, setCfgFpassIds] = useState<string[]>([]);
-  const [cfgPremises, setCfgPremises] = useState<{ label: string; lat: number; lng: number; radiusMeters: number } | null>(null);
 
   useEffect(() => {
     if (mode !== "edit" || !roleId) return;
@@ -530,14 +529,12 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   useEffect(() => {
     (async () => {
       try {
-        const [groupsData, fpassData, premisesData] = await Promise.all([
+        const [groupsData, fpassData] = await Promise.all([
           apiFetch<{ groups: { id: string; name: string; code: string }[] }>("/api/groups"),
           apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings"),
-          apiFetch<{ premises: { label: string; lat: number; lng: number; radiusMeters: number } }>("/api/settings/premises"),
         ]);
         setCfgGroups(groupsData.groups ?? []);
         setCfgFpassIds(fpassData.enabledGroupIds ?? []);
-        setCfgPremises(premisesData.premises);
       } catch {
         // non-fatal
       }
@@ -786,7 +783,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
           System Configuration
         </h2>
         <p className="text-xs text-rcc-text-muted -mt-2">
-          Overview of FPASS and geolocation settings. Configure in their respective modules.
+          Current FPASS and profile edit settings across the system.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -806,30 +803,19 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
                 })}
               </div>
             )}
-            <button
-              onClick={() => setCurrentPage("fpass", "settings")}
-              className="text-xs font-medium text-rcc-primary hover:underline transition-colors"
-            >
-              Configure FPASS &rarr;
-            </button>
+            <p className="text-xs text-rcc-text-muted">Configure in the Employee Profile page &rarr; System Configuration.</p>
           </div>
 
           <div className="border border-rcc-border rounded-lg p-4 space-y-2">
-            <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Geolocation Premises</h3>
-            {cfgPremises ? (
-              <div>
-                <p className="text-sm font-medium text-rcc-text-primary">{cfgPremises.label}</p>
-                <p className="text-xs text-rcc-text-muted">{cfgPremises.lat}, {cfgPremises.lng} &bull; {cfgPremises.radiusMeters}m radius</p>
-              </div>
-            ) : (
-              <p className="text-xs text-rcc-text-muted">Loading...</p>
-            )}
-            <button
-              onClick={() => setCurrentPage("attendance", "premises")}
-              className="text-xs font-medium text-rcc-primary hover:underline transition-colors"
-            >
-              Configure Premises &rarr;
-            </button>
+            <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">Profile Edit Access</h3>
+            <p className="text-xs text-rcc-text-muted">Controls whether users with this role can fill/edit their own profile sections.</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold ${canEditProfile ? "bg-green-50 text-green-700 border border-green-200" : "bg-rcc-bg text-rcc-text-muted border border-rcc-border"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${canEditProfile ? "bg-green-500" : "bg-rcc-text-muted"}`} />
+                {canEditProfile ? "Enabled" : "Disabled"}
+              </span>
+              <span className="text-xs text-rcc-text-muted">Toggle in Employee Profiling &rarr; Scope Flags.</span>
+            </div>
           </div>
         </div>
       </section>

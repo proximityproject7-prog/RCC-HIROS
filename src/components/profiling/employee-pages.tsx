@@ -849,7 +849,8 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   // System configuration (visible to roles.edit users)
   const [configGroups, setConfigGroups] = useState<GroupBrief[]>([]);
   const [configFpassGroupIds, setConfigFpassGroupIds] = useState<string[]>([]);
-  const [configPremises, setConfigPremises] = useState<{ label: string; lat: number; lng: number; radiusMeters: number } | null>(null);
+  const [fpassConfigSaving, setFpassConfigSaving] = useState(false);
+  const [fpassConfigMsg, setFpassConfigMsg] = useState<string | null>(null);
 
   // Parse profileData JSON
   useEffect(() => {
@@ -909,14 +910,12 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     if (!has("roles.edit")) return;
     (async () => {
       try {
-        const [groupsData, fpassData, premisesData] = await Promise.all([
+        const [groupsData, fpassData] = await Promise.all([
           apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
           apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings"),
-          apiFetch<{ premises: { label: string; lat: number; lng: number; radiusMeters: number } }>("/api/settings/premises"),
         ]);
         setConfigGroups(groupsData.groups ?? []);
         setConfigFpassGroupIds(fpassData.enabledGroupIds ?? []);
-        setConfigPremises(premisesData.premises);
       } catch {
         // non-fatal
       }
@@ -1158,6 +1157,25 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       setFullEditError(err instanceof Error ? err.message : "Save failed.");
     } finally {
       setFullEditSaving(false);
+    }
+  };
+
+  // ── FPASS config save (inline in System Configuration) ─────
+  const saveFpassConfig = async () => {
+    setFpassConfigSaving(true);
+    setFpassConfigMsg(null);
+    try {
+      await apiFetch("/api/fpass/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ enabledGroupIds: configFpassGroupIds }),
+      });
+      setFpassConfigMsg("FPASS group settings saved.");
+      setTimeout(() => setFpassConfigMsg(null), 3000);
+    } catch (err) {
+      setFpassConfigMsg(null);
+      setError(err instanceof Error ? err.message : "Failed to save FPASS settings.");
+    } finally {
+      setFpassConfigSaving(false);
     }
   };
 
@@ -1713,40 +1731,54 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       {has("roles.edit") && (
         <SectionCard title="System Configuration" icon={Settings}>
           <div className="space-y-4">
+            {/* FPASS Enabled Groups — inline checkboxes */}
             <div>
               <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">FPASS Enabled Groups</h3>
-              {configFpassGroupIds.length === 0 ? (
-                <p className="text-xs text-rcc-text-muted">No groups enabled for FPASS.</p>
+              <p className="text-xs text-rcc-text-muted mb-3">Select which departments can fill the Faculty Performance Appraisal form.</p>
+              {configGroups.length === 0 ? (
+                <p className="text-xs text-rcc-text-muted">Loading groups...</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {configFpassGroupIds.map(id => {
-                    const g = configGroups.find(gr => gr.id === id);
-                    return g ? (
-                      <span key={id} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-rcc-primary/10 text-rcc-primary border border-rcc-primary/20">{g.name}</span>
-                    ) : (
-                      <span key={id} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-rcc-bg text-rcc-text-muted border border-rcc-border">{id}</span>
-                    );
-                  })}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {configGroups.map(g => (
+                    <label key={g.id} className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${configFpassGroupIds.includes(g.id) ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"}`}>
+                      <input
+                        type="checkbox"
+                        checked={configFpassGroupIds.includes(g.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setConfigFpassGroupIds(prev => [...prev, g.id]);
+                          else setConfigFpassGroupIds(prev => prev.filter(id => id !== g.id));
+                        }}
+                        className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-rcc-text-primary">{g.name}</p>
+                        <p className="text-xs text-rcc-text-muted">{g.code}</p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               )}
-              <button onClick={() => setCurrentPage("fpass", "settings")} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-rcc-primary hover:underline transition-colors">
-                Configure FPASS <span className="text-[10px]">&#8594;</span>
+              <button
+                onClick={saveFpassConfig}
+                disabled={fpassConfigSaving}
+                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
+              >
+                <Save className="h-3 w-3" /> {fpassConfigSaving ? "Saving..." : "Save FPASS Settings"}
               </button>
+              {fpassConfigMsg && <p className="mt-2 text-xs text-green-600">{fpassConfigMsg}</p>}
             </div>
 
+            {/* Profile Edit Access */}
             <div className="border-t border-rcc-border pt-4">
-              <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">Geolocation Premises</h3>
-              {configPremises ? (
-                <div className="text-sm text-rcc-text-primary">
-                  <p className="font-medium">{configPremises.label}</p>
-                  <p className="text-xs text-rcc-text-muted mt-0.5">{configPremises.lat}, {configPremises.lng} &bull; {configPremises.radiusMeters}m radius</p>
-                </div>
-              ) : (
-                <p className="text-xs text-rcc-text-muted">Loading...</p>
-              )}
-              <button onClick={() => setCurrentPage("attendance", "premises")} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-rcc-primary hover:underline transition-colors">
-                Configure Premises <span className="text-[10px]">&#8594;</span>
-              </button>
+              <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">Profile Edit Access</h3>
+              <p className="text-xs text-rcc-text-muted mb-2">Controls whether users can fill/edit their own profile sections (education, experience, etc.).</p>
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold ${user?.canEditProfile ? "bg-green-50 text-green-700 border border-green-200" : "bg-rcc-bg text-rcc-text-muted border border-rcc-border"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${user?.canEditProfile ? "bg-green-500" : "bg-rcc-text-muted"}`} />
+                  {user?.canEditProfile ? "Enabled" : "Disabled"}
+                </span>
+                <span className="text-xs text-rcc-text-muted">Configured per role in Role Management.</span>
+              </div>
             </div>
           </div>
         </SectionCard>
