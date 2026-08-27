@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
-  FileText, Settings, Users, CheckCircle2, Eye, X,
+  FileText, Settings, Users, CheckCircle2, X, Search,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -185,19 +185,31 @@ export function FpassPage({ employeeId, submissionId, showSettings: showSettings
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FPASS List Page (admin view of all submissions)
+// FPASS List Page (all employees + submission status)
 // ═══════════════════════════════════════════════════════════════
 
+interface FpassStatusEmployee {
+  employeeId: string;
+  name: string;
+  group: { id: string; name: string; code: string } | null;
+  roleName: string | null;
+  submission: { id: string; totalPoints: number; updatedAt: string; schoolYear: string } | null;
+  hasSubmission: boolean;
+}
+
 function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canManage: boolean }) {
-  const [submissions, setSubmissions] = useState<FpassSubmissionRecord[]>([]);
+  const [employees, setEmployees] = useState<FpassStatusEmployee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "empty">("all");
+  const [groupFilter, setGroupFilter] = useState("all");
   const { setCurrentPage } = useAuthStore();
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await apiFetch<{ submissions: FpassSubmissionRecord[] }>("/api/fpass");
-        setSubmissions(data.submissions ?? []);
+        const data = await apiFetch<{ employees: FpassStatusEmployee[] }>("/api/fpass/status");
+        setEmployees(data.employees ?? []);
       } catch {
         // non-fatal
       } finally {
@@ -206,20 +218,40 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
     })();
   }, []);
 
+  const groups = useMemo(() => {
+    const map = new Map<string, string>();
+    employees.forEach((e) => { if (e.group) map.set(e.group.id, e.group.name); });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [employees]);
+
+  const filtered = useMemo(() => {
+    return employees.filter((e) => {
+      if (search) {
+        const q = search.toLowerCase();
+        if (!e.employeeId.toLowerCase().includes(q) && !e.name.toLowerCase().includes(q)) return false;
+      }
+      if (groupFilter !== "all" && e.group?.id !== groupFilter) return false;
+      if (statusFilter === "submitted" && !e.hasSubmission) return false;
+      if (statusFilter === "empty" && e.hasSubmission) return false;
+      return true;
+    });
+  }, [employees, search, statusFilter, groupFilter]);
+
+  const submittedCount = employees.filter((e) => e.hasSubmission).length;
+  const emptyCount = employees.length - submittedCount;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setCurrentPage("dashboard")}
-          className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
-      </div>
+      <button
+        onClick={() => setCurrentPage("dashboard")}
+        className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back
+      </button>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-rcc-text-primary">FPASS Submissions</h1>
-          <p className="text-sm text-rcc-text-muted mt-0.5">Faculty Performance Appraisal Form submissions.</p>
+          <p className="text-sm text-rcc-text-muted mt-0.5">Track faculty performance appraisal status.</p>
         </div>
         {canManage && (
           <button
@@ -231,6 +263,47 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
         )}
       </div>
 
+      {/* Filters */}
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4 space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-rcc-text-muted" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or employee ID..."
+              className="w-full pl-9 pr-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
+            />
+          </div>
+          <select
+            value={groupFilter}
+            onChange={(e) => setGroupFilter(e.target.value)}
+            className="px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
+          >
+            <option value="all">All groups</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-rcc-text-muted uppercase tracking-wide">Status:</span>
+          {(["all", "submitted", "empty"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                statusFilter === s
+                  ? "bg-rcc-primary text-rcc-primary-foreground"
+                  : "bg-rcc-bg border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg/80"
+              }`}
+            >
+              {s === "all" ? "All" : s === "submitted" ? `Submitted (${submittedCount})` : `Not Started (${emptyCount})`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
       <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -239,31 +312,48 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Employee ID</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Name</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Department</th>
-                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">School Year</th>
+                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Status</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Total Points</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Last Updated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-rcc-border">
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-              ) : submissions.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">No submissions found.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+                    Loading...
+                  </div>
+                </td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">No employees found.</td></tr>
               ) : (
-                submissions.map((s) => (
+                filtered.map((e) => (
                   <tr
-                    key={s.id}
-                    onClick={() => setCurrentPage("fpass", `view:${s.id}`)}
-                    className="cursor-pointer hover:bg-rcc-bg/30 transition-colors"
+                    key={e.employeeId}
+                    onClick={() => e.hasSubmission && e.submission && setCurrentPage("fpass", `view:${e.submission.id}`)}
+                    className={`transition-colors ${e.hasSubmission ? "cursor-pointer hover:bg-rcc-bg/30" : ""}`}
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{s.employee.employeeId}</td>
-                    <td className="px-4 py-3 font-medium text-rcc-text-primary">
-                      {s.employee.firstName} {s.employee.middleName ? s.employee.middleName + " " : ""}{s.employee.lastName}
+                    <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{e.employeeId}</td>
+                    <td className="px-4 py-3 font-medium text-rcc-text-primary">{e.name}</td>
+                    <td className="px-4 py-3 text-rcc-text-secondary">{e.group?.name ?? "Unassigned"}</td>
+                    <td className="px-4 py-3">
+                      {e.hasSubmission ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> SUBMITTED
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-bg text-rcc-text-muted border border-rcc-border">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rcc-text-muted" /> NOT STARTED
+                        </span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-rcc-text-secondary">{s.employee.group?.name ?? "Unassigned"}</td>
-                    <td className="px-4 py-3 text-rcc-text-secondary">{s.schoolYear}</td>
-                    <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{s.totalPoints.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-xs text-rcc-text-muted">{new Date(s.updatedAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">
+                      {e.submission ? e.submission.totalPoints.toFixed(1) : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-rcc-text-muted">
+                      {e.submission ? new Date(e.submission.updatedAt).toLocaleDateString() : "-"}
+                    </td>
                   </tr>
                 ))
               )}
@@ -365,9 +455,6 @@ function FpassFormPage({
   const [formData, setFormData] = useState<FpassFormData>(DEFAULT_FORM_DATA);
   const [existingId, setExistingId] = useState<string | null>(submissionId ?? null);
   const [schoolYear, setSchoolYear] = useState(new Date().getFullYear() + "-" + (new Date().getFullYear() + 1));
-  const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
-  const [submissionsData, setSubmissionsData] = useState<FpassSubmissionRecord[]>([]);
-  const [submissionsLoading, setSubmissionsLoading] = useState(false);
 
   // Load employee data
   useEffect(() => {
@@ -436,19 +523,6 @@ function FpassFormPage({
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const fetchSubmissions = async () => {
-    setSubmissionsLoading(true);
-    setShowSubmissionsModal(true);
-    try {
-      const data = await apiFetch<{ submissions: FpassSubmissionRecord[] }>("/api/fpass");
-      setSubmissionsData(data.submissions ?? []);
-    } catch {
-      setSubmissionsData([]);
-    } finally {
-      setSubmissionsLoading(false);
     }
   };
 
@@ -525,40 +599,32 @@ function FpassFormPage({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
-            <ArrowLeft className="h-4 w-4" /> Back to FPASS
-          </button>
+      <div>
+        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
+          <ArrowLeft className="h-4 w-4" /> Back to FPASS
+        </button>
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-rcc-text-primary">Faculty Performance Appraisal Form</h1>
             <p className="text-sm text-rcc-text-muted mt-0.5">
               {employee?.employeeId} - {formData.header.name || "Loading..."}
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-rcc-accent/10 text-rcc-accent text-sm font-semibold tabular-nums">
-            {totalPoints.toFixed(1)} pts
-          </span>
-          {canManage && (
-            <button
-              onClick={fetchSubmissions}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-            >
-              <Eye className="h-4 w-4" /> View Submissions
-            </button>
-          )}
-          {!readOnly && (
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-rcc-accent/10 text-rcc-accent text-sm font-semibold tabular-nums">
+              {totalPoints.toFixed(1)} pts
+            </span>
+            {!readOnly && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? "Saving..." : "Save"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1000,55 +1066,6 @@ function FpassFormPage({
           readOnly={readOnly}
         />
       </CriteriaSection>
-
-      {/* View Submissions Modal */}
-      {showSubmissionsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-rcc-surface rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-rcc-border">
-              <h2 className="text-sm font-semibold text-rcc-text-primary">FPASS Submissions</h2>
-              <button onClick={() => setShowSubmissionsModal(false)} className="p-1.5 rounded-md text-rcc-text-muted hover:bg-rcc-bg hover:text-rcc-text-primary transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-                  <tr>
-                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Employee ID</th>
-                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Name</th>
-                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Department</th>
-                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">School Year</th>
-                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Total Points</th>
-                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Last Updated</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-rcc-border">
-                  {submissionsLoading ? (
-                    <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
-                  ) : submissionsData.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">No submissions found.</td></tr>
-                  ) : (
-                    submissionsData.map((s) => (
-                      <tr key={s.id} className="hover:bg-rcc-bg/30 transition-colors cursor-pointer"
-                        onClick={() => { setShowSubmissionsModal(false); /* navigate handled by parent */ }}>
-                        <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{s.employee.employeeId}</td>
-                        <td className="px-4 py-3 font-medium text-rcc-text-primary">
-                          {s.employee.firstName} {s.employee.middleName ? s.employee.middleName + " " : ""}{s.employee.lastName}
-                        </td>
-                        <td className="px-4 py-3 text-rcc-text-secondary">{s.employee.group?.name ?? "Unassigned"}</td>
-                        <td className="px-4 py-3 text-rcc-text-secondary">{s.schoolYear}</td>
-                        <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{s.totalPoints.toFixed(1)}</td>
-                        <td className="px-4 py-3 text-xs text-rcc-text-muted">{new Date(s.updatedAt).toLocaleDateString()}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

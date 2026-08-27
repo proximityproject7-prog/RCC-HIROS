@@ -569,17 +569,6 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
           <Field label="Monthly Salary" hint="₱ PHP">
             <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} min="0" step="0.01" className={inputClass} />
           </Field>
-          <label
-            className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors md:col-span-2 ${
-              active ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"
-            }`}
-          >
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40" />
-            <div>
-              <p className="text-sm font-semibold text-rcc-text-primary">Active Employee</p>
-              <p className="text-xs text-rcc-text-muted mt-0.5">Inactive employees cannot sign in.</p>
-            </div>
-          </label>
         </div>
       </section>
 
@@ -637,6 +626,20 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
           </Field>
         </section>
       )}
+
+      <section className="bg-rcc-surface rounded-lg border border-rcc-border p-6 space-y-4">
+        <label
+          className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+            active ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"
+          }`}
+        >
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40" />
+          <div>
+            <p className="text-sm font-semibold text-rcc-text-primary">Active Employee</p>
+            <p className="text-xs text-rcc-text-muted mt-0.5">Inactive employees cannot sign in.</p>
+          </div>
+        </label>
+      </section>
 
       <div className="flex justify-end gap-2 pt-2">
         <button
@@ -1433,9 +1436,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
             <InfoItem icon={Building2} label="Department" value={employee.group?.name} />
             <InfoItem icon={Shield} label="Role" value={employee.roleName} />
-            {employee.salary != null && employee.salary > 0 && (
-              <InfoItem icon={DollarSign} label="Salary" value={`₱${employee.salary.toLocaleString()}`} />
-            )}
+            <InfoItem icon={DollarSign} label="Salary" value={employee.salary != null && employee.salary > 0 ? `₱${employee.salary.toLocaleString()}` : "Not set"} />
           </dl>
         )}
       </SectionCard>
