@@ -83,6 +83,7 @@ export interface AuthUser {
   scopeGroupAttendance: boolean;
   canSelfApproveLeave: boolean;
   canEditProfile: boolean;
+  canChangePassword: boolean;
   isSystem: boolean;
 
   // Employee profile
@@ -138,6 +139,7 @@ export async function getAuthUser(employeeId: string): Promise<AuthUser | null> 
     scopeGroupAttendance: employee.role.scopeGroupAttendance,
     canSelfApproveLeave: employee.role.canSelfApproveLeave,
     canEditProfile: employee.role.canEditProfile,
+    canChangePassword: employee.role.canChangePassword,
     isSystem: employee.role.isSystem,
     groupId: employee.groupId,
     active: employee.active,

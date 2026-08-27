@@ -192,7 +192,7 @@ export function EmployeeListPage() {
 
       {/* Filters */}
       <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <div className="lg:col-span-2 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-rcc-text-muted" />
             <input
@@ -797,7 +797,7 @@ function ProfileSection({ sectionKey, label, rows, fields, editing, canEdit, onE
 
 export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const { setCurrentPage } = useAuthStore();
-  const { has } = usePermissions();
+  const { has, canChangePassword } = usePermissions();
   const { user } = useAuth();
 
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -1385,11 +1385,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
               </div>
             </div>
             <div className="flex items-center gap-2 pb-1">
-              {has("profiling.edit") && (
-                <button onClick={startEditing} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </button>
-              )}
               {((employeeId === user?.id && fpassEnabled) || has("fpass.manage")) && (
                 <button onClick={() => setCurrentPage("fpass", `emp:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-accent/30 text-rcc-accent hover:bg-rcc-accent/5 transition-colors">
                   <FileText className="h-3.5 w-3.5" /> FPASS
@@ -1478,8 +1473,8 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         )}
       </SectionCard>
 
-      {/* Change Password (visible to admins or self) */}
-      {(has("profiling.edit") || canSelfEdit) && (
+      {/* Change Password (visible only to roles with canChangePassword) */}
+      {canChangePassword && (
         <SectionCard title="Change Password" icon={Lock}>
           <div className="space-y-3">
             <p className="text-xs text-rcc-text-muted">Set a new password for this employee. Leave blank to keep the current password.</p>

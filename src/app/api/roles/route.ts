@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
       scopeAllAttendance: role.scopeAllAttendance,
       scopeGroupAttendance: role.scopeGroupAttendance,
       canSelfApproveLeave: role.canSelfApproveLeave,
+      canEditProfile: role.canEditProfile,
+      canChangePassword: role.canChangePassword,
       isSystem: role.isSystem,
       active: role.active,
       createdAt: role.createdAt.toISOString(),
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
       scopeGroupAttendance = false,
       canSelfApproveLeave = false,
       canEditProfile = false,
+      canChangePassword = false,
       permissions = [],
     } = body as {
       name?: string;
@@ -90,6 +93,7 @@ export async function POST(request: NextRequest) {
       scopeGroupAttendance?: boolean;
       canSelfApproveLeave?: boolean;
       canEditProfile?: boolean;
+      canChangePassword?: boolean;
       permissions?: string[];
     };
 
@@ -133,6 +137,7 @@ export async function POST(request: NextRequest) {
         scopeGroupAttendance: !!scopeGroupAttendance,
         canSelfApproveLeave: !!canSelfApproveLeave,
         canEditProfile: !!canEditProfile,
+        canChangePassword: !!canChangePassword,
         isSystem: false, // Never allow creating system roles via API
         permissions: {
           create: Array.from(new Set(permissions)).map((identifier) => ({
@@ -168,6 +173,7 @@ export async function POST(request: NextRequest) {
           scopeGroupAttendance: role.scopeGroupAttendance,
           canSelfApproveLeave: role.canSelfApproveLeave,
           canEditProfile: role.canEditProfile,
+          canChangePassword: role.canChangePassword,
           isSystem: role.isSystem,
           active: role.active,
           permissions: role.permissions

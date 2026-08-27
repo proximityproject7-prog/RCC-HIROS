@@ -40,6 +40,7 @@ model Role {
   scopeGroupAttendance Boolean @default(false)
   canSelfApproveLeave  Boolean @default(false)
   canEditProfile       Boolean @default(false)
+  canChangePassword    Boolean @default(false)
   isSystem             Boolean @default(false)
   active               Boolean @default(true)
   createdAt            DateTime @default(now())

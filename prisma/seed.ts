@@ -173,6 +173,7 @@ async function upsertRole(
     scopeAllAttendance?: boolean;
     scopeGroupAttendance?: boolean;
     canSelfApproveLeave?: boolean;
+    canChangePassword?: boolean;
     isSystem?: boolean;
   },
   permissions: string[]
@@ -188,6 +189,7 @@ async function upsertRole(
       scopeAllAttendance: opts.scopeAllAttendance ?? false,
       scopeGroupAttendance: opts.scopeGroupAttendance ?? false,
       canSelfApproveLeave: opts.canSelfApproveLeave ?? false,
+      canChangePassword: opts.canChangePassword ?? false,
       isSystem: opts.isSystem ?? false,
       active: true,
     },
@@ -201,6 +203,7 @@ async function upsertRole(
       scopeAllAttendance: opts.scopeAllAttendance ?? false,
       scopeGroupAttendance: opts.scopeGroupAttendance ?? false,
       canSelfApproveLeave: opts.canSelfApproveLeave ?? false,
+      canChangePassword: opts.canChangePassword ?? false,
       isSystem: opts.isSystem ?? false,
       active: true,
     },
@@ -290,6 +293,7 @@ async function main() {
       scopeAllReports: true,
       scopeAllAttendance: true,
       canSelfApproveLeave: false,
+      canChangePassword: true,
       isSystem: true,
     },
     ALL_PERMISSIONS
@@ -305,6 +309,7 @@ async function main() {
       scopeAllReports: true,
       scopeAllAttendance: true,
       canSelfApproveLeave: true,
+      canChangePassword: false,
       isSystem: false,
     },
     ACCOUNTANT_PERMS
@@ -320,6 +325,7 @@ async function main() {
       scopeAllReports: true,
       scopeAllAttendance: true,
       canSelfApproveLeave: false,
+      canChangePassword: true,
       isSystem: false,
     },
     HR_PERMS
@@ -336,6 +342,7 @@ async function main() {
       scopeAllAttendance: false,
       scopeGroupAttendance: true,
       canSelfApproveLeave: false,
+      canChangePassword: false,
       isSystem: false,
     },
     DEAN_PERMS
@@ -351,6 +358,7 @@ async function main() {
       scopeAllReports: true,
       scopeAllAttendance: true,
       canSelfApproveLeave: false,
+      canChangePassword: true,
       isSystem: false,
     },
     IT_STAFF_PERMS
@@ -366,6 +374,7 @@ async function main() {
       scopeAllReports: false,
       scopeAllAttendance: false,
       canSelfApproveLeave: false,
+      canChangePassword: false,
       isSystem: false,
     },
     PROFESSOR_PERMS
@@ -381,6 +390,7 @@ async function main() {
       scopeAllReports: false,
       scopeAllAttendance: false,
       canSelfApproveLeave: false,
+      canChangePassword: false,
       isSystem: false,
     },
     HR_ASSISTANT_PERMS

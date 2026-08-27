@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         scopeGroupAttendance: employee.role.scopeGroupAttendance,
         canSelfApproveLeave: employee.role.canSelfApproveLeave,
         canEditProfile: employee.role.canEditProfile,
+        canChangePassword: employee.role.canChangePassword,
         isSystem: employee.role.isSystem,
         groupId: employee.groupId,
         group: employee.group?.name ?? null,

@@ -32,6 +32,7 @@ export interface Role {
   scopeGroupAttendance: boolean;
   canSelfApproveLeave: boolean;
   canEditProfile: boolean;
+  canChangePassword: boolean;
   isSystem: boolean;
   active: boolean;
   createdAt: string;
@@ -59,7 +60,8 @@ type ScopeKey =
   | "scopeAllAttendance"
   | "scopeGroupAttendance"
   | "canSelfApproveLeave"
-  | "canEditProfile";
+  | "canEditProfile"
+  | "canChangePassword";
 
 interface ScopeDef {
   key: ScopeKey;
@@ -126,38 +128,39 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
     label: "Employee Profiling",
     permissions: ["profiling.view", "profiling.view_inactive", "profiling.create", "profiling.edit", "profiling.delete", "profile.selfEdit", "profile.editAll"],
     scopes: [
-      { key: "scopeAllProfiling", label: "All Profiling", description: "See employee records across all groups." },
-      { key: "canEditProfile", label: "Fill Profile Data", description: "Allow users to fill/edit their own profile sections (education, experience, etc.)." },
+      { key: "scopeAllProfiling" as const, label: "All Profiling", description: "See employee records across all groups." },
+      { key: "canEditProfile" as const, label: "Fill Profile Data", description: "Allow users to fill/edit their own profile sections (education, experience, etc.)." },
+      { key: "canChangePassword" as const, label: "Change Password", description: "Allow users to change passwords for employees." },
     ],
   },
   {
     label: "Attendance",
     permissions: ["attendance.view", "attendance.clock_in", "attendance.edit", "attendance.edit_on_premise", "attendance.view_all"],
     scopes: [
-      { key: "scopeAllAttendance", label: "All Attendance", description: "View attendance records across all groups." },
-      { key: "scopeGroupAttendance", label: "Own Group Attendance", description: "View attendance records within own group only." },
+      { key: "scopeAllAttendance" as const, label: "All Attendance", description: "View attendance records across all groups." },
+      { key: "scopeGroupAttendance" as const, label: "Own Group Attendance", description: "View attendance records within own group only." },
     ],
   },
   {
     label: "Performance Evaluation",
     permissions: ["evaluation.view", "evaluation.submit", "evaluation.view_results", "evaluation.manage_forms", "evaluation.reset"],
     scopes: [
-      { key: "scopeAllEvaluation", label: "All Evaluation", description: "View and submit evaluations institution-wide." },
+      { key: "scopeAllEvaluation" as const, label: "All Evaluation", description: "View and submit evaluations institution-wide." },
     ],
   },
   {
     label: "Leave Management",
     permissions: ["leave.request", "leave.approve_l1", "leave.approve_l2", "leave.view_all", "leave.manage_types"],
     scopes: [
-      { key: "scopeAllLeave", label: "All Leave", description: "Approve and view all leave requests." },
-      { key: "canSelfApproveLeave", label: "Can Self-Approve Leave", description: "Allow approving own leave requests." },
+      { key: "scopeAllLeave" as const, label: "All Leave", description: "Approve and view all leave requests." },
+      { key: "canSelfApproveLeave" as const, label: "Can Self-Approve Leave", description: "Allow approving own leave requests." },
     ],
   },
   {
     label: "Reports",
     permissions: ["reports.view", "reports.export"],
     scopes: [
-      { key: "scopeAllReports", label: "All Reports", description: "Access reports across all groups." },
+      { key: "scopeAllReports" as const, label: "All Reports", description: "Access reports across all groups." },
     ],
   },
   {
@@ -480,6 +483,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   const [scopeGroupAttendance, setScopeGroupAttendance] = useState(false);
   const [canSelfApproveLeave, setCanSelfApproveLeave] = useState(false);
   const [canEditProfile, setCanEditProfile] = useState(false);
+  const [canChangePassword, setCanChangePassword] = useState(false);
   const [active, setActive] = useState(true);
   const [isSystem, setIsSystem] = useState(false);
   const [perms, setPerms] = useState<Set<string>>(new Set());
@@ -511,6 +515,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         setScopeGroupAttendance(r.scopeGroupAttendance);
         setCanSelfApproveLeave(r.canSelfApproveLeave);
         setCanEditProfile(r.canEditProfile);
+        setCanChangePassword(r.canChangePassword);
         setActive(r.active);
         setIsSystem(r.isSystem);
         setPerms(new Set(r.permissions));
@@ -559,6 +564,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
     scopeGroupAttendance: [scopeGroupAttendance, setScopeGroupAttendance],
     canSelfApproveLeave: [canSelfApproveLeave, setCanSelfApproveLeave],
     canEditProfile: [canEditProfile, setCanEditProfile],
+    canChangePassword: [canChangePassword, setCanChangePassword],
   };
 
   const handleSave = async () => {
@@ -580,6 +586,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         scopeGroupAttendance,
         canSelfApproveLeave,
         canEditProfile,
+        canChangePassword,
         active,
         permissions: Array.from(perms),
       };

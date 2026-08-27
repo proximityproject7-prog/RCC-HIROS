@@ -35,6 +35,8 @@ export interface UsePermissionsResult {
   canSelfApproveLeave: boolean;
   /** Whether the user can fill/edit their own profile data (education, experience, etc.). */
   canEditProfile: boolean;
+  /** Whether the user can change passwords for employees. */
+  canChangePassword: boolean;
   /** Raw permission set (frozen list). */
   permissions: string[];
 }
@@ -77,6 +79,7 @@ export function usePermissions(): UsePermissionsResult {
       scopeGroupAttendance: user?.scopeGroupAttendance ?? false,
       canSelfApproveLeave: user?.canSelfApproveLeave ?? false,
       canEditProfile: user?.canEditProfile ?? false,
+      canChangePassword: user?.canChangePassword ?? false,
       permissions,
     };
   }, [permissions, isSystemAdmin, user]);
