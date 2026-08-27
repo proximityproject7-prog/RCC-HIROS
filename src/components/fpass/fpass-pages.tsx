@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
-  FileText, Settings, Users, CheckCircle2,
+  FileText, Settings, Users, CheckCircle2, Eye, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -365,6 +365,9 @@ function FpassFormPage({
   const [formData, setFormData] = useState<FpassFormData>(DEFAULT_FORM_DATA);
   const [existingId, setExistingId] = useState<string | null>(submissionId ?? null);
   const [schoolYear, setSchoolYear] = useState(new Date().getFullYear() + "-" + (new Date().getFullYear() + 1));
+  const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
+  const [submissionsData, setSubmissionsData] = useState<FpassSubmissionRecord[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
 
   // Load employee data
   useEffect(() => {
@@ -433,6 +436,19 @@ function FpassFormPage({
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const fetchSubmissions = async () => {
+    setSubmissionsLoading(true);
+    setShowSubmissionsModal(true);
+    try {
+      const data = await apiFetch<{ submissions: FpassSubmissionRecord[] }>("/api/fpass");
+      setSubmissionsData(data.submissions ?? []);
+    } catch {
+      setSubmissionsData([]);
+    } finally {
+      setSubmissionsLoading(false);
     }
   };
 
@@ -512,7 +528,7 @@ function FpassFormPage({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
-            <ArrowLeft className="h-4 w-4" /> Back
+            <ArrowLeft className="h-4 w-4" /> Back to FPASS
           </button>
           <div>
             <h1 className="text-xl font-bold text-rcc-text-primary">Faculty Performance Appraisal Form</h1>
@@ -525,12 +541,12 @@ function FpassFormPage({
           <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-rcc-accent/10 text-rcc-accent text-sm font-semibold tabular-nums">
             {totalPoints.toFixed(1)} pts
           </span>
-          {onSettings && canManage && (
+          {canManage && (
             <button
-              onClick={onSettings}
+              onClick={fetchSubmissions}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
             >
-              <Settings className="h-4 w-4" /> Settings
+              <Eye className="h-4 w-4" /> View Submissions
             </button>
           )}
           {!readOnly && (
@@ -984,6 +1000,55 @@ function FpassFormPage({
           readOnly={readOnly}
         />
       </CriteriaSection>
+
+      {/* View Submissions Modal */}
+      {showSubmissionsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-rcc-surface rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-rcc-border">
+              <h2 className="text-sm font-semibold text-rcc-text-primary">FPASS Submissions</h2>
+              <button onClick={() => setShowSubmissionsModal(false)} className="p-1.5 rounded-md text-rcc-text-muted hover:bg-rcc-bg hover:text-rcc-text-primary transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-rcc-bg/50 border-b border-rcc-border">
+                  <tr>
+                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Employee ID</th>
+                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Name</th>
+                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Department</th>
+                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">School Year</th>
+                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Total Points</th>
+                    <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Last Updated</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rcc-border">
+                  {submissionsLoading ? (
+                    <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">Loading...</td></tr>
+                  ) : submissionsData.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">No submissions found.</td></tr>
+                  ) : (
+                    submissionsData.map((s) => (
+                      <tr key={s.id} className="hover:bg-rcc-bg/30 transition-colors cursor-pointer"
+                        onClick={() => { setShowSubmissionsModal(false); /* navigate handled by parent */ }}>
+                        <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{s.employee.employeeId}</td>
+                        <td className="px-4 py-3 font-medium text-rcc-text-primary">
+                          {s.employee.firstName} {s.employee.middleName ? s.employee.middleName + " " : ""}{s.employee.lastName}
+                        </td>
+                        <td className="px-4 py-3 text-rcc-text-secondary">{s.employee.group?.name ?? "Unassigned"}</td>
+                        <td className="px-4 py-3 text-rcc-text-secondary">{s.schoolYear}</td>
+                        <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">{s.totalPoints.toFixed(1)}</td>
+                        <td className="px-4 py-3 text-xs text-rcc-text-muted">{new Date(s.updatedAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

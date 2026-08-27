@@ -6,6 +6,7 @@ import {
   Plus, Search, Pencil, ArrowLeft, Save, Users as UsersIcon, Upload,
   FileText, Download, Trash2, Eye, X, Lock, Mail, Phone, MapPin, Calendar,
   IdCard, Briefcase, Award, Image as ImageIcon, AlertTriangle, Building2, Settings,
+  Hash, User, DollarSign, Shield,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
@@ -809,26 +810,23 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   // FPASS enabled state
   const [fpassEnabled, setFpassEnabled] = useState(false);
 
-  // Inline edit mode
+  // Inline edit mode — unified for all fields
   const canSelfEdit = employeeId === user?.id && has("profile.selfEdit");
-  const canInlineEdit = canSelfEdit;
   const canManageFiles = has("profiling.edit") || has("profile.editAll") || canSelfEdit;
+  const isAdmin = has("profiling.edit") || has("profile.editAll");
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ email: "", phone: "", address: "", birthday: "", gender: "" });
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editSaving, setEditSaving] = useState(false);
-
-  // Full inline edit form (replaces navigating to EmployeeFormPage)
-  const [showFullEdit, setShowFullEdit] = useState(false);
-  const [fullEditGroups, setFullEditGroups] = useState<GroupBrief[]>([]);
-  const [fullEditRoles, setFullEditRoles] = useState<RoleBrief[]>([]);
-  const [fullEditSaving, setFullEditSaving] = useState(false);
-  const [fullEditError, setFullEditError] = useState<string | null>(null);
-  const [fullEditForm, setFullEditForm] = useState({
+  const [editFormData, setEditFormData] = useState({
     employeeId: "", firstName: "", middleName: "", lastName: "", email: "",
     phone: "", address: "", birthday: "", gender: "",
-    groupId: "", roleId: "", contractType: "Regular", hireDate: "", salary: "", active: true,
+    placeOfBirth: "", rank: "", civilStatus: "", citizenship: "",
+    religion: "", height: "", weight: "", bloodType: "",
+    contractType: "Regular", hireDate: "", salary: "",
+    groupId: "", roleId: "", active: true,
   });
+  const [editFormGroups, setEditFormGroups] = useState<GroupBrief[]>([]);
+  const [editFormRoles, setEditFormRoles] = useState<RoleBrief[]>([]);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   // Profile data (LinkedIn-style)
   const canFillProfile = employeeId === user?.id && (user as any)?.canEditProfile;
@@ -837,14 +835,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const [sectionForm, setSectionForm] = useState<any[]>([]);
   const [sectionSaving, setSectionSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
-
-  // Profile scalar field edit state
-  const [profileScalars, setProfileScalars] = useState({
-    placeOfBirth: "", rank: "", civilStatus: "", citizenship: "",
-    religion: "", height: "", weight: "", bloodType: "",
-  });
-  const [editingScalars, setEditingScalars] = useState(false);
-  const [scalarSaving, setScalarSaving] = useState(false);
 
   // System configuration (visible to roles.edit users)
   const [configGroups, setConfigGroups] = useState<GroupBrief[]>([]);
@@ -858,22 +848,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       try { setProfileData(JSON.parse(employee.profileData)); } catch { setProfileData({}); }
     }
   }, [employee?.profileData]);
-
-  // Initialize scalar edit form when employee loads
-  useEffect(() => {
-    if (employee) {
-      setProfileScalars({
-        placeOfBirth: employee.placeOfBirth || "",
-        rank: employee.rank || "",
-        civilStatus: employee.civilStatus || "",
-        citizenship: employee.citizenship || "",
-        religion: employee.religion || "",
-        height: employee.height || "",
-        weight: employee.weight || "",
-        bloodType: employee.bloodType || "",
-      });
-    }
-  }, [employee]);
 
   const loadEmployee = useCallback(async () => {
     setLoading(true);
@@ -1051,15 +1025,43 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   };
 
   // ── Inline edit ──────────────────────────────────────────────
-  const startEditing = () => {
-    setEditForm({
-      email: employee?.email ?? "",
-      phone: employee?.phone ?? "",
-      address: employee?.address ?? "",
-      birthday: employee?.birthday ? employee.birthday.slice(0, 10) : "",
-      gender: employee?.gender ?? "",
-    });
+  // ── Unified inline edit (replaces old 3-mode edit) ────────────
+  const startEditing = async () => {
+    if (!employee) return;
     setEditError(null);
+    setEditFormData({
+      employeeId: employee.employeeId,
+      firstName: employee.firstName,
+      middleName: employee.middleName ?? "",
+      lastName: employee.lastName,
+      email: employee.email,
+      phone: employee.phone ?? "",
+      address: employee.address ?? "",
+      birthday: employee.birthday ? employee.birthday.slice(0, 10) : "",
+      gender: employee.gender ?? "",
+      placeOfBirth: employee.placeOfBirth ?? "",
+      rank: employee.rank ?? "",
+      civilStatus: employee.civilStatus ?? "",
+      citizenship: employee.citizenship ?? "",
+      religion: employee.religion ?? "",
+      height: employee.height ?? "",
+      weight: employee.weight ?? "",
+      bloodType: employee.bloodType ?? "",
+      contractType: employee.contractType ?? "Regular",
+      hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
+      salary: employee.salary != null ? String(employee.salary) : "",
+      groupId: employee.groupId ?? "",
+      roleId: employee.roleId ?? "",
+      active: employee.active,
+    });
+    try {
+      const [groupsData, rolesData] = await Promise.all([
+        apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
+        apiFetch<{ roles: RoleBrief[] }>("/api/roles/active"),
+      ]);
+      setEditFormGroups(groupsData.groups ?? []);
+      setEditFormRoles(rolesData.roles ?? []);
+    } catch { /* non-fatal — dropdowns will be empty */ }
     setEditing(true);
   };
 
@@ -1070,15 +1072,43 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
   const saveEditing = async () => {
     setEditError(null);
+    if (!editFormData.employeeId.trim()) return setEditError("Employee ID is required.");
+    if (!editFormData.firstName.trim()) return setEditError("First name is required.");
+    if (!editFormData.lastName.trim()) return setEditError("Last name is required.");
+    if (!editFormData.email.trim()) return setEditError("Email is required.");
     setEditSaving(true);
     try {
-      const body: Record<string, string | null> = {};
-      // Email cannot be changed via self-edit — only admins with profiling.edit can change it
-      if (!canSelfEdit && editForm.email.trim()) body.email = editForm.email.trim();
-      if (editForm.phone !== employee?.phone) body.phone = editForm.phone.trim() || null;
-      if (editForm.address !== employee?.address) body.address = editForm.address.trim() || null;
-      if (editForm.birthday !== (employee?.birthday ? employee.birthday.slice(0, 10) : "")) body.birthday = editForm.birthday || null;
-      if (editForm.gender !== employee?.gender) body.gender = editForm.gender || null;
+      const body: Record<string, unknown> = {};
+      // Admin-editable fields
+      if (isAdmin) {
+        body.employeeId = editFormData.employeeId.trim();
+        body.firstName = editFormData.firstName.trim();
+        body.middleName = editFormData.middleName.trim() || null;
+        body.lastName = editFormData.lastName.trim();
+        body.email = editFormData.email.trim();
+        body.groupId = editFormData.groupId || null;
+        body.roleId = editFormData.roleId || null;
+        body.contractType = editFormData.contractType;
+        body.salary = editFormData.salary ? parseFloat(editFormData.salary) : 0;
+        body.active = editFormData.active;
+      } else {
+        // Self-edit: limited fields, email disabled
+        body.middleName = editFormData.middleName.trim() || null;
+      }
+      // Shared fields
+      body.phone = editFormData.phone.trim() || null;
+      body.address = editFormData.address.trim() || null;
+      body.birthday = editFormData.birthday || null;
+      body.gender = editFormData.gender || null;
+      body.placeOfBirth = editFormData.placeOfBirth.trim() || null;
+      body.rank = editFormData.rank.trim() || null;
+      body.civilStatus = editFormData.civilStatus || null;
+      body.citizenship = editFormData.citizenship.trim() || null;
+      body.religion = editFormData.religion.trim() || null;
+      body.height = editFormData.height.trim() || null;
+      body.weight = editFormData.weight.trim() || null;
+      body.bloodType = editFormData.bloodType.trim() || null;
+      body.hireDate = editFormData.hireDate || null;
       await apiFetch(`/api/employees/${employeeId}`, { method: "PATCH", body: JSON.stringify(body) });
       setEditing(false);
       loadEmployee();
@@ -1089,90 +1119,19 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     }
   };
 
-  // ── Full inline edit form ────────────────────────────────────
-  const openFullEdit = async () => {
-    if (!employee) return;
-    setFullEditError(null);
-    setFullEditForm({
-      employeeId: employee.employeeId,
-      firstName: employee.firstName,
-      middleName: employee.middleName ?? "",
-      lastName: employee.lastName,
-      email: employee.email,
-      phone: employee.phone ?? "",
-      address: employee.address ?? "",
-      birthday: employee.birthday ? employee.birthday.slice(0, 10) : "",
-      gender: employee.gender ?? "",
-      groupId: employee.groupId ?? "",
-      roleId: employee.roleId ?? "",
-      contractType: employee.contractType ?? "Regular",
-      hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
-      salary: employee.salary != null ? String(employee.salary) : "",
-      active: employee.active,
-    });
-    try {
-      const [groupsData, rolesData] = await Promise.all([
-        apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
-        apiFetch<{ roles: RoleBrief[] }>("/api/roles/active"),
-      ]);
-      setFullEditGroups(groupsData.groups ?? []);
-      setFullEditRoles(rolesData.roles ?? []);
-    } catch {
-      // non-fatal — dropdowns will be empty
-    }
-    setShowFullEdit(true);
-  };
-
-  const saveFullEdit = async () => {
-    setFullEditError(null);
-    if (!fullEditForm.employeeId.trim()) return setFullEditError("Employee ID is required.");
-    if (!fullEditForm.firstName.trim()) return setFullEditError("First name is required.");
-    if (!fullEditForm.lastName.trim()) return setFullEditError("Last name is required.");
-    if (!fullEditForm.email.trim()) return setFullEditError("Email is required.");
-    setFullEditSaving(true);
-    try {
-      await apiFetch(`/api/employees/${employeeId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          employeeId: fullEditForm.employeeId.trim(),
-          firstName: fullEditForm.firstName.trim(),
-          middleName: fullEditForm.middleName.trim() || null,
-          lastName: fullEditForm.lastName.trim(),
-          email: fullEditForm.email.trim(),
-          phone: fullEditForm.phone.trim() || null,
-          address: fullEditForm.address.trim() || null,
-          birthday: fullEditForm.birthday || null,
-          gender: fullEditForm.gender || null,
-          groupId: fullEditForm.groupId || null,
-          roleId: fullEditForm.roleId || null,
-          contractType: fullEditForm.contractType,
-          hireDate: fullEditForm.hireDate || null,
-          salary: fullEditForm.salary ? parseFloat(fullEditForm.salary) : 0,
-          active: fullEditForm.active,
-        }),
-      });
-      setShowFullEdit(false);
-      loadEmployee();
-    } catch (err) {
-      setFullEditError(err instanceof Error ? err.message : "Save failed.");
-    } finally {
-      setFullEditSaving(false);
-    }
-  };
-
-  // ── FPASS config save (inline in System Configuration) ─────
-  const saveFpassConfig = async () => {
+  // ── FPASS config auto-save (inline in System Configuration) ──
+  const autoSaveFpassConfig = async (newIds: string[]) => {
     setFpassConfigSaving(true);
-    setFpassConfigMsg(null);
     try {
       await apiFetch("/api/fpass/settings", {
         method: "PATCH",
-        body: JSON.stringify({ enabledGroupIds: configFpassGroupIds }),
+        body: JSON.stringify({ enabledGroupIds: newIds }),
       });
-      setFpassConfigMsg("FPASS group settings saved.");
-      setTimeout(() => setFpassConfigMsg(null), 3000);
+      setFpassConfigMsg("Saved");
+      setTimeout(() => setFpassConfigMsg(null), 2000);
     } catch (err) {
-      setFpassConfigMsg(null);
+      // revert on error
+      setConfigFpassGroupIds(prev => prev);
       setError(err instanceof Error ? err.message : "Failed to save FPASS settings.");
     } finally {
       setFpassConfigSaving(false);
@@ -1301,23 +1260,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     }
   };
 
-  // ── Profile scalar fields save ─────────────────────────────────
-  const saveScalars = async () => {
-    setScalarSaving(true);
-    try {
-      await apiFetch(`/api/employees/${employeeId}`, {
-        method: "PATCH",
-        body: JSON.stringify(profileScalars),
-      });
-      setEditingScalars(false);
-      loadEmployee();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save.");
-    } finally {
-      setScalarSaving(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1404,7 +1346,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             </div>
             <div className="flex items-center gap-2 pb-1">
               {has("profiling.edit") && (
-                <button onClick={openFullEdit} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                <button onClick={startEditing} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </button>
               )}
@@ -1418,132 +1360,62 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </div>
       </div>
 
-      {/* Full Inline Edit Form */}
-      {showFullEdit && (
-        <div className="space-y-5">
-          {fullEditError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-rcc-error flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0" /> {fullEditError}
-              <button onClick={() => setFullEditError(null)} className="ml-auto"><X className="h-4 w-4" /></button>
-            </div>
-          )}
-
-          <SectionCard title="Personal Information" icon={UsersIcon}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Field label="Employee ID" required>
-                <input type="text" value={fullEditForm.employeeId} onChange={(e) => setFullEditForm(f => ({ ...f, employeeId: e.target.value }))} placeholder="EMP-0001" className={`${inputClass} font-mono`} />
-              </Field>
-              <Field label="First Name" required>
-                <input type="text" value={fullEditForm.firstName} onChange={(e) => setFullEditForm(f => ({ ...f, firstName: e.target.value }))} className={inputClass} />
-              </Field>
-              <Field label="Middle Name">
-                <input type="text" value={fullEditForm.middleName} onChange={(e) => setFullEditForm(f => ({ ...f, middleName: e.target.value }))} className={inputClass} />
-              </Field>
-              <Field label="Last Name" required>
-                <input type="text" value={fullEditForm.lastName} onChange={(e) => setFullEditForm(f => ({ ...f, lastName: e.target.value }))} className={inputClass} />
-              </Field>
-              <Field label="Email" required>
-                <input type="email" value={fullEditForm.email} onChange={(e) => setFullEditForm(f => ({ ...f, email: e.target.value }))} className={inputClass} />
-              </Field>
-              <Field label="Phone">
-                <input type="text" value={fullEditForm.phone} onChange={(e) => setFullEditForm(f => ({ ...f, phone: e.target.value }))} className={inputClass} />
-              </Field>
-              <Field label="Birthday">
-                <input type="date" value={fullEditForm.birthday} onChange={(e) => setFullEditForm(f => ({ ...f, birthday: e.target.value }))} className={inputClass} />
-              </Field>
-              <Field label="Gender">
-                <select value={fullEditForm.gender} onChange={(e) => setFullEditForm(f => ({ ...f, gender: e.target.value }))} className={inputClass}>
-                  <option value="">-</option>
-                  {GENDER_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </Field>
-              <Field label="Address" hint="Full home address.">
-                <input type="text" value={fullEditForm.address} onChange={(e) => setFullEditForm(f => ({ ...f, address: e.target.value }))} className={inputClass} />
-              </Field>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Work Assignment" icon={Briefcase}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Field label="Group">
-                <select value={fullEditForm.groupId} onChange={(e) => setFullEditForm(f => ({ ...f, groupId: e.target.value }))} className={inputClass}>
-                  <option value="">Unassigned</option>
-                  {fullEditGroups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.code})</option>)}
-                </select>
-              </Field>
-              <Field label="Role">
-                <select value={fullEditForm.roleId} onChange={(e) => setFullEditForm(f => ({ ...f, roleId: e.target.value }))} className={inputClass}>
-                  <option value="">Unassigned</option>
-                  {fullEditRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </Field>
-              <Field label="Contract Type">
-                <select value={fullEditForm.contractType} onChange={(e) => setFullEditForm(f => ({ ...f, contractType: e.target.value }))} className={inputClass}>
-                  {CONTRACT_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </Field>
-              <Field label="Hire Date">
-                <input type="date" value={fullEditForm.hireDate} onChange={(e) => setFullEditForm(f => ({ ...f, hireDate: e.target.value }))} className={inputClass} />
-              </Field>
-              <Field label="Monthly Salary" hint="PHP">
-                <input type="number" value={fullEditForm.salary} onChange={(e) => setFullEditForm(f => ({ ...f, salary: e.target.value }))} min="0" step="0.01" className={inputClass} />
-              </Field>
-              <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors md:col-span-2 ${fullEditForm.active ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"}`}>
-                <input type="checkbox" checked={fullEditForm.active} onChange={(e) => setFullEditForm(f => ({ ...f, active: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40" />
-                <div>
-                  <p className="text-sm font-semibold text-rcc-text-primary">Active Employee</p>
-                  <p className="text-xs text-rcc-text-muted mt-0.5">Inactive employees cannot sign in.</p>
-                </div>
-              </label>
-            </div>
-          </SectionCard>
-
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setShowFullEdit(false)} className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">Cancel</button>
-            <button onClick={saveFullEdit} disabled={fullEditSaving} className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50">
-              <Save className="h-4 w-4" /> {fullEditSaving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!showFullEdit && (<>
       {/* Personal Information */}
       <SectionCard
         title="Personal Information"
         icon={UsersIcon}
         canEdit={canEditProfile}
-        editing={editing || editingScalars}
-        onEdit={() => canInlineEdit ? startEditing() : setEditingScalars(true)}
-        onCancel={() => { cancelEditing(); setEditingScalars(false); }}
-        onSave={canInlineEdit ? saveEditing : saveScalars}
-        saving={editSaving || scalarSaving}
+        editing={editing}
+        onEdit={startEditing}
+        onCancel={cancelEditing}
+        onSave={saveEditing}
+        saving={editSaving}
         editError={editError}
       >
         {editing ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-            <EditField icon={Mail} label="Email" type="email" value={editForm.email} onChange={(v) => setEditForm(f => ({ ...f, email: v }))} disabled={canSelfEdit} />
-            <EditField icon={Phone} label="Phone" type="text" value={editForm.phone} onChange={(v) => setEditForm(f => ({ ...f, phone: v }))} />
-            <EditField icon={MapPin} label="Address" type="text" value={editForm.address} onChange={(v) => setEditForm(f => ({ ...f, address: v }))} />
-            <EditField icon={Calendar} label="Birthday" type="date" value={editForm.birthday} onChange={(v) => setEditForm(f => ({ ...f, birthday: v }))} />
-            <SelectField icon={UsersIcon} label="Gender" value={editForm.gender} options={["", "Male", "Female"]} onChange={(v) => setEditForm(f => ({ ...f, gender: v }))} />
-            <InfoItem icon={Briefcase} label="Contract" value={employee.contractType} />
-            <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
-            <InfoItem icon={Building2} label="Department" value={employee.group?.name} />
-          </div>
-        ) : editingScalars ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-            <EditField icon={MapPin} label="Place of Birth" type="text" value={profileScalars.placeOfBirth} onChange={(v) => setProfileScalars(s => ({ ...s, placeOfBirth: v }))} />
-            <EditField icon={Briefcase} label="Rank" type="text" value={profileScalars.rank} onChange={(v) => setProfileScalars(s => ({ ...s, rank: v }))} />
-            <SelectField icon={UsersIcon} label="Civil Status" value={profileScalars.civilStatus} options={["", "Single", "Married", "Widowed", "Separated"]} onChange={(v) => setProfileScalars(s => ({ ...s, civilStatus: v }))} />
-            <EditField icon={IdCard} label="Citizenship" type="text" value={profileScalars.citizenship} onChange={(v) => setProfileScalars(s => ({ ...s, citizenship: v }))} />
-            <EditField icon={Building2} label="Religion" type="text" value={profileScalars.religion} onChange={(v) => setProfileScalars(s => ({ ...s, religion: v }))} />
-            <EditField icon={UsersIcon} label="Height" type="text" value={profileScalars.height} onChange={(v) => setProfileScalars(s => ({ ...s, height: v }))} />
-            <EditField icon={UsersIcon} label="Weight" type="text" value={profileScalars.weight} onChange={(v) => setProfileScalars(s => ({ ...s, weight: v }))} />
-            <EditField icon={Award} label="Blood Type" type="text" value={profileScalars.bloodType} onChange={(v) => setProfileScalars(s => ({ ...s, bloodType: v }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+            <EditField icon={Hash} label="Employee ID" type="text" value={editFormData.employeeId} onChange={(v) => setEditFormData(f => ({ ...f, employeeId: v }))} disabled={!isAdmin} className="font-mono" />
+            <EditField icon={User} label="First Name" type="text" value={editFormData.firstName} onChange={(v) => setEditFormData(f => ({ ...f, firstName: v }))} disabled={!isAdmin} />
+            <EditField icon={User} label="Middle Name" type="text" value={editFormData.middleName} onChange={(v) => setEditFormData(f => ({ ...f, middleName: v }))} />
+            <EditField icon={User} label="Last Name" type="text" value={editFormData.lastName} onChange={(v) => setEditFormData(f => ({ ...f, lastName: v }))} disabled={!isAdmin} />
+            <EditField icon={Mail} label="Email" type="email" value={editFormData.email} onChange={(v) => setEditFormData(f => ({ ...f, email: v }))} disabled={!isAdmin} />
+            <EditField icon={Phone} label="Phone" type="text" value={editFormData.phone} onChange={(v) => setEditFormData(f => ({ ...f, phone: v }))} />
+            <EditField icon={Calendar} label="Birthday" type="date" value={editFormData.birthday} onChange={(v) => setEditFormData(f => ({ ...f, birthday: v }))} />
+            <SelectField icon={UsersIcon} label="Gender" value={editFormData.gender} options={["", "Male", "Female"]} onChange={(v) => setEditFormData(f => ({ ...f, gender: v }))} />
+            <EditField icon={MapPin} label="Address" type="text" value={editFormData.address} onChange={(v) => setEditFormData(f => ({ ...f, address: v }))} />
+            <EditField icon={MapPin} label="Place of Birth" type="text" value={editFormData.placeOfBirth} onChange={(v) => setEditFormData(f => ({ ...f, placeOfBirth: v }))} />
+            <EditField icon={Briefcase} label="Rank" type="text" value={editFormData.rank} onChange={(v) => setEditFormData(f => ({ ...f, rank: v }))} />
+            <SelectField icon={UsersIcon} label="Civil Status" value={editFormData.civilStatus} options={["", "Single", "Married", "Widowed", "Separated"]} onChange={(v) => setEditFormData(f => ({ ...f, civilStatus: v }))} />
+            <EditField icon={IdCard} label="Citizenship" type="text" value={editFormData.citizenship} onChange={(v) => setEditFormData(f => ({ ...f, citizenship: v }))} />
+            <EditField icon={Building2} label="Religion" type="text" value={editFormData.religion} onChange={(v) => setEditFormData(f => ({ ...f, religion: v }))} />
+            <EditField icon={UsersIcon} label="Height" type="text" value={editFormData.height} onChange={(v) => setEditFormData(f => ({ ...f, height: v }))} />
+            <EditField icon={UsersIcon} label="Weight" type="text" value={editFormData.weight} onChange={(v) => setEditFormData(f => ({ ...f, weight: v }))} />
+            <EditField icon={Award} label="Blood Type" type="text" value={editFormData.bloodType} onChange={(v) => setEditFormData(f => ({ ...f, bloodType: v }))} />
+            <SelectField icon={Briefcase} label="Contract Type" value={editFormData.contractType} options={CONTRACT_TYPES} onChange={(v) => setEditFormData(f => ({ ...f, contractType: v }))} disabled={!isAdmin} />
+            <EditField icon={Calendar} label="Hire Date" type="date" value={editFormData.hireDate} onChange={(v) => setEditFormData(f => ({ ...f, hireDate: v }))} disabled={!isAdmin} />
+            {isAdmin && (
+              <EditField icon={DollarSign} label="Monthly Salary" type="number" value={editFormData.salary} onChange={(v) => setEditFormData(f => ({ ...f, salary: v }))} />
+            )}
+            {isAdmin && (
+              <SelectField icon={Building2} label="Department" value={editFormData.groupId} options={["", ...editFormGroups.map(g => g.id)]} optionLabels={["Unassigned", ...editFormGroups.map(g => `${g.name} (${g.code})`)]} onChange={(v) => setEditFormData(f => ({ ...f, groupId: v }))} />
+            )}
+            {isAdmin && (
+              <SelectField icon={Shield} label="Role" value={editFormData.roleId} options={["", ...editFormRoles.map(r => r.id)]} optionLabels={["Unassigned", ...editFormRoles.map(r => r.name)]} onChange={(v) => setEditFormData(f => ({ ...f, roleId: v }))} />
+            )}
+            {isAdmin && (
+              <label className="col-span-full sm:col-span-2 lg:col-span-3 flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors mt-1" style={{ borderColor: editFormData.active ? "var(--rcc-accent)" : "var(--rcc-border)", backgroundColor: editFormData.active ? "color-mix(in srgb, var(--rcc-accent) 5%, transparent)" : undefined }}>
+                <input type="checkbox" checked={editFormData.active} onChange={(e) => setEditFormData(f => ({ ...f, active: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40" />
+                <div>
+                  <p className="text-sm font-semibold text-rcc-text-primary">Active Employee</p>
+                  <p className="text-xs text-rcc-text-muted mt-0.5">Inactive employees cannot sign in.</p>
+                </div>
+              </label>
+            )}
           </div>
         ) : (
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+            <InfoItem icon={Hash} label="Employee ID" value={employee.employeeId} className="font-mono" />
+            <InfoItem icon={User} label="Full Name" value={fullName} />
             <InfoItem icon={Mail} label="Email" value={employee.email} />
             <InfoItem icon={Phone} label="Phone" value={employee.phone} />
             <InfoItem icon={MapPin} label="Address" value={employee.address} />
@@ -1560,6 +1432,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <InfoItem icon={Briefcase} label="Contract" value={employee.contractType} />
             <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
             <InfoItem icon={Building2} label="Department" value={employee.group?.name} />
+            <InfoItem icon={Shield} label="Role" value={employee.roleName} />
+            {employee.salary != null && employee.salary > 0 && (
+              <InfoItem icon={DollarSign} label="Salary" value={`₱${employee.salary.toLocaleString()}`} />
+            )}
           </dl>
         )}
       </SectionCard>
@@ -1725,7 +1601,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           )}
         </div>
       </SectionCard>
-      </>)}
 
       {/* System Configuration (visible to roles.edit users) */}
       {has("roles.edit") && (
@@ -1745,8 +1620,11 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
                         type="checkbox"
                         checked={configFpassGroupIds.includes(g.id)}
                         onChange={(e) => {
-                          if (e.target.checked) setConfigFpassGroupIds(prev => [...prev, g.id]);
-                          else setConfigFpassGroupIds(prev => prev.filter(id => id !== g.id));
+                          const newIds = e.target.checked
+                            ? [...configFpassGroupIds, g.id]
+                            : configFpassGroupIds.filter(id => id !== g.id);
+                          setConfigFpassGroupIds(newIds);
+                          autoSaveFpassConfig(newIds);
                         }}
                         className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
                       />
@@ -1758,28 +1636,9 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
                   ))}
                 </div>
               )}
-              <button
-                onClick={saveFpassConfig}
-                disabled={fpassConfigSaving}
-                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
-              >
-                <Save className="h-3 w-3" /> {fpassConfigSaving ? "Saving..." : "Save FPASS Settings"}
-              </button>
               {fpassConfigMsg && <p className="mt-2 text-xs text-green-600">{fpassConfigMsg}</p>}
             </div>
 
-            {/* Profile Edit Access */}
-            <div className="border-t border-rcc-border pt-4">
-              <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">Profile Edit Access</h3>
-              <p className="text-xs text-rcc-text-muted mb-2">Controls whether users can fill/edit their own profile sections (education, experience, etc.).</p>
-              <div className="flex items-center gap-3">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold ${user?.canEditProfile ? "bg-green-50 text-green-700 border border-green-200" : "bg-rcc-bg text-rcc-text-muted border border-rcc-border"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${user?.canEditProfile ? "bg-green-500" : "bg-rcc-text-muted"}`} />
-                  {user?.canEditProfile ? "Enabled" : "Disabled"}
-                </span>
-                <span className="text-xs text-rcc-text-muted">Configured per role in Role Management.</span>
-              </div>
-            </div>
           </div>
         </SectionCard>
       )}
@@ -1900,17 +1759,19 @@ function InfoItem({
   icon: Icon,
   label,
   value,
+  className,
 }: {
   icon: typeof Mail;
   label: string;
   value: string | null | undefined;
+  className?: string;
 }) {
   return (
     <div className="flex items-start gap-2.5">
       <Icon className="h-4 w-4 text-rcc-text-muted mt-0.5 shrink-0" />
       <div className="min-w-0">
         <dt className="text-xs font-semibold text-rcc-text-muted uppercase tracking-wide">{label}</dt>
-        <dd className="text-sm text-rcc-text-primary mt-0.5 break-words">{value || <span className="text-rcc-text-muted">-</span>}</dd>
+        <dd className={`text-sm text-rcc-text-primary mt-0.5 break-words ${className || ""}`}>{value || <span className="text-rcc-text-muted">-</span>}</dd>
       </div>
     </div>
   );
@@ -1946,6 +1807,7 @@ function EditField({
   value,
   onChange,
   disabled,
+  className,
 }: {
   icon: typeof Mail;
   label: string;
@@ -1953,6 +1815,7 @@ function EditField({
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  className?: string;
 }) {
   return (
     <div className="flex items-start gap-2.5">
@@ -1971,7 +1834,7 @@ function EditField({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
-            className="w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 disabled:opacity-50 disabled:cursor-not-allowed ${className || ""}`}
           />
         )}
         {disabled && (
@@ -1987,22 +1850,27 @@ function SelectField({
   label,
   value,
   options,
+  optionLabels,
   onChange,
+  disabled,
 }: {
   icon: typeof Mail;
   label: string;
   value: string;
   options: string[];
+  optionLabels?: string[];
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-start gap-2.5">
       <Icon className="h-4 w-4 text-rcc-text-muted mt-2 shrink-0" />
       <div className="min-w-0 flex-1">
         <dt className="text-xs font-semibold text-rcc-text-muted uppercase tracking-wide mb-1">{label}</dt>
-        <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40">
-          {options.map((o) => (
-            <option key={o} value={o}>{o || "-"}</option>
+        <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}
+          className={`w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}>
+          {options.map((o, i) => (
+            <option key={o} value={o}>{optionLabels?.[i] || o || "-"}</option>
           ))}
         </select>
       </div>
