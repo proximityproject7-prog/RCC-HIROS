@@ -120,6 +120,7 @@ export function EmployeeListPage() {
   const [roleId, setRoleId] = useState("");
   const [contractType, setContractType] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
+  const [fpassFilter, setFpassFilter] = useState("");
 
   // Load groups & roles once for filters
   useEffect(() => {
@@ -147,6 +148,7 @@ export function EmployeeListPage() {
       if (roleId) params.set("roleId", roleId);
       if (contractType) params.set("contractType", contractType);
       if (activeFilter) params.set("active", activeFilter);
+      if (fpassFilter) params.set("fpassStatus", fpassFilter);
       const qs = params.toString();
       const data = await apiFetch<{ employees: Employee[] }>(
         `/api/employees${qs ? `?${qs}` : ""}`
@@ -157,7 +159,7 @@ export function EmployeeListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, groupId, roleId, contractType, activeFilter]);
+  }, [search, groupId, roleId, contractType, activeFilter, fpassFilter]);
 
   useEffect(() => {
     loadEmployees();
@@ -218,6 +220,11 @@ export function EmployeeListPage() {
             {CONTRACT_TYPES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
+          </select>
+          <select value={fpassFilter} onChange={(e) => setFpassFilter(e.target.value)} className={inputClass}>
+            <option value="">All FPASS</option>
+            <option value="submitted">FPASS Submitted</option>
+            <option value="empty">FPASS Not Started</option>
           </select>
         </div>
         {canViewInactive && (
@@ -831,6 +838,12 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
+  // Password change (profile page)
+  const [newPassword, setNewPassword] = useState("");
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdMsg, setPwdMsg] = useState<string | null>(null);
+  const [pwdError, setPwdError] = useState<string | null>(null);
+
   // Profile data (LinkedIn-style)
   const canFillProfile = employeeId === user?.id && (user as any)?.canEditProfile;
   const [profileData, setProfileData] = useState<Record<string, any[]>>({});
@@ -1141,6 +1154,30 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     }
   };
 
+  // ── Password change (profile page) ────────────────────────────
+  const handlePasswordChange = async () => {
+    if (!newPassword || newPassword.length < 8) {
+      setPwdError("Password must be at least 8 characters.");
+      return;
+    }
+    setPwdSaving(true);
+    setPwdError(null);
+    setPwdMsg(null);
+    try {
+      await apiFetch(`/api/employees/${employeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: newPassword }),
+      });
+      setNewPassword("");
+      setPwdMsg("Password updated successfully.");
+      setTimeout(() => setPwdMsg(null), 3000);
+    } catch (err) {
+      setPwdError(err instanceof Error ? err.message : "Failed to change password.");
+    } finally {
+      setPwdSaving(false);
+    }
+  };
+
   // ── Reupload file ────────────────────────────────────────────
   const [reuploading, setReuploading] = useState<string | null>(null);
 
@@ -1440,6 +1477,43 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           </dl>
         )}
       </SectionCard>
+
+      {/* Change Password (visible to admins or self) */}
+      {(has("profiling.edit") || canSelfEdit) && (
+        <SectionCard title="Change Password" icon={Lock}>
+          <div className="space-y-3">
+            <p className="text-xs text-rcc-text-muted">Set a new password for this employee. Leave blank to keep the current password.</p>
+            {pwdError && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-2 text-xs text-rcc-error flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {pwdError}
+              </div>
+            )}
+            {pwdMsg && (
+              <div className="bg-green-50 border border-green-200 rounded-md p-2 text-xs text-green-700">{pwdMsg}</div>
+            )}
+            <div className="flex items-end gap-3">
+              <div className="flex-1 max-w-sm">
+                <label className="text-xs font-semibold text-rcc-text-muted uppercase tracking-wide mb-1 block">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min 8 characters"
+                  className="w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
+                  autoComplete="new-password"
+                />
+              </div>
+              <button
+                onClick={handlePasswordChange}
+                disabled={pwdSaving || !newPassword}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" /> {pwdSaving ? "Saving..." : "Update Password"}
+              </button>
+            </div>
+          </div>
+        </SectionCard>
+      )}
 
       {/* Profile Sections (repeatable rows) */}
       {(Object.keys(SECTION_LABELS) as string[]).filter(key => key !== "awards").map((key) => (

@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const roleId = searchParams.get("roleId") || undefined;
     const contractType = searchParams.get("contractType") || undefined;
     const activeParam = searchParams.get("active");
+    const fpassStatus = searchParams.get("fpassStatus") || undefined;
     const scope = searchParams.get("scope") || "profiling";
 
     // Group scoping: use the appropriate scope permission
@@ -71,6 +72,15 @@ export async function GET(request: NextRequest) {
     // Hide system admin employees from non-system-admin users
     if (!auth.user.isSystem) {
       where.role = { ...(where.role as object || {}), isSystem: false };
+    }
+
+    // FPASS status filter
+    const currentYear = new Date().getFullYear();
+    const fpassSchoolYear = `${currentYear}-${currentYear + 1}`;
+    if (fpassStatus === "submitted") {
+      where.fpassSubmissions = { some: { schoolYear: fpassSchoolYear } };
+    } else if (fpassStatus === "empty") {
+      where.fpassSubmissions = { none: { schoolYear: fpassSchoolYear } };
     }
 
     const employees = await db.employee.findMany({
