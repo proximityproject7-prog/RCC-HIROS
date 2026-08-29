@@ -766,8 +766,8 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
                           />
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium text-rcc-text-primary">
-                              {s.label}
-                              <span className="ml-1.5 text-[9px] uppercase tracking-wide font-semibold text-amber-700 bg-amber-100 px-1 py-0.5 rounded align-middle">
+                              {s.label}{" "}
+                              <span className="text-[9px] uppercase tracking-wide font-semibold text-amber-700 bg-amber-100 px-1 py-0.5 rounded align-middle">
                                 Scope
                               </span>
                             </p>

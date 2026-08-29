@@ -900,14 +900,16 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     if (!has("roles.edit")) return;
     (async () => {
       try {
-        const [groupsData, fpassData] = await Promise.all([
-          apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
-          apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings"),
-        ]);
+        const groupsData = await apiFetch<{ groups: GroupBrief[] }>("/api/groups");
         setConfigGroups(groupsData.groups ?? []);
+      } catch {
+        // groups fetch failed — non-fatal
+      }
+      try {
+        const fpassData = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings");
         setConfigFpassGroupIds(fpassData.enabledGroupIds ?? []);
       } catch {
-        // non-fatal
+        // fpass settings fetch failed — non-fatal
       }
     })();
   }, [has]);

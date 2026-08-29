@@ -725,7 +725,8 @@ function RequestCard({
           <p className="font-mono text-xs text-rcc-text-muted">{req.requestNo}</p>
           <p className="font-semibold text-rcc-text-primary truncate">
             {emp ? `${emp.firstName} ${emp.lastName}` : "Unknown"}
-            <span className="ml-2 text-xs font-normal text-rcc-text-muted font-mono">{emp?.employeeId ?? ""}</span>
+            {" "}
+            <span className="text-xs font-normal text-rcc-text-muted font-mono">{emp?.employeeId ?? ""}</span>
           </p>
         </div>
         <StatusBadge status={req.status} />

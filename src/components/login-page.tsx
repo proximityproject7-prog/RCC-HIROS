@@ -122,7 +122,6 @@ export default function LoginPage() {
                 placeholder="username@rcc.edu.ph"
                 className="w-full px-4 py-2.5 rounded-md border-2 border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
                 autoComplete="username"
-                required
               />
             </div>
 
@@ -142,7 +141,6 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   className="w-full px-4 py-2.5 pr-11 rounded-md border-2 border-rcc-border bg-rcc-bg text-sm font-medium text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 transition-colors"
                   autoComplete="current-password"
-                  required
                 />
                 <button
                   type="button"
