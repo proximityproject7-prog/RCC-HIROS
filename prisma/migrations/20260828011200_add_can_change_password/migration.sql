@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE ole ADD COLUMN canChangePassword BOOLEAN NOT NULL DEFAULT FALSE;
