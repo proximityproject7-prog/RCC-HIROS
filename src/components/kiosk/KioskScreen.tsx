@@ -6,8 +6,10 @@ import { fingerprintServiceUrl } from "@/lib/biometric";
 
 // ═══════════════════════════════════════════════════════════════
 // KioskScreen — fingerprint attendance terminal.
-// Identification-only: the Python service matches fingers and writes
-// attendance rows; this screen renders live WS events.
+// Styled on the RCC-HIROS rcc-* tokens (light theme) like the rest
+// of the system. Identification-only: the Python service matches
+// fingers and writes attendance rows; this screen renders live WS
+// events.
 // ═══════════════════════════════════════════════════════════════
 
 interface ScanEvent {
@@ -141,94 +143,94 @@ export function KioskScreen() {
   }, [handleEvent]);
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col">
+    <div className="min-h-screen bg-rcc-bg text-rcc-text-primary flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+      <header className="bg-rcc-surface border-b border-rcc-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-rcc-primary/10 text-rcc-primary flex items-center justify-center">
             <Fingerprint className="h-5 w-5" />
           </div>
           <div>
             <h1 className="text-base font-bold tracking-tight">RCC-HIROS Attendance Kiosk</h1>
-            <p className="text-xs text-stone-400">Scan your fingerprint to clock in / out</p>
+            <p className="text-xs text-rcc-text-muted">Scan your fingerprint to clock in / out</p>
           </div>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold tabular-nums">{fmtClock(now)}</p>
-          <p className="text-xs text-stone-400">{fmtDate(now)}</p>
+          <p className="text-xs text-rcc-text-muted">{fmtDate(now)}</p>
         </div>
       </header>
 
       {/* Status bar */}
-      <div className="flex items-center gap-2 px-6 py-2 text-xs border-b border-white/10">
+      <div className="flex items-center gap-2 px-6 py-2 text-xs bg-rcc-surface border-b border-rcc-border">
         {connected
-          ? <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-          : <WifiOff className="h-3.5 w-3.5 text-red-400" />}
-        <span className={connected ? "text-emerald-300" : "text-red-300"}>
+          ? <Wifi className="h-3.5 w-3.5 text-emerald-600" />
+          : <WifiOff className="h-3.5 w-3.5 text-rcc-error" />}
+        <span className={connected ? "text-emerald-700 font-medium" : "text-rcc-error font-medium"}>
           {connected ? "Service connected" : "Service offline"}
         </span>
-        <span className="text-stone-500">·</span>
-        <span className={readerReady ? "text-emerald-300" : "text-amber-300"}>{readerMsg}</span>
+        <span className="text-rcc-text-muted">·</span>
+        <span className={readerReady ? "text-emerald-700" : "text-amber-700"}>{readerMsg}</span>
       </div>
 
       {/* Body */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 max-w-6xl w-full mx-auto">
         {/* Scan prompt */}
-        <section className="flex flex-col items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] p-10 min-h-[320px] relative overflow-hidden">
-          <div className={`w-28 h-28 rounded-full flex items-center justify-center ${readerReady ? "bg-amber-500/15 text-amber-300 animate-pulse" : "bg-white/5 text-stone-500"}`}>
+        <section className="flex flex-col items-center justify-center rounded-lg border border-rcc-border bg-rcc-surface p-10 min-h-[320px] relative overflow-hidden">
+          <div className={`w-28 h-28 rounded-full flex items-center justify-center ${readerReady ? "bg-rcc-accent/15 text-rcc-primary animate-pulse" : "bg-rcc-bg text-rcc-text-muted"}`}>
             <Fingerprint className="h-14 w-14" />
           </div>
           <p className="mt-6 text-lg font-semibold">
             {readerReady ? "Place your finger on the reader" : "Reader unavailable"}
           </p>
-          <p className="mt-1 text-sm text-stone-400">
+          <p className="mt-1 text-sm text-rcc-text-muted text-center">
             {readerReady ? "First scan clocks you in, second scan clocks you out." : readerMsg}
           </p>
 
           {/* Result popup */}
           {popup && (
-            <div key={popup.key} className={`absolute inset-x-6 bottom-6 rounded-lg border p-4 flex items-center gap-3 ${
-              popup.tone === "in" ? "border-emerald-500/40 bg-emerald-950/80"
-              : popup.tone === "out" ? "border-sky-500/40 bg-sky-950/80"
-              : "border-amber-500/40 bg-amber-950/80"
+            <div key={popup.key} className={`absolute inset-x-6 bottom-6 rounded-md border p-4 flex items-center gap-3 shadow-lg ${
+              popup.tone === "in" ? "border-emerald-300 bg-emerald-50"
+              : popup.tone === "out" ? "border-sky-300 bg-sky-50"
+              : "border-amber-300 bg-amber-50"
             }`}>
               {popup.tone === "in"
-                ? <LogIn className="h-6 w-6 text-emerald-300 shrink-0" />
+                ? <LogIn className="h-6 w-6 text-emerald-600 shrink-0" />
                 : popup.tone === "out"
-                  ? <LogOut className="h-6 w-6 text-sky-300 shrink-0" />
-                  : <CircleAlert className="h-6 w-6 text-amber-300 shrink-0" />}
+                  ? <LogOut className="h-6 w-6 text-sky-600 shrink-0" />
+                  : <CircleAlert className="h-6 w-6 text-amber-600 shrink-0" />}
               <div className="min-w-0">
-                <p className="text-sm font-bold truncate">{popup.title}</p>
-                <p className="text-xs text-stone-300 truncate">{popup.subtitle}</p>
+                <p className="text-sm font-bold text-rcc-text-primary truncate">{popup.title}</p>
+                <p className="text-xs text-rcc-text-secondary truncate">{popup.subtitle}</p>
               </div>
             </div>
           )}
         </section>
 
         {/* Recent activity (this session) */}
-        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+        <section className="rounded-lg border border-rcc-border bg-rcc-surface p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Clock className="h-4 w-4 text-stone-400" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-300">Recent scans — this session</h2>
+            <Clock className="h-4 w-4 text-rcc-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-rcc-text-primary">Recent scans — this session</h2>
           </div>
           {activity.length === 0 ? (
-            <p className="text-sm text-stone-500 py-8 text-center">No scans yet. Successful scans appear here.</p>
+            <p className="text-sm text-rcc-text-muted py-8 text-center">No scans yet. Successful scans appear here.</p>
           ) : (
             <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
               {activity.map((a) => (
-                <li key={a.key} className="flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+                <li key={a.key} className="flex items-center gap-3 rounded-md border border-rcc-border bg-rcc-bg/50 px-3 py-2">
                   <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold ${
-                    a.action === "clock_in" ? "bg-emerald-500/15 text-emerald-300"
-                    : a.action === "clock_out" ? "bg-sky-500/15 text-sky-300"
-                    : "bg-amber-500/15 text-amber-300"
+                    a.action === "clock_in" ? "bg-emerald-100 text-emerald-700"
+                    : a.action === "clock_out" ? "bg-sky-100 text-sky-700"
+                    : "bg-amber-100 text-amber-700"
                   }`}>
                     {a.action === "clock_in" ? "IN" : a.action === "clock_out" ? "OUT" : "DONE"}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{a.name}</p>
-                    <p className="text-xs text-stone-500 font-mono">{a.employeeCode}</p>
+                    <p className="text-sm font-medium text-rcc-text-primary truncate">{a.name}</p>
+                    <p className="text-xs text-rcc-text-muted font-mono">{a.employeeCode}</p>
                   </div>
-                  <span className="text-xs text-stone-400 tabular-nums shrink-0">{a.time}</span>
+                  <span className="text-xs text-rcc-text-secondary tabular-nums shrink-0">{a.time}</span>
                 </li>
               ))}
             </ul>

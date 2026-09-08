@@ -18,10 +18,10 @@ export default function KioskPage() {
 
   if (!mounted || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-950">
+      <div className="min-h-screen flex items-center justify-center bg-rcc-bg">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-          <p className="text-sm text-stone-400">Loading kiosk…</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
+          <p className="text-sm text-rcc-text-muted">Loading kiosk…</p>
         </div>
       </div>
     );
