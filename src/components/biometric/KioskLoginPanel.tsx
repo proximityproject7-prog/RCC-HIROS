@@ -21,6 +21,7 @@ interface Notice {
 
 export function KioskLoginPanel() {
   const [active, setActive] = useState(false);
+  const [switchOn, setSwitchOn] = useState<boolean | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -58,6 +59,25 @@ export function KioskLoginPanel() {
   useEffect(() => {
     let closed = false;
     let timer: ReturnType<typeof setTimeout>;
+
+    // Master switch first: OFF means no panel and no WS probe at all.
+    // Public endpoint (login screen is logged out); missing = ON.
+    fetch("/api/settings/biometrics")
+      .then((r) => r.json().catch(() => ({})))
+      .then((d) => {
+        if (closed) return;
+        if (d && (d as Record<string, unknown>).enabled === false) {
+          setSwitchOn(false);
+          return;
+        }
+        setSwitchOn(true);
+        connect();
+      })
+      .catch(() => {
+        if (closed) return;
+        setSwitchOn(true);
+        connect();
+      });
 
     const connect = () => {
       if (closed) return;
@@ -98,7 +118,6 @@ export function KioskLoginPanel() {
       timer = setTimeout(connect, delay);
     };
 
-    connect();
     return () => {
       closed = true;
       clearTimeout(timer);
@@ -107,7 +126,7 @@ export function KioskLoginPanel() {
     };
   }, [handleEvent]);
 
-  if (!active) return null;
+  if (switchOn === false || !active) return null;
 
   return (
     <div className="mt-6">

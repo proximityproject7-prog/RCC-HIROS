@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-token";
 import { MAX_TEMPLATES_PER_EMPLOYEE } from "@/lib/biometric";
+import { getBiometricsEnabled } from "@/lib/biometric-server";
 
 // ═══════════════════════════════════════════════════════════════
 // POST   /api/biometric/enroll  — save one enrolled template
@@ -36,6 +37,13 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
+
+    if (!(await getBiometricsEnabled())) {
+      return NextResponse.json(
+        { error: "Fingerprint biometrics is currently disabled" },
+        { status: 403 }
+      );
+    }
 
     const body = await request.json().catch(() => null);
     const employeeId = typeof body?.employeeId === "string" ? body.employeeId : "";
@@ -123,6 +131,13 @@ export async function DELETE(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
+
+    if (!(await getBiometricsEnabled())) {
+      return NextResponse.json(
+        { error: "Fingerprint biometrics is currently disabled" },
+        { status: 403 }
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get("templateId") || "";

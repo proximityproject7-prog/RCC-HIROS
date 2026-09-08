@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-token";
 import { MAX_TEMPLATES_PER_EMPLOYEE } from "@/lib/biometric";
+import { getBiometricsEnabled } from "@/lib/biometric-server";
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/biometric/status?employeeId=X
@@ -13,6 +14,17 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
+
+    // Master switch OFF: report empty, no DB lookups.
+    if (!(await getBiometricsEnabled())) {
+      const { searchParams } = new URL(request.url);
+      return NextResponse.json({
+        employeeId: searchParams.get("employeeId") || auth.user.id,
+        enrolled: 0,
+        maxAllowed: MAX_TEMPLATES_PER_EMPLOYEE,
+        templates: [],
+      });
+    }
 
     const { searchParams } = new URL(request.url);
     const targetId = searchParams.get("employeeId") || auth.user.id;

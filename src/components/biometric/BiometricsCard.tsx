@@ -32,6 +32,7 @@ export function BiometricsCard({ employeeId }: { employeeId: string }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [serviceUp, setServiceUp] = useState<boolean | null>(null);
+  const [masterOn, setMasterOn] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
 
   const isSelf = user?.id === employeeId;
@@ -46,6 +47,12 @@ export function BiometricsCard({ employeeId }: { employeeId: string }) {
         `/api/biometric/status?employeeId=${encodeURIComponent(employeeId)}`
       );
       setTemplates(Array.isArray(data.templates) ? data.templates : []);
+      try {
+        const flag = await apiFetch<{ enabled: boolean }>("/api/settings/biometrics");
+        setMasterOn(flag.enabled !== false);
+      } catch {
+        // non-fatal — master switch keeps its default ON state
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load biometrics");
     } finally {
@@ -264,10 +271,13 @@ export function BiometricsCard({ employeeId }: { employeeId: string }) {
               </div>
             )}
 
-            {canModify && serviceUp === false && (
+            {canModify && masterOn === false && (
+              <p className="text-xs text-rcc-text-muted">Fingerprint biometrics is currently disabled.</p>
+            )}
+            {canModify && masterOn !== false && serviceUp === false && (
               <p className="text-xs text-rcc-text-muted">Fingerprint enrollment is available only on the kiosk device.</p>
             )}
-            {canModify && serviceUp === true && templates.length < MAX_TEMPLATES_PER_EMPLOYEE && !enrolling && (
+            {canModify && masterOn !== false && serviceUp === true && templates.length < MAX_TEMPLATES_PER_EMPLOYEE && !enrolling && (
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   value={slot}
