@@ -118,7 +118,6 @@ const PERMISSION_LABELS: Record<string, { label: string; description: string }> 
   "fpass.fill": { label: "Fill FPASS Form", description: "Fill out the Faculty Performance Appraisal form." },
   "fpass.manage": { label: "Manage FPASS", description: "View all FPASS submissions and manage group access." },
 
-  "kiosk.view": { label: "View Kiosk", description: "Open the fingerprint attendance kiosk screen." },
   "biometric.enroll": { label: "Enroll Own Fingerprint", description: "Enroll own fingerprint templates from the profile page." },
   "biometric.manage": { label: "Manage Biometrics", description: "Enroll or delete fingerprint templates for any employee." },
 };
@@ -180,8 +179,8 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
     permissions: ["fpass.fill", "fpass.manage"],
   },
   {
-    label: "Fingerprint Kiosk",
-    permissions: ["kiosk.view", "biometric.enroll", "biometric.manage"],
+    label: "Biometrics",
+    permissions: ["biometric.enroll", "biometric.manage"],
   },
 ].map((m) => ({
   label: m.label,

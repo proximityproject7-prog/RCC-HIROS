@@ -31,6 +31,7 @@ export function BiometricsCard({ employeeId }: { employeeId: string }) {
   const [progress, setProgress] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [serviceUp, setServiceUp] = useState<boolean | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const isSelf = user?.id === employeeId;
@@ -58,6 +59,45 @@ export function BiometricsCard({ employeeId }: { employeeId: string }) {
       try { wsRef.current?.close(); } catch { /* noop */ }
     };
   }, [load]);
+
+  // Probe the kiosk fingerprint service once: enrollment is only offered
+  // on the kiosk device (reader + service present).
+  useEffect(() => {
+    let done = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let ws: WebSocket | null = null;
+    const settle = (up: boolean) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { ws?.close(); } catch { /* noop */ }
+      setServiceUp(up);
+    };
+    try {
+      ws = new WebSocket(fingerprintServiceUrl());
+    } catch {
+      setServiceUp(false);
+      return;
+    }
+    timer = setTimeout(() => settle(false), 5000);
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg && typeof msg === "object" && msg.type === "reader_status") {
+          settle(msg.connected === true);
+        }
+      } catch {
+        /* ignore malformed frames */
+      }
+    };
+    ws.onclose = () => settle(false);
+    ws.onerror = () => settle(false);
+    return () => {
+      done = true;
+      clearTimeout(timer);
+      try { ws?.close(); } catch { /* noop */ }
+    };
+  }, []);
 
   const usedSlots = new Set(templates.map((t) => t.fingerIndex));
   const freeSlots = FINGER_LABELS.map((_, i) => i).filter((i) => !usedSlots.has(i));
@@ -224,7 +264,10 @@ export function BiometricsCard({ employeeId }: { employeeId: string }) {
               </div>
             )}
 
-            {canModify && templates.length < MAX_TEMPLATES_PER_EMPLOYEE && !enrolling && (
+            {canModify && serviceUp === false && (
+              <p className="text-xs text-rcc-text-muted">Fingerprint enrollment is available only on the kiosk device.</p>
+            )}
+            {canModify && serviceUp === true && templates.length < MAX_TEMPLATES_PER_EMPLOYEE && !enrolling && (
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   value={slot}

@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, LogIn, AlertCircle, Lock, Clock } from "lucide-react";
 import { useAuthContext } from "@/components/providers/auth-provider";
+import { KioskLoginPanel } from "@/components/biometric/KioskLoginPanel";
 
 export default function LoginPage() {
   const { login } = useAuthContext();
@@ -175,6 +176,9 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Fingerprint kiosk clock in/out — renders only on kiosk devices */}
+          <KioskLoginPanel />
 
           <p className="text-xs font-medium text-rcc-text-muted text-center mt-6">
             Access is restricted to RCC employees only.{" "}
