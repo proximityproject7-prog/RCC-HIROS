@@ -16,6 +16,7 @@ import {
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { BiometricsCard } from "@/components/biometric/BiometricsCard";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -1673,6 +1674,9 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           )}
         </div>
       </SectionCard>
+
+      {/* Biometrics — fingerprint enrollment for kiosk clock in/out */}
+      <BiometricsCard employeeId={employeeId} />
 
       {/* System Configuration (visible to roles.edit users) */}
       {has("roles.edit") && (

@@ -18,6 +18,7 @@ import { ReportsPage } from "@/components/reports/report-pages";
 import { RoleListPage, RoleFormPage } from "@/components/admin/role-pages";
 import { GroupListPage, GroupFormPage } from "@/components/admin/group-pages";
 import { FpassPage } from "@/components/fpass/fpass-pages";
+import { KioskScreen } from "@/components/kiosk/KioskScreen";
 
 export default function HomePage() {
   const { user, isAuthenticated, isLoading, mustChangePassword } = useAuth();
@@ -111,6 +112,12 @@ export default function HomePage() {
             employeeId={currentSubpage?.startsWith("emp:") ? currentSubpage.slice(4) : undefined}
             submissionId={currentSubpage?.startsWith("view:") ? currentSubpage.slice(5) : undefined}
           />
+        </PermissionGuard>
+      ); break;
+    case "kiosk":
+      content = (
+        <PermissionGuard require="kiosk.view" fallback={<PermissionDenied />}>
+          <KioskScreen />
         </PermissionGuard>
       ); break;
     default: content = <DynamicDashboard />;
