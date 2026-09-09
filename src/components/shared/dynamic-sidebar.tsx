@@ -6,11 +6,11 @@ import { MODULES } from "@/lib/permissions";
 import Image from "next/image";
 import {
   LayoutDashboard, Users, Clock, ClipboardCheck, CalendarClock,
-  BarChart3, ShieldCheck, Building2, ChevronLeft, ChevronRight, UserCircle, type LucideIcon,
+  BarChart3, ShieldCheck, Building2, ChevronLeft, ChevronRight, UserCircle, Fingerprint, type LucideIcon,
 } from "lucide-react";
 
 const ICONS: Record<string, LucideIcon> = {
-  LayoutDashboard, Users, Clock, ClipboardCheck, CalendarClock, BarChart3, ShieldCheck, Building2,
+  LayoutDashboard, Users, Clock, ClipboardCheck, CalendarClock, BarChart3, ShieldCheck, Building2, Fingerprint,
 };
 
 export function DynamicSidebar() {

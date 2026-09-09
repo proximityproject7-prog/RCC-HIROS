@@ -48,6 +48,8 @@ const ALL_PERMISSIONS = [
   "roles.delete",
   "groups.view",
   "groups.manage",
+  "biometric.enroll",
+  "biometric.manage",
 ];
 
 const ACCOUNTANT_PERMS = [
@@ -67,6 +69,7 @@ const ACCOUNTANT_PERMS = [
   "reports.export",
   "groups.view",
   "roles.view",
+  "biometric.enroll",
 ];
 
 const HR_PERMS = [
@@ -94,6 +97,8 @@ const HR_PERMS = [
   "groups.view",
   "groups.manage",
   "roles.view",
+  "biometric.enroll",
+  "biometric.manage",
 ];
 
 const DEAN_PERMS = [
@@ -134,6 +139,8 @@ const IT_STAFF_PERMS = [
   "roles.edit",
   "groups.view",
   "groups.manage",
+  "biometric.enroll",
+  "biometric.manage",
 ];
 
 const PROFESSOR_PERMS = [

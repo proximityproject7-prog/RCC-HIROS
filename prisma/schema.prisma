@@ -387,3 +387,21 @@ model SystemSetting {
   category  String   @default("general")
   updatedAt DateTime @updatedAt
 }
+
+// ═══════════════════════════════════════════════════════════════
+// BIOMETRIC FINGERPRINT TEMPLATES
+// ═══════════════════════════════════════════════════════════════
+
+model BiometricTemplate {
+  id         String   @id @default(cuid())
+  employeeId String
+  fingerIndex Int     // 0 = first enrolled finger, 1 = second
+  templateData String @db.Text // WinBio template GUID
+  quality    Int      @default(0) // 0-100 enrollment quality score
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, fingerIndex])
+}

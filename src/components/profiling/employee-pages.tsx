@@ -6,7 +6,7 @@ import {
   Plus, Search, Pencil, ArrowLeft, Save, Users as UsersIcon, Upload,
   FileText, Download, Trash2, Eye, X, Lock, Mail, Phone, MapPin, Calendar,
   IdCard, Briefcase, Award, Image as ImageIcon, AlertTriangle, Building2, Settings,
-  Hash, User, DollarSign, Shield,
+  Hash, User, DollarSign, Shield, Fingerprint,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
@@ -16,6 +16,7 @@ import {
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { BiometricsCard } from "@/components/biometric/BiometricsCard";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -1713,6 +1714,11 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
           </div>
         </SectionCard>
+      )}
+
+      {/* Fingerprint Biometrics */}
+      {has("biometric.enroll") && (
+        <BiometricsCard employeeId={employeeId} />
       )}
 
       {/* File Viewer Modal */}

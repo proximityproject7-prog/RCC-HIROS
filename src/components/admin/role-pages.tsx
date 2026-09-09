@@ -117,6 +117,9 @@ const PERMISSION_LABELS: Record<string, { label: string; description: string }> 
 
   "fpass.fill": { label: "Fill FPASS Form", description: "Fill out the Faculty Performance Appraisal form." },
   "fpass.manage": { label: "Manage FPASS", description: "View all FPASS submissions and manage group access." },
+
+  "biometric.enroll": { label: "Enroll Fingerprints", description: "Enroll and delete employee fingerprint templates." },
+  "biometric.manage": { label: "View Biometric Status", description: "View any employee's biometric enrollment status." },
 };
 
 const PERMISSIONS_BY_MODULE: PermissionModule[] = [
@@ -174,6 +177,10 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
   {
     label: "FPASS (Faculty Appraisal)",
     permissions: ["fpass.fill", "fpass.manage"],
+  },
+  {
+    label: "Fingerprint (Biometric)",
+    permissions: ["biometric.enroll", "biometric.manage"],
   },
 ].map((m) => ({
   label: m.label,
