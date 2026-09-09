@@ -121,7 +121,6 @@ model Employee {
   attendanceRecords Attendance[]
   attendanceEdits Attendance[]           @relation("AttendanceEdits")
   fpassSubmissions FpassSubmission[]
-  biometricTemplates BiometricTemplate[]
   auditLogs      AuditLog[]
 }
 
@@ -343,24 +342,6 @@ model Attendance {
   editedBy Employee? @relation("AttendanceEdits", fields: [editedById], references: [id])
 
   @@unique([employeeId, date])
-}
-
-// Fingerprint templates enrolled via the kiosk Python service (WinBio).
-// templateData holds the base64-encoded template blob; fingerIndex is the
-// enrolled finger slot (0-9). Max 2 active templates per employee (app-enforced).
-model BiometricTemplate {
-  id           String   @id @default(cuid())
-  employeeId   String
-  fingerIndex  Int      @default(0)
-  templateData String   @db.Text
-  quality      Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@unique([employeeId, fingerIndex])
-  @@index([employeeId])
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -66,10 +66,6 @@ export const PERMISSIONS = [
   // Groups
   "groups.view",
   "groups.manage",
-
-  // Biometrics (login-screen kiosk clock in/out + profile enrollment)
-  "biometric.enroll",
-  "biometric.manage",
 ] as const;
 
 export type PermissionIdentifier = (typeof PERMISSIONS)[number];

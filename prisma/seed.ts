@@ -27,7 +27,6 @@ const ALL_PERMISSIONS = [
   "profile.editAll",
   "attendance.view",
   "attendance.clock_in",
-  "biometric.enroll",
   "attendance.edit",
   "attendance.edit_on_premise",
   "attendance.view_all",
@@ -49,7 +48,6 @@ const ALL_PERMISSIONS = [
   "roles.delete",
   "groups.view",
   "groups.manage",
-  "biometric.manage",
 ];
 
 const ACCOUNTANT_PERMS = [
@@ -60,7 +58,6 @@ const ACCOUNTANT_PERMS = [
   "profile.editAll",
   "attendance.view",
   "attendance.clock_in",
-  "biometric.enroll",
   "attendance.edit",
   "attendance.edit_on_premise",
   "leave.request",
@@ -82,7 +79,6 @@ const HR_PERMS = [
   "profile.editAll",
   "attendance.view",
   "attendance.clock_in",
-  "biometric.enroll",
   "attendance.edit",
   "attendance.edit_on_premise",
   "evaluation.view",
@@ -98,7 +94,6 @@ const HR_PERMS = [
   "groups.view",
   "groups.manage",
   "roles.view",
-  "biometric.manage",
 ];
 
 const DEAN_PERMS = [
@@ -107,7 +102,6 @@ const DEAN_PERMS = [
   "profile.selfEdit",
   "attendance.view",
   "attendance.clock_in",
-  "biometric.enroll",
   "evaluation.view",
   "evaluation.submit",
   "leave.approve_l1",
@@ -126,7 +120,6 @@ const IT_STAFF_PERMS = [
   "profile.editAll",
   "attendance.view",
   "attendance.clock_in",
-  "biometric.enroll",
   "attendance.edit",
   "attendance.edit_on_premise",
   "evaluation.view",
@@ -141,13 +134,11 @@ const IT_STAFF_PERMS = [
   "roles.edit",
   "groups.view",
   "groups.manage",
-  "biometric.manage",
 ];
 
 const PROFESSOR_PERMS = [
   "dashboard.view",
   "attendance.clock_in",
-  "biometric.enroll",
   "attendance.view",
   "leave.request",
   "evaluation.view_results",
@@ -160,7 +151,6 @@ const HR_ASSISTANT_PERMS = [
   "profile.selfEdit",
   "attendance.view",
   "attendance.clock_in",
-  "biometric.enroll",
   "evaluation.view",
   "evaluation.view_results",
   "leave.request",

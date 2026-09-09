@@ -177,7 +177,7 @@ export function AttendanceListPage() {
             onClick={() => setCurrentPage("attendance", "premises")}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
           >
-            <Settings className="h-4 w-4" /> Attendance Configuration
+            <Settings className="h-4 w-4" /> Premises Settings
           </button>
         )}
       </div>
@@ -584,9 +584,6 @@ export function PremisesSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [bioEnabled, setBioEnabled] = useState(true);
-  const [bioSaving, setBioSaving] = useState(false);
-  const [bioSuccess, setBioSuccess] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -599,12 +596,6 @@ export function PremisesSettingsPage() {
         setLabel(p.label);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load premises config.");
-      }
-      try {
-        const bio = await apiFetch<{ enabled: boolean }>("/api/settings/biometrics");
-        setBioEnabled(bio.enabled !== false);
-      } catch {
-        // non-fatal — toggle keeps its default ON state
       } finally {
         setLoading(false);
       }
@@ -679,9 +670,9 @@ export function PremisesSettingsPage() {
         </button>
       </div>
       <div>
-        <h1 className="text-xl font-bold text-rcc-text-primary">Attendance Configuration</h1>
+        <h1 className="text-xl font-bold text-rcc-text-primary">Premises Settings</h1>
         <p className="text-sm text-rcc-text-muted mt-0.5">
-          Configure the geofence premises and the fingerprint biometrics master switch.
+          Configure the geofence center and radius used to evaluate clock-in / clock-out on-premise status.
         </p>
       </div>
 
@@ -730,59 +721,6 @@ export function PremisesSettingsPage() {
               <ExternalLink className="h-3 w-3" /> View on OpenStreetMap
             </a>
           )}
-        </div>
-      </div>
-
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6 space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-rcc-text-primary uppercase tracking-wide">Biometrics</h2>
-          <p className="text-xs text-rcc-text-muted mt-0.5">
-            Master switch for fingerprint clock in/out and enrollment. When off, all fingerprint features hide and biometric requests are rejected.
-          </p>
-        </div>
-        {bioSuccess && (
-          <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-700">
-            Biometrics setting saved.
-          </div>
-        )}
-        <label className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${bioEnabled ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"}`}>
-          <input
-            type="checkbox"
-            checked={bioEnabled}
-            onChange={(e) => {
-              setBioEnabled(e.target.checked);
-              setBioSuccess(false);
-            }}
-            className="h-4 w-4 accent-[#8B5E3C]"
-          />
-          <span className="text-sm font-medium text-rcc-text-primary">
-            Fingerprint biometrics enabled
-          </span>
-        </label>
-        <div>
-          <button
-            onClick={async () => {
-              setError(null);
-              setBioSuccess(false);
-              setBioSaving(true);
-              try {
-                await apiFetch("/api/settings/biometrics", {
-                  method: "POST",
-                  body: JSON.stringify({ enabled: bioEnabled }),
-                });
-                setBioSuccess(true);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Failed to save biometrics setting.");
-              } finally {
-                setBioSaving(false);
-              }
-            }}
-            disabled={bioSaving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {bioSaving ? "Saving..." : "Save Biometrics"}
-          </button>
         </div>
       </div>
 
