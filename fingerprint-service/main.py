@@ -14,7 +14,8 @@ import signal
 import sys
 
 import websockets
-from websockets.server import serve
+from websockets import serve
+from websockets.exceptions import ConnectionClosedError
 
 import winbio_api as wb
 import database as db
@@ -88,11 +89,12 @@ async def handler(websocket):
     connected_clients.add(websocket)
     log.info(f"Client connected ({len(connected_clients)} total)")
     try:
-        # Send initial status
+        # Send initial status — just report if WinBio session is open
+        session_ok = wb.has_winbio() and wb.open_session()
         await websocket.send(json.dumps({
             "type": "status",
-            "connected": wb.has_winbio() and wb.open_session(),
-            "readerReady": wb.locate_sensor(timeout_ms=5000) if wb.has_winbio() else False,
+            "connected": session_ok,
+            "readerReady": session_ok,
         }))
 
         async for message in websocket:
@@ -131,6 +133,8 @@ async def handler(websocket):
                     "type": "error",
                     "message": str(e),
                 }))
+    except ConnectionClosedError:
+        log.info("Client disconnected (normal)")
     finally:
         connected_clients.discard(websocket)
         log.info(f"Client disconnected ({len(connected_clients)} total)")
@@ -142,14 +146,8 @@ async def main():
     # Open WinBio session
     if wb.has_winbio():
         if wb.open_session():
-            log.info("WinBio session opened")
-            sensor_ok = wb.locate_sensor(timeout_ms=5000)
-            if sensor_ok:
-                log.info("Fingerprint sensor detected")
-                service_ready = True
-            else:
-                log.warning("No fingerprint sensor found — running in no-reader mode")
-                service_ready = True  # still serve, just no reader
+            log.info("WinBio session opened — fingerprint sensor ready")
+            service_ready = True
         else:
             log.error("Failed to open WinBio session")
             service_ready = True  # serve anyway

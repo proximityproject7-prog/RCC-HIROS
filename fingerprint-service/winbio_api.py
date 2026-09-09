@@ -99,18 +99,13 @@ def close_session():
 
 
 def locate_sensor(timeout_ms: int = 10000) -> bool:
-    """Check if a fingerprint sensor is available. Uses Identify with timeout."""
+    """Check if a fingerprint sensor is available. Uses WinBioLocateSensor (non-blocking)."""
     if not _HAS_WINBIO or not _session_handle.value:
         return False
     try:
-        identity = WINBIO_IDENTITY()
-        sub_factor = wintypes.UINT8(0)
-        reject = wintypes.UINT32(0)
-        ret = _winbio.WinBioIdentify(
-            _session_handle, ctypes.byref(identity),
-            ctypes.byref(sub_factor), ctypes.byref(reject)
-        )
-        return ret == S_OK or ret == WINBIO_I_MORE_DATA
+        unit_id = wintypes.UINT32(0)
+        ret = _winbio.WinBioLocateSensor(_session_handle, ctypes.byref(unit_id))
+        return ret == S_OK
     except Exception:
         return False
 
