@@ -798,7 +798,7 @@ function ProfileSection({ sectionKey, label, rows, fields, editing, canEdit, onE
 
 export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const { setCurrentPage } = useAuthStore();
-  const { has, canChangePassword } = usePermissions();
+  const { has, canChangePassword, canManageBiometrics } = usePermissions();
   const { user } = useAuth();
 
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -1717,7 +1717,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       )}
 
       {/* Fingerprint Biometrics */}
-      {has("biometric.enroll") && (
+      {canManageBiometrics && (
         <BiometricsCard employeeId={employeeId} />
       )}
 

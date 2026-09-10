@@ -37,6 +37,8 @@ export interface UsePermissionsResult {
   canEditProfile: boolean;
   /** Whether the user can change passwords for employees. */
   canChangePassword: boolean;
+  /** Whether the user can manage fingerprints on employee profiles. */
+  canManageBiometrics: boolean;
   /** Raw permission set (frozen list). */
   permissions: string[];
 }
@@ -80,6 +82,7 @@ export function usePermissions(): UsePermissionsResult {
       canSelfApproveLeave: user?.canSelfApproveLeave ?? false,
       canEditProfile: user?.canEditProfile ?? false,
       canChangePassword: user?.canChangePassword ?? false,
+      canManageBiometrics: user?.canManageBiometrics ?? false,
       permissions,
     };
   }, [permissions, isSystemAdmin, user]);

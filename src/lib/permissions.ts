@@ -12,8 +12,7 @@ export type ModuleKey =
   | "leave"
   | "reports"
   | "roles"
-  | "groups"
-  | "biometric";
+  | "groups";
 
 /** Every permission identifier granted/revoked via RolePermission. */
 export const PERMISSIONS = [
@@ -87,8 +86,7 @@ export interface ModuleDef {
     | "CalendarClock"
     | "BarChart3"
     | "ShieldCheck"
-    | "Building2"
-    | "Fingerprint";
+    | "Building2";
   /** Identifiers relevant to this module — module is visible if user has ANY of them. */
   permissions: readonly string[];
 }
@@ -165,12 +163,6 @@ export const MODULES: readonly ModuleDef[] = [
     label: "Groups",
     icon: "Building2",
     permissions: ["groups.view", "groups.manage"],
-  },
-  {
-    key: "biometric",
-    label: "Fingerprint",
-    icon: "Fingerprint",
-    permissions: ["biometric.enroll", "biometric.manage"],
   },
 ] as const;
 

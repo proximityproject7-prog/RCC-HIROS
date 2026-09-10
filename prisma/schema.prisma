@@ -41,6 +41,7 @@ model Role {
   canSelfApproveLeave  Boolean @default(false)
   canEditProfile       Boolean @default(false)
   canChangePassword    Boolean @default(false)
+  canManageBiometrics  Boolean @default(false)
   isSystem             Boolean @default(false)
   active               Boolean @default(true)
   createdAt            DateTime @default(now())
@@ -122,6 +123,7 @@ model Employee {
   attendanceEdits Attendance[]           @relation("AttendanceEdits")
   fpassSubmissions FpassSubmission[]
   auditLogs      AuditLog[]
+  biometricTemplates BiometricTemplate[]
 }
 
 model EmployeeCertificate {
@@ -393,13 +395,15 @@ model SystemSetting {
 // ═══════════════════════════════════════════════════════════════
 
 model BiometricTemplate {
-  id         String   @id @default(cuid())
-  employeeId String
-  fingerIndex Int     // 0 = first enrolled finger, 1 = second
-  templateData String @db.Text // WinBio template GUID
-  quality    Int      @default(0) // 0-100 enrollment quality score
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id               String   @id @default(cuid())
+  employeeId       String
+  fingerIndex      Int      // 0 = first enrolled finger, 1 = second
+  credentialId     String   @db.Text // WebAuthn credential ID (base64url)
+  credentialPubKey String   @db.Text // WebAuthn public key (base64url)
+  counter          Int      @default(0) // WebAuthn signature counter
+  quality          Int      @default(0) // 0-100 enrollment quality score
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 

@@ -84,6 +84,7 @@ export interface AuthUser {
   canSelfApproveLeave: boolean;
   canEditProfile: boolean;
   canChangePassword: boolean;
+  canManageBiometrics: boolean;
   isSystem: boolean;
 
   // Employee profile
@@ -140,6 +141,7 @@ export async function getAuthUser(employeeId: string): Promise<AuthUser | null> 
     canSelfApproveLeave: employee.role.canSelfApproveLeave,
     canEditProfile: employee.role.canEditProfile,
     canChangePassword: employee.role.canChangePassword,
+    canManageBiometrics: employee.role.canManageBiometrics,
     isSystem: employee.role.isSystem,
     groupId: employee.groupId,
     active: employee.active,

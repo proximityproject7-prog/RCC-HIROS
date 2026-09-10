@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Fingerprint, Trash2, AlertCircle, Wifi, WifiOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Fingerprint, Trash2, AlertCircle, Shield, ShieldOff } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 import { apiFetch } from "@/lib/api-client";
+import {
+  startRegistration,
+  type RegistrationResponseJSON,
+} from "@simplewebauthn/browser";
 
 // ═══════════════════════════════════════════════════════════════
 // BiometricsCard — displays enrollment status + enroll/delete
-// Shown on employee profile page, visible only with biometric.enroll
-// Communicates with Python fingerprint service via WebSocket.
+// Uses WebAuthn API to enroll fingerprints via Windows Hello.
 // ═══════════════════════════════════════════════════════════════
 
 interface Template {
@@ -23,22 +26,29 @@ interface BiometricsCardProps {
 }
 
 export function BiometricsCard({ employeeId }: BiometricsCardProps) {
-  const { has } = usePermissions();
-  const canEnroll = has("biometric.enroll");
+  const { has, canManageBiometrics } = usePermissions();
+  const canEnroll = has("biometric.enroll") || canManageBiometrics;
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [enrollMsg, setEnrollMsg] = useState<string | null>(null);
   const [enrollError, setEnrollError] = useState<string | null>(null);
-  const [fpConnected, setFpConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
-  const enrollResolveRef = useRef<((data: Record<string, unknown>) => void) | null>(null);
+  const [webauthnSupported, setWebauthnSupported] = useState(true);
+
+  // Check WebAuthn support
+  useEffect(() => {
+    if (!window.PublicKeyCredential) {
+      setWebauthnSupported(false);
+    }
+  }, []);
 
   // Load templates
   const loadTemplates = async () => {
     try {
-      const data = await apiFetch(`/api/biometric/status?employeeId=${employeeId}`) as { templates?: Template[] };
+      const data = await apiFetch(
+        `/api/biometric/status?employeeId=${employeeId}`
+      ) as { templates?: Template[] };
       setTemplates(data.templates || []);
     } catch {
       // Silently fail
@@ -51,88 +61,52 @@ export function BiometricsCard({ employeeId }: BiometricsCardProps) {
     loadTemplates();
   }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Connect to fingerprint service
-  useEffect(() => {
-    if (!canEnroll) return;
-
-    const wsUrl = process.env.NEXT_PUBLIC_FINGERPRINT_SERVICE_URL || "ws://localhost:8765";
-    let cancelled = false;
-
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ op: "ping" }));
-      };
-
-      ws.onmessage = (event: MessageEvent) => {
-        if (cancelled) return;
-        try {
-          const data = JSON.parse(String(event.data));
-          if (data.type === "status") {
-            setFpConnected(data.connected && data.readerReady);
-          } else if (data.type === "result" && data.op === "enroll") {
-            enrollResolveRef.current?.(data);
-            enrollResolveRef.current = null;
-          }
-        } catch {
-          // Ignore
-        }
-      };
-
-      ws.onerror = () => {
-        if (!cancelled) setFpConnected(false);
-      };
-
-      ws.onclose = () => {
-        if (!cancelled) setFpConnected(false);
-      };
-    } catch {
-      setFpConnected(false);
-    }
-
-    return () => {
-      cancelled = true;
-      wsRef.current?.close();
-    };
-  }, [canEnroll]);
-
   const handleEnroll = async (fingerIndex: number) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      setEnrollError("Fingerprint service not connected");
-      return;
-    }
-
     setEnrolling(true);
     setEnrollMsg(null);
     setEnrollError(null);
 
-    // Enroll via WebSocket
-    const result = await new Promise<Record<string, unknown>>((resolve) => {
-      enrollResolveRef.current = resolve;
-      wsRef.current!.send(JSON.stringify({
-        op: "enroll",
-        employeeId,
-        fingerIndex,
-      }));
-
-      // Timeout after 30s
-      setTimeout(() => {
-        if (enrollResolveRef.current === resolve) {
-          enrollResolveRef.current = null;
-          resolve({ success: false, message: "Enrollment timeout" });
+    try {
+      // Step 1: Get registration options from server
+      const optionsRes = await apiFetch(
+        "/api/biometric/webauthn/register/options",
+        {
+          method: "POST",
+          body: JSON.stringify({ employeeId, fingerIndex }),
         }
-      }, 30000);
-    });
+      );
 
-    setEnrolling(false);
+      // Step 2: Trigger browser's WebAuthn API (Windows Hello)
+      const registrationResponse = await startRegistration({
+        optionsJSON: optionsRes as any,
+      });
 
-    if (result.success) {
+      // Step 3: Verify registration with server
+      const verifyRes = await apiFetch(
+        "/api/biometric/webauthn/register/verify",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            employeeId,
+            fingerIndex,
+            response: registrationResponse,
+          }),
+        }
+      );
+
       setEnrollMsg(`Finger ${fingerIndex + 1} enrolled successfully`);
       loadTemplates();
-    } else {
-      setEnrollError(String(result.message || "Enrollment failed"));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Enrollment failed";
+      if (msg.includes("cancelled")) {
+        setEnrollError("Enrollment cancelled");
+      } else if (msg.includes("not allowed")) {
+        setEnrollError("Not allowed - check Windows Hello settings");
+      } else {
+        setEnrollError(msg);
+      }
+    } finally {
+      setEnrolling(false);
     }
 
     // Clear message after 5s
@@ -163,15 +137,17 @@ export function BiometricsCard({ employeeId }: BiometricsCardProps) {
     <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6 space-y-4">
       <div className="flex items-center gap-2">
         <Fingerprint className="h-5 w-5 text-rcc-accent" />
-        <h3 className="text-sm font-bold text-rcc-text-primary">Fingerprint Biometrics</h3>
+        <h3 className="text-sm font-bold text-rcc-text-primary">
+          Fingerprint Biometrics
+        </h3>
         <div className="ml-auto flex items-center gap-1.5">
-          {fpConnected ? (
+          {webauthnSupported ? (
             <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-              <Wifi className="h-3 w-3" /> Reader connected
+              <Shield className="h-3 w-3" /> WebAuthn ready
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-rcc-text-muted font-medium">
-              <WifiOff className="h-3 w-3" /> No reader
+              <ShieldOff className="h-3 w-3" /> Not supported
             </span>
           )}
         </div>
@@ -181,6 +157,40 @@ export function BiometricsCard({ employeeId }: BiometricsCardProps) {
         Enroll up to {maxFingers} fingerprint templates for this employee.
         Fingerprint is used for clock in/out at the kiosk.
       </p>
+
+      {/* Enrollment in progress banner */}
+      {enrolling && (
+        <div className="flex items-center gap-3 p-3 rounded-md border border-blue-200 bg-blue-50">
+          <svg
+            className="animate-spin h-5 w-5 text-blue-600 shrink-0"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-blue-800">
+              Windows Hello dialog opened
+            </p>
+            <p className="text-xs text-blue-600">
+              Follow the prompts to scan your fingerprint
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Enrolled templates */}
       {loading ? (
@@ -193,13 +203,16 @@ export function BiometricsCard({ employeeId }: BiometricsCardProps) {
       ) : (
         <div className="space-y-2">
           {templates.map((t) => (
-            <div key={t.id} className="flex items-center justify-between p-3 border border-rcc-border rounded-md bg-rcc-bg/30">
+            <div
+              key={t.id}
+              className="flex items-center justify-between p-3 border border-rcc-border rounded-md bg-rcc-bg/30"
+            >
               <div>
                 <p className="text-sm font-medium text-rcc-text-primary">
                   Finger {t.fingerIndex + 1}
                 </p>
                 <p className="text-xs text-rcc-text-muted">
-                  Quality: {t.quality}% &middot; Enrolled {new Date(t.createdAt).toLocaleDateString()}
+                  Enrolled {new Date(t.createdAt).toLocaleDateString()}
                 </p>
               </div>
               <button
@@ -217,29 +230,47 @@ export function BiometricsCard({ employeeId }: BiometricsCardProps) {
       {/* Enroll buttons */}
       {canAddMore && (
         <div className="flex gap-2">
-          {[0, 1].filter(i => !templates.find(t => t.fingerIndex === i)).map((idx) => (
-            <button
-              key={idx}
-              onClick={() => handleEnroll(idx)}
-              disabled={enrolling || !fpConnected}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {enrolling ? (
-                <>
-                  <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Scanning...
-                </>
-              ) : (
-                <>
-                  <Fingerprint className="h-3.5 w-3.5" />
-                  Enroll Finger {idx + 1}
-                </>
-              )}
-            </button>
-          ))}
+          {[0, 1]
+            .filter((i) => !templates.find((t) => t.fingerIndex === i))
+            .map((idx) => (
+              <button
+                key={idx}
+                onClick={() => handleEnroll(idx)}
+                disabled={enrolling || !webauthnSupported}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {enrolling ? (
+                  <>
+                    <svg
+                      className="animate-spin h-3.5 w-3.5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    Enrolling...
+                  </>
+                ) : (
+                  <>
+                    <Fingerprint className="h-3.5 w-3.5" />
+                    Enroll Finger {idx + 1}
+                  </>
+                )}
+              </button>
+            ))}
         </div>
       )}
 
@@ -255,10 +286,11 @@ export function BiometricsCard({ employeeId }: BiometricsCardProps) {
         </div>
       )}
 
-      {/* Service note */}
-      {!fpConnected && (
+      {/* WebAuthn support note */}
+      {!webauthnSupported && (
         <p className="text-[10px] text-rcc-text-muted">
-          Fingerprint service not available. Start the Python service to enroll.
+          WebAuthn is not supported in this browser. Use Chrome or Edge on
+          Windows 10/11.
         </p>
       )}
     </div>

@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         canSelfApproveLeave: employee.role.canSelfApproveLeave,
         canEditProfile: employee.role.canEditProfile,
         canChangePassword: employee.role.canChangePassword,
+        canManageBiometrics: employee.role.canManageBiometrics,
         isSystem: employee.role.isSystem,
         groupId: employee.groupId,
         group: employee.group?.name ?? null,

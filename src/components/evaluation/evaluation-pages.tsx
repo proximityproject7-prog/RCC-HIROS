@@ -461,7 +461,7 @@ export function EvaluationFormsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       {editingPeriodId === p.id ? (
-                        <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                           <input
                             type="text"
                             value={editName}

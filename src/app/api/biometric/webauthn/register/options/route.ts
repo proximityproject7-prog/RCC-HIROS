@@ -1,45 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/auth-token";
-import { db } from "@/lib/db";
+import { generateRegistrationOpts } from "@/lib/webauthn";
 
 // ═══════════════════════════════════════════════════════════════
-// DELETE /api/biometric/enroll  — biometric.enroll required
-//   { templateId } or { employeeId } (deletes all for that employee)
+// POST /api/biometric/webauthn/register/options
+// biometric.enroll required
+// Returns WebAuthn registration options for enrollment
 // ═══════════════════════════════════════════════════════════════
 
-export async function DELETE(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const auth = await requirePermission(request, "biometric.enroll");
     if (!auth.ok) return auth.response;
 
     const body = await request.json();
-    const { templateId, employeeId } = body as {
-      templateId?: string;
+    const { employeeId, fingerIndex } = body as {
       employeeId?: string;
+      fingerIndex?: number;
     };
 
-    if (!templateId && !employeeId) {
+    if (!employeeId || fingerIndex === undefined) {
       return NextResponse.json(
-        { error: "Missing templateId or employeeId" },
+        { error: "Missing employeeId or fingerIndex" },
         { status: 400 }
       );
     }
 
-    if (templateId) {
-      // Delete single template
-      await db.biometricTemplate.delete({
-        where: { id: templateId },
-      });
-    } else if (employeeId) {
-      // Delete all templates for employee
-      await db.biometricTemplate.deleteMany({
-        where: { employeeId },
-      });
+    if (fingerIndex < 0 || fingerIndex > 1) {
+      return NextResponse.json(
+        { error: "fingerIndex must be 0 or 1" },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ message: "Deleted successfully" });
+    const options = await generateRegistrationOpts(employeeId, fingerIndex);
+
+    return NextResponse.json(options);
   } catch (error) {
-    console.error("[API /biometric/enroll DELETE] Error:", error);
+    console.error("[API /biometric/webauthn/register/options] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

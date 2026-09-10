@@ -79,6 +79,7 @@ function publicUser(emp: any) {
     canSelfApproveLeave: emp.role?.canSelfApproveLeave ?? false,
     canEditProfile: emp.role?.canEditProfile ?? false,
     canChangePassword: emp.role?.canChangePassword ?? false,
+    canManageBiometrics: emp.role?.canManageBiometrics ?? false,
     isSystem: emp.role?.isSystem ?? false,
     groupId: emp.groupId,
     group: emp.group?.name ?? null,

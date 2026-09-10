@@ -262,7 +262,7 @@ async function main() {
   ];
 
   await db.evaluationCriterion.deleteMany({ where: { formId: evalForm.id } });
-  const createdCriteria = [];
+  const createdCriteria: any[] = [];
   for (const c of criteriaDefs) {
     const criterion = await db.evaluationCriterion.create({
       data: { formId: evalForm.id, category: c.category, description: c.description, maxScore: 5, weight: 1.0, sortOrder: c.sortOrder },

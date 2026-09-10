@@ -4,24 +4,18 @@ import { useState, FormEvent, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, LogIn, AlertCircle, Lock, Clock, Fingerprint, User } from "lucide-react";
 import { useAuthContext } from "@/components/providers/auth-provider";
+import {
+  startAuthentication,
+  type AuthenticationResponseJSON,
+} from "@simplewebauthn/browser";
 
 // ═══════════════════════════════════════════════════════════════
 // Login page with optional fingerprint panel (right side).
-// When biometrics_enabled AND fingerprint service reachable:
-//   Two-column layout: login form (left) + fingerprint scan (right)
-// Otherwise: single centered login card (original layout).
+// Uses WebAuthn API (Windows Hello) for kiosk fingerprint clock-in.
 // ═══════════════════════════════════════════════════════════════
 
-interface FPStatus {
-  type: string;
-  connected: boolean;
-  readerReady: boolean;
-}
-
 interface FPResult {
-  type: string;
-  op?: string;
-  success: boolean;
+  action?: string;
   message?: string;
   employee?: {
     id: string;
@@ -30,11 +24,11 @@ interface FPResult {
     lastName: string;
     photoPath: string | null;
   };
-  action?: string;
   attendance?: {
     clockInAt?: string;
     clockOutAt?: string;
   };
+  error?: string;
 }
 
 type PanelState = "idle" | "scanning" | "result" | "error";
@@ -49,112 +43,35 @@ export default function LoginPage() {
 
   // Fingerprint panel state
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
-  const [fpConnected, setFpConnected] = useState(false);
   const [panelState, setPanelState] = useState<PanelState>("idle");
   const [fpResult, setFpResult] = useState<FPResult | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanCooldownRef = useRef(false);
 
-  // Check biometrics setting + connect to fingerprint service
+  // Check biometrics setting
   useEffect(() => {
-    let cancelled = false;
-
     async function checkBiometrics() {
       try {
         const res = await fetch("/api/settings/biometrics");
         const data = await res.json();
-        if (cancelled) return;
         setBiometricsEnabled(data.enabled);
-        if (data.enabled) {
-          connectFingerprintService();
-        }
       } catch {
-        // Biometrics unavailable — stay in login-only mode
+        // Biometrics unavailable
       }
     }
-
-    function connectFingerprintService() {
-      const wsUrl = process.env.NEXT_PUBLIC_FINGERPRINT_SERVICE_URL || "ws://localhost:8765";
-      try {
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          // Send ping to verify connection
-          ws.send(JSON.stringify({ op: "ping" }));
-        };
-
-        ws.onmessage = (event: MessageEvent) => {
-          if (cancelled) return;
-          try {
-            const data = JSON.parse(String(event.data)) as FPStatus | FPResult;
-
-            if (data.type === "status") {
-              const status = data as FPStatus;
-              setFpConnected(status.connected && status.readerReady);
-            } else if (data.type === "result") {
-              handleFPResult(data as FPResult);
-            }
-          } catch {
-            // Ignore parse errors
-          }
-        };
-
-        ws.onerror = () => {
-          if (!cancelled) setFpConnected(false);
-        };
-
-        ws.onclose = () => {
-          if (!cancelled) {
-            setFpConnected(false);
-            // Reconnect after 5 seconds
-            setTimeout(connectFingerprintService, 5000);
-          }
-        };
-      } catch {
-        setFpConnected(false);
-      }
-    }
-
     checkBiometrics();
 
     return () => {
-      cancelled = true;
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-      wsRef.current?.close();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFPResult = useCallback((data: FPResult) => {
     if (scanCooldownRef.current) return;
     scanCooldownRef.current = true;
 
-    if (data.success && data.employee) {
-      // Auto clock in/out via kiosk API
-      fetch("/api/kiosk/clock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeId: data.employee.id }),
-      })
-        .then((res) => res.json())
-        .then((clockData) => {
-          setFpResult({
-            ...data,
-            action: clockData.action,
-            message: clockData.message,
-            attendance: clockData.attendance,
-          } as FPResult);
-          setPanelState("result");
-        })
-        .catch(() => {
-          setFpResult({ ...data, message: "Clock failed — service error" });
-          setPanelState("error");
-        });
-    } else {
-      setFpResult(data);
-      setPanelState("error");
-    }
+    setFpResult(data);
+    setPanelState(data.error ? "error" : "result");
 
     // Auto-reset after 5 seconds
     resetTimerRef.current = setTimeout(() => {
@@ -163,6 +80,55 @@ export default function LoginPage() {
       scanCooldownRef.current = false;
     }, 5000);
   }, []);
+
+  const handleFingerprintScan = async () => {
+    if (scanCooldownRef.current) return;
+
+    setPanelState("scanning");
+    setFpResult(null);
+
+    try {
+      // Step 1: Get authentication options from server
+      const optionsRes = await fetch("/api/biometric/webauthn/authenticate/options", {
+        method: "POST",
+      });
+
+      if (!optionsRes.ok) {
+        throw new Error("Failed to get authentication options");
+      }
+
+      const options = await optionsRes.json();
+
+      // Step 2: Trigger browser's WebAuthn API (Windows Hello)
+      const authResponse = await startAuthentication({
+        optionsJSON: options,
+      });
+
+      // Step 3: Verify authentication with server
+      const verifyRes = await fetch("/api/biometric/webauthn/authenticate/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: authResponse }),
+      });
+
+      const result = await verifyRes.json();
+
+      if (!verifyRes.ok) {
+        handleFPResult({ error: result.error || "Authentication failed" });
+      } else {
+        handleFPResult(result);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Scan failed";
+      if (msg.includes("cancelled")) {
+        handleFPResult({ error: "Scan cancelled" });
+      } else if (msg.includes("not allowed")) {
+        handleFPResult({ error: "Not allowed" });
+      } else {
+        handleFPResult({ error: msg });
+      }
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -197,7 +163,7 @@ export default function LoginPage() {
     return <AlertCircle className="h-4 w-4 shrink-0" />;
   };
 
-  const showFingerprintPanel = biometricsEnabled && fpConnected;
+  const showFingerprintPanel = biometricsEnabled;
 
   // Fingerprint panel content
   const renderFingerprintPanel = () => {
@@ -242,7 +208,7 @@ export default function LoginPage() {
           </div>
           <div className="text-center">
             <p className="text-lg font-semibold text-rcc-text-primary">Fingerprint not recognized</p>
-            <p className="text-sm text-rcc-text-secondary mt-1">Please try again</p>
+            <p className="text-sm text-rcc-text-secondary mt-1">{fpResult?.error || "Please try again"}</p>
           </div>
         </div>
       );
@@ -251,18 +217,28 @@ export default function LoginPage() {
     // Idle / scanning state
     return (
       <div className="flex flex-col items-center gap-4">
-        <div className={`w-28 h-28 rounded-full border-2 flex items-center justify-center transition-colors ${
-          panelState === "scanning"
-            ? "border-rcc-accent bg-rcc-accent/10 animate-pulse"
-            : "border-rcc-border bg-rcc-bg"
-        }`}>
+        <button
+          onClick={handleFingerprintScan}
+          disabled={panelState === "scanning"}
+          className={`w-28 h-28 rounded-full border-2 flex items-center justify-center transition-colors cursor-pointer hover:scale-105 ${
+            panelState === "scanning"
+              ? "border-rcc-accent bg-rcc-accent/10 animate-pulse"
+              : "border-rcc-border bg-rcc-bg hover:border-rcc-accent"
+          }`}
+        >
           <Fingerprint className={`h-14 w-14 transition-colors ${
             panelState === "scanning" ? "text-rcc-accent" : "text-rcc-text-muted"
           }`} />
-        </div>
+        </button>
         <div className="text-center">
-          <p className="text-lg font-semibold text-rcc-text-primary">Place your finger</p>
-          <p className="text-sm text-rcc-text-secondary mt-1">on the fingerprint reader to clock in/out</p>
+          <p className="text-lg font-semibold text-rcc-text-primary">
+            {panelState === "scanning" ? "Scanning..." : "Tap to scan"}
+          </p>
+          <p className="text-sm text-rcc-text-secondary mt-1">
+            {panelState === "scanning"
+              ? "Follow Windows Hello prompts"
+              : "Place your finger on the reader"}
+          </p>
         </div>
       </div>
     );

@@ -32,7 +32,7 @@ export function PaginationControls(props: {
 }) {
   if (props.totalItems === 0) return null;
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-rcc-border bg-rcc-bg/30">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-t border-rcc-border bg-rcc-bg/30">
       <div className="flex items-center gap-2 text-xs text-rcc-text-muted">
         <span>Rows per page:</span>
         <select value={props.pageSize} onChange={(e) => props.setPageSize(Number(e.target.value))}

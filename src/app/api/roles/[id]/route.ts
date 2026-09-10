@@ -52,12 +52,13 @@ export async function GET(
         scopeAllAttendance: role.scopeAllAttendance,
         scopeGroupAttendance: role.scopeGroupAttendance,
         canSelfApproveLeave: role.canSelfApproveLeave,
-        canEditProfile: role.canEditProfile,
-        canChangePassword: role.canChangePassword,
-        isSystem: role.isSystem,
-        active: role.active,
-        createdAt: role.createdAt.toISOString(),
-        updatedAt: role.updatedAt.toISOString(),
+      canEditProfile: role.canEditProfile,
+      canChangePassword: role.canChangePassword,
+      canManageBiometrics: role.canManageBiometrics,
+      isSystem: role.isSystem,
+      active: role.active,
+      createdAt: role.createdAt.toISOString(),
+      updatedAt: role.updatedAt.toISOString(),
         permissions: role.permissions
           .filter((p) => p.granted)
           .map((p) => p.identifier),
@@ -107,6 +108,7 @@ export async function PATCH(
       canSelfApproveLeave,
       canEditProfile,
       canChangePassword,
+      canManageBiometrics,
       active,
       permissions,
     } = body as {
@@ -121,6 +123,7 @@ export async function PATCH(
       canSelfApproveLeave?: boolean;
       canEditProfile?: boolean;
       canChangePassword?: boolean;
+      canManageBiometrics?: boolean;
       active?: boolean;
       permissions?: string[];
     };
@@ -161,6 +164,8 @@ export async function PATCH(
       data.canEditProfile = !!canEditProfile;
     if (canChangePassword !== undefined)
       data.canChangePassword = !!canChangePassword;
+    if (canManageBiometrics !== undefined)
+      data.canManageBiometrics = !!canManageBiometrics;
     if (active !== undefined) data.active = !!active;
 
     // Never let API callers change isSystem flag
@@ -245,6 +250,7 @@ export async function PATCH(
             canSelfApproveLeave: updated.canSelfApproveLeave,
             canEditProfile: updated.canEditProfile,
             canChangePassword: updated.canChangePassword,
+            canManageBiometrics: updated.canManageBiometrics,
             isSystem: updated.isSystem,
             active: updated.active,
             permissions: updated.permissions

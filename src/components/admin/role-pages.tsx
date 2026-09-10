@@ -33,6 +33,7 @@ export interface Role {
   canSelfApproveLeave: boolean;
   canEditProfile: boolean;
   canChangePassword: boolean;
+  canManageBiometrics: boolean;
   isSystem: boolean;
   active: boolean;
   createdAt: string;
@@ -61,7 +62,8 @@ type ScopeKey =
   | "scopeGroupAttendance"
   | "canSelfApproveLeave"
   | "canEditProfile"
-  | "canChangePassword";
+  | "canChangePassword"
+  | "canManageBiometrics";
 
 interface ScopeDef {
   key: ScopeKey;
@@ -134,6 +136,7 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
       { key: "scopeAllProfiling" as const, label: "All Profiling", description: "See employee records across all groups." },
       { key: "canEditProfile" as const, label: "Fill Profile Data", description: "Allow users to fill/edit their own profile sections (education, experience, etc.)." },
       { key: "canChangePassword" as const, label: "Change Password", description: "Allow users to change passwords for employees." },
+      { key: "canManageBiometrics" as const, label: "Manage Fingerprints", description: "Allow users to enroll and manage employee fingerprint biometrics." },
     ],
   },
   {
@@ -177,10 +180,6 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
   {
     label: "FPASS (Faculty Appraisal)",
     permissions: ["fpass.fill", "fpass.manage"],
-  },
-  {
-    label: "Fingerprint (Biometric)",
-    permissions: ["biometric.enroll", "biometric.manage"],
   },
 ].map((m) => ({
   label: m.label,
@@ -491,6 +490,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   const [canSelfApproveLeave, setCanSelfApproveLeave] = useState(false);
   const [canEditProfile, setCanEditProfile] = useState(false);
   const [canChangePassword, setCanChangePassword] = useState(false);
+  const [canManageBiometrics, setCanManageBiometrics] = useState(false);
   const [active, setActive] = useState(true);
   const [isSystem, setIsSystem] = useState(false);
   const [perms, setPerms] = useState<Set<string>>(new Set());
@@ -523,6 +523,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         setCanSelfApproveLeave(r.canSelfApproveLeave);
         setCanEditProfile(r.canEditProfile);
         setCanChangePassword(r.canChangePassword);
+        setCanManageBiometrics(r.canManageBiometrics);
         setActive(r.active);
         setIsSystem(r.isSystem);
         setPerms(new Set(r.permissions));
@@ -572,6 +573,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
     canSelfApproveLeave: [canSelfApproveLeave, setCanSelfApproveLeave],
     canEditProfile: [canEditProfile, setCanEditProfile],
     canChangePassword: [canChangePassword, setCanChangePassword],
+    canManageBiometrics: [canManageBiometrics, setCanManageBiometrics],
   };
 
   const handleSave = async () => {
@@ -594,6 +596,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         canSelfApproveLeave,
         canEditProfile,
         canChangePassword,
+        canManageBiometrics,
         active,
         permissions: Array.from(perms),
       };

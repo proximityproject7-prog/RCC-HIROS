@@ -33,6 +33,7 @@ export interface AuthUser {
   canSelfApproveLeave: boolean;
   canEditProfile: boolean;
   canChangePassword: boolean;
+  canManageBiometrics: boolean;
   isSystem: boolean;
 
   // Employee profile

@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       canSelfApproveLeave: role.canSelfApproveLeave,
       canEditProfile: role.canEditProfile,
       canChangePassword: role.canChangePassword,
+      canManageBiometrics: role.canManageBiometrics,
       isSystem: role.isSystem,
       active: role.active,
       createdAt: role.createdAt.toISOString(),
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
       canSelfApproveLeave = false,
       canEditProfile = false,
       canChangePassword = false,
+      canManageBiometrics = false,
       permissions = [],
     } = body as {
       name?: string;
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
       canSelfApproveLeave?: boolean;
       canEditProfile?: boolean;
       canChangePassword?: boolean;
+      canManageBiometrics?: boolean;
       permissions?: string[];
     };
 
@@ -138,6 +141,7 @@ export async function POST(request: NextRequest) {
         canSelfApproveLeave: !!canSelfApproveLeave,
         canEditProfile: !!canEditProfile,
         canChangePassword: !!canChangePassword,
+        canManageBiometrics: !!canManageBiometrics,
         isSystem: false, // Never allow creating system roles via API
         permissions: {
           create: Array.from(new Set(permissions)).map((identifier) => ({
@@ -174,6 +178,7 @@ export async function POST(request: NextRequest) {
           canSelfApproveLeave: role.canSelfApproveLeave,
           canEditProfile: role.canEditProfile,
           canChangePassword: role.canChangePassword,
+          canManageBiometrics: role.canManageBiometrics,
           isSystem: role.isSystem,
           active: role.active,
           permissions: role.permissions
