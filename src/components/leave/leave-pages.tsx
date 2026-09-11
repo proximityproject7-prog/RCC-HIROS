@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import {
-  Plus, Search, Pencil, Trash2, ArrowLeft, Save, AlertTriangle,
-  CalendarClock, FileText, Eye, Download, X, Upload, Clock,
-  ThumbsUp, ThumbsDown, Undo2, FileUp, ToggleRight, ToggleLeft,
+  Plus, Search, Pencil, Trash2, Save, AlertTriangle,
+  FileText, Eye, X, Upload,
+  ThumbsUp, ThumbsDown, Undo2, ToggleRight, ToggleLeft,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
@@ -1248,11 +1248,3 @@ function Field({
     </div>
   );
 }
-
-// Suppress unused-import warnings
-void CalendarClock;
-void Clock;
-void Eye;
-void Download;
-void FileUp;
-void ArrowLeft;

@@ -55,8 +55,8 @@ export default function LoginPage() {
         const res = await fetch("/api/settings/biometrics");
         const data = await res.json();
         setBiometricsEnabled(data.enabled);
-      } catch {
-        // Biometrics unavailable
+      } catch (e) {
+        console.error("[Login] Biometrics check failed:", e);
       }
     }
     checkBiometrics();

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAnyPermission } from "@/lib/auth-token";
-import { randomUUID } from "crypto";
 import { mkdir, writeFile, unlink, readFile } from "fs/promises";
 import path from "path";
 
@@ -174,7 +173,7 @@ export async function DELETE(
       await db.employee.update({ where: { id }, data: { photo: null } });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[API /employees/[id]/photo DELETE] Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

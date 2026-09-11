@@ -30,7 +30,7 @@ export function DynamicSidebar() {
     }
   }
 
-  const profileActive = currentPage === "profiling" && (window as any).__navSubpage?.startsWith("view:") && (window as any).__navSubpage === `view:${user?.id}`;
+  const profileActive = currentPage === "profiling" && useAuthStore.getState().currentSubpage?.startsWith("view:") && useAuthStore.getState().currentSubpage === `view:${user?.id}`;
 
   return (
     <aside className={`${sidebarCollapsed ? "w-[68px]" : "w-[260px]"} bg-rcc-sidebar-bg flex flex-col shrink-0 transition-all duration-300`}>
@@ -51,7 +51,7 @@ export function DynamicSidebar() {
         )}
         {visibleModules.map((m) => {
           const Icon = ICONS[m.icon] || LayoutDashboard;
-          const active = currentPage === m.key && !(m.key === "profiling" && (useAuthStore.getState() as any).currentSubpage === "myprofile");
+          const active = currentPage === m.key && !(m.key === "profiling" && useAuthStore.getState().currentSubpage === "myprofile");
           return (
             <button key={m.key} onClick={() => handleClick(m)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors ${active ? "bg-rcc-accent/15 text-rcc-accent" : "text-rcc-primary-foreground/70 hover:bg-white/5 hover:text-rcc-primary-foreground"}`}
@@ -68,10 +68,10 @@ export function DynamicSidebar() {
             <div className="my-2 border-t border-white/10" />
             <button
               onClick={() => setCurrentPage("profiling", `myprofile`)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors ${currentPage === "profiling" && (useAuthStore.getState() as any).currentSubpage === "myprofile" ? "bg-rcc-accent/15 text-rcc-accent" : "text-rcc-primary-foreground/70 hover:bg-white/5 hover:text-rcc-primary-foreground"}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors ${currentPage === "profiling" && useAuthStore.getState().currentSubpage === "myprofile" ? "bg-rcc-accent/15 text-rcc-accent" : "text-rcc-primary-foreground/70 hover:bg-white/5 hover:text-rcc-primary-foreground"}`}
               title={sidebarCollapsed ? "My Profile" : undefined}
             >
-              <UserCircle className={`h-4 w-4 shrink-0 ${currentPage === "profiling" && (useAuthStore.getState() as any).currentSubpage === "myprofile" ? "text-rcc-accent" : ""}`} />
+              <UserCircle className={`h-4 w-4 shrink-0 ${currentPage === "profiling" && useAuthStore.getState().currentSubpage === "myprofile" ? "text-rcc-accent" : ""}`} />
               {!sidebarCollapsed && <span>My Profile</span>}
             </button>
           </>

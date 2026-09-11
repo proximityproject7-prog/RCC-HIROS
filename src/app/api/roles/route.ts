@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   requirePermission,
-  requireAuth,
 } from "@/lib/auth-token";
 import { PERMISSIONS } from "@/lib/permissions";
 
@@ -197,6 +196,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-// Suppress unused-import warning for requireAuth (kept for symmetry / future use)
-void requireAuth;

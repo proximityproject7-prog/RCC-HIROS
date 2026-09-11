@@ -846,7 +846,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const [pwdError, setPwdError] = useState<string | null>(null);
 
   // Profile data (LinkedIn-style)
-  const canFillProfile = employeeId === user?.id && (user as any)?.canEditProfile;
+  const canFillProfile = employeeId === user?.id && user?.canEditProfile;
   const [profileData, setProfileData] = useState<Record<string, any[]>>({});
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [sectionForm, setSectionForm] = useState<any[]>([]);
@@ -1955,6 +1955,3 @@ function SelectField({
     </div>
   );
 }
-
-// Suppress unused-import warnings
-void AlertTriangle;

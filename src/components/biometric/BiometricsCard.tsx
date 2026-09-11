@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api-client";
 import {
   startRegistration,
   type RegistrationResponseJSON,
+  type PublicKeyCredentialCreationOptionsJSON,
 } from "@simplewebauthn/browser";
 
 // ═══════════════════════════════════════════════════════════════
@@ -78,7 +79,7 @@ export function BiometricsCard({ employeeId }: BiometricsCardProps) {
 
       // Step 2: Trigger browser's WebAuthn API (Windows Hello)
       const registrationResponse = await startRegistration({
-        optionsJSON: optionsRes as any,
+        optionsJSON: optionsRes as PublicKeyCredentialCreationOptionsJSON,
       });
 
       // Step 3: Verify registration with server

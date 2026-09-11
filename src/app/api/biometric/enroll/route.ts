@@ -37,7 +37,7 @@ export async function DELETE(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ message: "Deleted successfully" });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[API /biometric/enroll DELETE] Error:", error);
     return NextResponse.json(

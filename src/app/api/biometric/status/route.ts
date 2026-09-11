@@ -33,6 +33,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[API /biometric/status] Error:", error);
-    return NextResponse.json({ enrolled: 0, templates: [] });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

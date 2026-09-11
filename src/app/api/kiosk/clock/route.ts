@@ -29,13 +29,13 @@ export async function POST(request: NextRequest) {
 
     // Verify employee exists and is active
     const employee = await db.employee.findFirst({
-      where: { id: employeeId, status: "ACTIVE" },
+      where: { id: employeeId, active: true },
       select: {
         id: true,
         employeeId: true,
         firstName: true,
         lastName: true,
-        photoPath: true,
+        photo: true,
       },
     });
 

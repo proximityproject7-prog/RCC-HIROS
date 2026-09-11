@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   requireAnyPermission,
-  requirePermission,
 } from "@/lib/auth-token";
 
 // ═══════════════════════════════════════════════════════════════
@@ -173,6 +172,3 @@ export async function POST(
     );
   }
 }
-
-// Suppress unused-import warning (requirePermission kept for future single-perm use)
-void requirePermission;

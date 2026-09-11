@@ -2,17 +2,12 @@
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore } from "@/store/auth-store";
-import { MODULES } from "@/lib/permissions";
 import { useEffect, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api-client";
 import {
   Users, ClipboardCheck, CalendarClock, BarChart3, ShieldCheck, Building2, LayoutDashboard,
   Clock, LogIn, LogOut, MapPin, Check, type LucideIcon,
 } from "lucide-react";
-
-const ICONS: Record<string, LucideIcon> = {
-  LayoutDashboard, Users, ClipboardCheck, CalendarClock, BarChart3, ShieldCheck, Building2,
-};
 
 interface Stats {
   roles?: number; groups?: number; employees?: number;
@@ -45,7 +40,9 @@ export function DynamicDashboard() {
           out.todayAttendance = (att.attendance ?? att.records ?? []).length;
         }
         setStats(out);
-      } catch {}
+      } catch (e) {
+        console.error("[Dashboard] Failed to load stats:", e);
+      }
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +125,9 @@ function TimeAttendanceWidget() {
       setToday((data.attendance ?? data.records ?? [])[0] ?? null);
       const p = await apiFetch<{ premises: PremisesInfo }>("/api/settings/premises");
       setPremises(p.premises);
-    } catch {}
+    } catch (e) {
+      console.error("[Dashboard] Failed to load today attendance:", e);
+    }
   }, []);
   useEffect(() => { loadToday(); }, [loadToday]);
 
