@@ -300,7 +300,7 @@ export function EvaluationFormsPage() {
         ev.evaluator?.name ?? "",
         ev.totalScore?.toFixed(2) ?? "",
         ev.submittedAt ? new Date(ev.submittedAt).toLocaleDateString() : "",
-        (ev.remarks ?? "").replace(/"/g, '""'),
+        (ev.remarks ?? "").replace(/"/g, '""').replace(/\r?\n/g, " "),
       ]);
 
       const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
@@ -675,6 +675,7 @@ export function SubmitEvaluationPage() {
   const [activeForm, setActiveForm] = useState<EvalForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [periodId, setPeriodId] = useState("");
@@ -825,6 +826,8 @@ export function SubmitEvaluationPage() {
         }),
       });
       setError(null);
+      setSuccess(status === "submitted" ? "Evaluation submitted successfully!" : "Draft saved successfully.");
+      setTimeout(() => setSuccess(null), 4000);
       // reset on success
       if (status === "submitted") {
         setEmployeeId("");
@@ -864,6 +867,10 @@ export function SubmitEvaluationPage() {
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
+      )}
+
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-700">{success}</div>
       )}
 
       {existingEval && (
@@ -1345,6 +1352,13 @@ function ResultsTable({ scope }: { scope: string }) {
 }
 
 function EvaluationDetailsModal({ evaluation, onClose }: { evaluation: Evaluation; onClose: () => void }) {
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-rcc-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">

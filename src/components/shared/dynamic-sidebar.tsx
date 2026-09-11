@@ -30,8 +30,6 @@ export function DynamicSidebar() {
     }
   }
 
-  const profileActive = currentPage === "profiling" && useAuthStore.getState().currentSubpage?.startsWith("view:") && useAuthStore.getState().currentSubpage === `view:${user?.id}`;
-
   return (
     <aside className={`${sidebarCollapsed ? "w-[68px]" : "w-[260px]"} bg-rcc-sidebar-bg flex flex-col shrink-0 transition-all duration-300`}>
       <div className="flex items-center gap-3 px-4 h-16 border-b border-white/10">

@@ -3,8 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   Search, Download, Users, Building2, TrendingUp, Calendar,
-  Clock, ChevronDown, ChevronRight, Check, X, Filter, Mail, Phone,
-  MapPin, Briefcase,
+  Clock, ChevronDown, ChevronRight, Check, X, Filter, Mail, Briefcase,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -24,7 +23,6 @@ interface GroupBrief { id: string; name: string; code: string; employeeCount?: n
 interface RoleBrief { id: string; name: string; }
 
 type ReportType = "all" | "headcount" | "attendance";
-type TimeOfDay = "all" | "morning" | "afternoon";
 
 interface UnifiedRow {
   employeeId: string;
@@ -198,7 +196,6 @@ export function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType | "">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | "">("");
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
   // ─── Additive filters ───
@@ -233,12 +230,17 @@ export function ReportsPage() {
     reportType !== "" &&
     dateFrom !== "" &&
     dateTo !== "" &&
-    timeOfDay !== "" &&
     selectedGroups.length > 0;
 
   // ─── Fetch & merge data when all required filters are filled ───
   const fetchReport = useCallback(async () => {
     if (!allRequiredFilled) {
+      setRows([]);
+      return;
+    }
+
+    if (dateFrom > dateTo) {
+      setError("Start date must be before or equal to end date.");
       setRows([]);
       return;
     }
@@ -363,7 +365,7 @@ export function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [allRequiredFilled, dateFrom, dateTo, timeOfDay, selectedGroups, selectedRole, groups]);
+  }, [allRequiredFilled, dateFrom, dateTo, selectedGroups, selectedRole, groups]);
 
   useEffect(() => {
     fetchReport();
@@ -489,23 +491,6 @@ export function ReportsPage() {
               onChange={(e) => setDateTo(e.target.value)}
               className={inputClass}
             />
-          </div>
-
-          {/* Time of Day */}
-          <div>
-            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">
-              Time <span className="text-rcc-error">*</span>
-            </label>
-            <select
-              value={timeOfDay}
-              onChange={(e) => setTimeOfDay(e.target.value as TimeOfDay | "")}
-              className={inputClass}
-            >
-              <option value="">Select time...</option>
-              <option value="all">All Day</option>
-              <option value="morning">Morning (6AM – 12PM)</option>
-              <option value="afternoon">Afternoon (12PM – 6PM)</option>
-            </select>
           </div>
 
           {/* Groups (multi-select) */}

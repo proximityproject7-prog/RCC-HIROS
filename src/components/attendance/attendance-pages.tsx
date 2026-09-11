@@ -428,6 +428,13 @@ function EditAttendanceModal({
   const [remarks, setRemarks] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   const emp = record.employee;
   const empName = emp ? `${emp.firstName} ${emp.lastName}` : "";
 
@@ -435,6 +442,20 @@ function EditAttendanceModal({
     if (!remarks.trim()) {
       onError("Edit remarks are required.");
       return;
+    }
+    if (canEditTime) {
+      if (clockIn && isNaN(new Date(clockIn).getTime())) {
+        onError("Invalid clock-in time.");
+        return;
+      }
+      if (clockOut && isNaN(new Date(clockOut).getTime())) {
+        onError("Invalid clock-out time.");
+        return;
+      }
+      if (clockIn && clockOut && new Date(clockOut) < new Date(clockIn)) {
+        onError("Clock-out time must be after clock-in time.");
+        return;
+      }
     }
     setSaving(true);
     try {

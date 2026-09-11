@@ -13,7 +13,7 @@ interface Stats {
   roles?: number; groups?: number; employees?: number;
   pendingL1?: number; pendingL2?: number; myLeaveRequests?: number;
   myEvaluations?: number; pendingEvaluations?: number;
-  todayAttendance?: number; offPremiseCount?: number;
+  todayAttendance?: number;
 }
 
 export function DynamicDashboard() {
@@ -23,28 +23,39 @@ export function DynamicDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
-    async function load() {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+
+    const fetchIf = async (condition: boolean, fn: () => Promise<number | undefined>): Promise<[number, undefined] | null> => {
+      if (!condition) return null;
+      try { const val = await fn(); return val !== undefined ? [val, undefined] : null; } catch { return null; }
+    };
+
+    (async () => {
+      const results = await Promise.allSettled([
+        fetchIf(has("roles.view"), async () => (await apiFetch<{ roles: unknown[] }>("/api/roles")).roles.length),
+        fetchIf(has("groups.view"), async () => (await apiFetch<{ groups: unknown[] }>("/api/groups")).groups.length),
+        fetchIf(has("profiling.view"), async () => (await apiFetch<{ employees: unknown[] }>("/api/employees")).employees.length),
+        fetchIf(has("leave.approve_l1"), async () => (await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=pending_l1")).requests.length),
+        fetchIf(has("leave.approve_l2"), async () => (await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=pending_l2")).requests.length),
+        fetchIf(has("leave.request"), async () => (await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=mine")).requests.length),
+        fetchIf(has("evaluation.view_results"), async () => (await apiFetch<{ evaluations: unknown[] }>("/api/evaluations?scope=for_me")).evaluations.length),
+        fetchIf(has("evaluation.submit"), async () => (await apiFetch<{ evaluations: unknown[] }>("/api/evaluations?scope=submitted_by_me")).evaluations.length),
+        fetchIf(has("attendance.view"), async () => {
+          const att = await apiFetch<{ attendance?: unknown[]; records?: unknown[] }>(`/api/attendance?scope=all&date=${todayStr}`);
+          return (att.attendance ?? att.records ?? []).length;
+        }),
+      ]);
+
       const out: Stats = {};
-      try {
-        if (has("roles.view")) { const r = await apiFetch<{ roles: unknown[] }>("/api/roles"); out.roles = r.roles.length; }
-        if (has("groups.view")) { const g = await apiFetch<{ groups: unknown[] }>("/api/groups"); out.groups = g.groups.length; }
-        if (has("profiling.view")) { const e = await apiFetch<{ employees: unknown[] }>("/api/employees"); out.employees = e.employees.length; }
-        if (has("leave.approve_l1")) { const l1 = await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=pending_l1"); out.pendingL1 = l1.requests.length; }
-        if (has("leave.approve_l2")) { const l2 = await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=pending_l2"); out.pendingL2 = l2.requests.length; }
-        if (has("leave.request")) { const mine = await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=mine"); out.myLeaveRequests = mine.requests.length; }
-        if (has("evaluation.view_results")) { const ev = await apiFetch<{ evaluations: unknown[] }>("/api/evaluations?scope=for_me"); out.myEvaluations = ev.evaluations.length; }
-        if (has("evaluation.submit")) { const pe = await apiFetch<{ evaluations: unknown[] }>("/api/evaluations?scope=submitted_by_me"); out.pendingEvaluations = pe.evaluations.length; }
-        if (has("attendance.view")) {
-          const d = new Date(); const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-          const att = await apiFetch<{ attendance?: unknown[]; records?: unknown[] }>(`/api/attendance?scope=all&date=${today}`);
-          out.todayAttendance = (att.attendance ?? att.records ?? []).length;
+      const keys: (keyof Stats)[] = ["roles", "groups", "employees", "pendingL1", "pendingL2", "myLeaveRequests", "myEvaluations", "pendingEvaluations", "todayAttendance"];
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled" && r.value && r.value[1] === undefined) {
+          out[keys[i]] = r.value[0];
         }
-        setStats(out);
-      } catch (e) {
-        console.error("[Dashboard] Failed to load stats:", e);
-      }
-    }
-    load();
+      });
+      setStats(out);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -81,7 +92,16 @@ export function DynamicDashboard() {
 
       {has("attendance.clock_in") && <TimeAttendanceWidget />}
 
-      {widgets.length > 0 && (
+      {stats === null ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1,2,3,4].map((i) => (
+            <div key={i} className="rounded-lg border border-rcc-border bg-rcc-surface p-5 animate-pulse">
+              <div className="h-3 bg-rcc-bg rounded w-24 mb-3" />
+              <div className="h-8 bg-rcc-bg rounded w-16" />
+            </div>
+          ))}
+        </div>
+      ) : widgets.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {widgets.map((w, i) => <WidgetCard key={i} {...w} />)}
         </div>

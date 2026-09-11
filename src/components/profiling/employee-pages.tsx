@@ -117,11 +117,18 @@ export function EmployeeListPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [groupId, setGroupId] = useState("");
   const [roleId, setRoleId] = useState("");
   const [contractType, setContractType] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [fpassFilter, setFpassFilter] = useState("");
+
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Load groups & roles once for filters
   useEffect(() => {
@@ -144,7 +151,7 @@ export function EmployeeListPage() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (groupId) params.set("groupId", groupId);
       if (roleId) params.set("roleId", roleId);
       if (contractType) params.set("contractType", contractType);
@@ -160,7 +167,7 @@ export function EmployeeListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, groupId, roleId, contractType, activeFilter, fpassFilter]);
+  }, [debouncedSearch, groupId, roleId, contractType, activeFilter, fpassFilter]);
 
   useEffect(() => {
     loadEmployees();
@@ -1827,10 +1834,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       )}
     </div>
   );
-}
-
-function Building2Icon({ className }: { className?: string }) {
-  return <Briefcase className={className} />;
 }
 
 function InfoItem({

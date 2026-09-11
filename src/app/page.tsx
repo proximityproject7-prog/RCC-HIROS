@@ -8,7 +8,7 @@ import AppLayout from "@/components/shared/app-layout";
 import { PermissionGuard } from "@/components/shared/permission-guard";
 import { PermissionDenied } from "@/components/shared/permission-denied";
 import { DynamicDashboard } from "@/components/shared/dashboard";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Component, type ReactNode } from "react";
 
 import { EmployeeListPage, EmployeeFormPage, EmployeeProfilePage } from "@/components/profiling/employee-pages";
 import { AttendanceListPage, PremisesSettingsPage } from "@/components/attendance/attendance-pages";
@@ -18,6 +18,31 @@ import { ReportsPage } from "@/components/reports/report-pages";
 import { RoleListPage, RoleFormPage } from "@/components/admin/role-pages";
 import { GroupListPage, GroupFormPage } from "@/components/admin/group-pages";
 import { FpassPage } from "@/components/fpass/fpass-pages";
+
+// ═══════════════════════════════════════════════════════════════
+// Error Boundary — catches render errors in page components
+// ═══════════════════════════════════════════════════════════════
+interface ErrorBoundaryState { hasError: boolean; error: Error | null; }
+class PageErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="text-4xl">⚠️</div>
+          <h2 className="text-lg font-bold text-rcc-text-primary">Something went wrong</h2>
+          <p className="text-sm text-rcc-text-muted max-w-md text-center">{this.state.error?.message ?? "An unexpected error occurred."}</p>
+          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+            className="mt-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90">
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function HomePage() {
   const { user, isAuthenticated, isLoading, mustChangePassword } = useAuth();
@@ -116,5 +141,5 @@ export default function HomePage() {
     default: content = <DynamicDashboard />;
   }
 
-  return <AppLayout>{content}</AppLayout>;
+  return <AppLayout><PageErrorBoundary>{content}</PageErrorBoundary></AppLayout>;
 }
