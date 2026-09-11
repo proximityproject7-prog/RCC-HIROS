@@ -136,13 +136,14 @@ export function MyLeavePage() {
     }
   }, []);
 
-  const loadRequests = useCallback(async () => {
+  const loadRequests = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=mine");
+      const data = await apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=mine", { signal });
       setRequests(data.requests ?? []);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load leave requests.");
     } finally {
       setLoading(false);
@@ -150,8 +151,10 @@ export function MyLeavePage() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     loadLeaveTypes();
-    loadRequests();
+    loadRequests(controller.signal);
+    return () => controller.abort();
   }, [loadLeaveTypes, loadRequests]);
 
   const { currentData, controls } = usePagination(requests, { defaultPageSize: 10 });
@@ -501,27 +504,28 @@ export function LeaveApprovalPage() {
   const [remarks, setRemarks] = useState("");
   const [acting, setActing] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
       const tasks: Promise<void>[] = [];
       if (canL1) {
         tasks.push(
-          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l1")
-            .then((d) => setL1Reqs(d.requests ?? []))
-            .catch(() => setL1Reqs([]))
+          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l1", { signal })
+            .then((d) => { if (!signal?.aborted) setL1Reqs(d.requests ?? []); })
+            .catch(() => { if (!signal?.aborted) setL1Reqs([]); })
         );
       }
       if (canL2) {
         tasks.push(
-          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l2")
-            .then((d) => setL2Reqs(d.requests ?? []))
-            .catch(() => setL2Reqs([]))
+          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l2", { signal })
+            .then((d) => { if (!signal?.aborted) setL2Reqs(d.requests ?? []); })
+            .catch(() => { if (!signal?.aborted) setL2Reqs([]); })
         );
       }
       await Promise.all(tasks);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load requests.");
     } finally {
       setLoading(false);
@@ -529,7 +533,9 @@ export function LeaveApprovalPage() {
   }, [canL1, canL2]);
 
   useEffect(() => {
-    load();
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
   }, [load]);
 
   const handleAction = async () => {
@@ -568,6 +574,10 @@ export function LeaveApprovalPage() {
 
   const list = tab === "l1" ? l1Reqs : l2Reqs;
   const level: 1 | 2 = tab === "l1" ? 1 : 2;
+
+  const l1Pagination = usePagination(l1Reqs, { defaultPageSize: 10 });
+  const l2Pagination = usePagination(l2Reqs, { defaultPageSize: 10 });
+  const activePagination = tab === "l1" ? l1Pagination : l2Pagination;
 
   return (
     <div className="space-y-4">
@@ -617,7 +627,7 @@ export function LeaveApprovalPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {list.map((req) => (
+          {activePagination.currentData.map((req) => (
             <RequestCard
               key={req.id}
               req={req}
@@ -631,6 +641,8 @@ export function LeaveApprovalPage() {
           ))}
         </div>
       )}
+
+      <PaginationControls {...activePagination.controls} />
 
       {/* Action Modal */}
       {actionTarget && (

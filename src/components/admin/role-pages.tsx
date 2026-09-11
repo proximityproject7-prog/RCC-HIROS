@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } from "react";
 import {
   Plus, Search, Pencil, ArrowLeft, Save, ShieldCheck,
   Users as UsersIcon, Lock, Unlock, Globe, BadgeCheck,
@@ -9,6 +9,7 @@ import {
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   usePagination,
@@ -499,6 +500,22 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Dirty detection
+  const snapshotRef = useRef<Record<string, unknown>>({});
+  const isDirty = useMemo(() => {
+    const current: Record<string, unknown> = {
+      name, description, scopeAllProfiling, scopeAllEvaluation, scopeAllLeave,
+      scopeAllReports, scopeAllAttendance, scopeGroupAttendance, canSelfApproveLeave,
+      canEditProfile, canChangePassword, canManageBiometrics, active,
+      perms: Array.from(perms),
+    };
+    return JSON.stringify(current) !== JSON.stringify(snapshotRef.current);
+  }, [name, description, scopeAllProfiling, scopeAllEvaluation, scopeAllLeave, scopeAllReports,
+    scopeAllAttendance, scopeGroupAttendance, canSelfApproveLeave, canEditProfile,
+    canChangePassword, canManageBiometrics, active, perms]);
+  useUnsavedChanges(isDirty);
+  const confirmNavigation = useNavigationGuard(isDirty);
+
   // System configuration state (for config panel at bottom)
   const [cfgGroups, setCfgGroups] = useState<{ id: string; name: string; code: string }[]>([]);
   const [cfgFpassIds, setCfgFpassIds] = useState<string[]>([]);
@@ -527,6 +544,15 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
         setActive(r.active);
         setIsSystem(r.isSystem);
         setPerms(new Set(r.permissions));
+        snapshotRef.current = {
+          name: r.name, description: r.description ?? "",
+          scopeAllProfiling: r.scopeAllProfiling, scopeAllEvaluation: r.scopeAllEvaluation,
+          scopeAllLeave: r.scopeAllLeave, scopeAllReports: r.scopeAllReports,
+          scopeAllAttendance: r.scopeAllAttendance, scopeGroupAttendance: r.scopeGroupAttendance,
+          canSelfApproveLeave: r.canSelfApproveLeave, canEditProfile: r.canEditProfile,
+          canChangePassword: r.canChangePassword, canManageBiometrics: r.canManageBiometrics,
+          active: r.active, perms: r.permissions,
+        };
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load role.");
       } finally {
@@ -626,7 +652,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setCurrentPage("roles")}
+          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("roles"); }}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -840,7 +866,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
       {/* Footer */}
       <div className="flex justify-end gap-2 pt-2">
         <button
-          onClick={() => setCurrentPage("roles")}
+          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("roles"); }}
           disabled={saving}
           className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
         >

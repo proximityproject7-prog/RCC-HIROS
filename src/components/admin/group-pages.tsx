@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } from "react";
 import {
   Plus, Search, Pencil, ArrowLeft, Save, Building2,
   Users as UsersIcon, ToggleLeft, ToggleRight,
@@ -8,6 +8,11 @@ import {
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
+import {
+  usePagination,
+  PaginationControls,
+} from "@/components/shared/table-pagination-v2";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 // ═══════════════════════════════════════════════════════════════
@@ -73,6 +78,8 @@ export function GroupListPage() {
         (g.description ?? "").toLowerCase().includes(q)
     );
   }, [groups, search]);
+
+  const { currentData, controls } = usePagination(filtered, { defaultPageSize: 12 });
 
   const handleToggleActive = async (group?: Group) => {
     const target = group ?? toggleTarget;
@@ -148,7 +155,7 @@ export function GroupListPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((group) => (
+          {currentData.map((group) => (
             <div
               key={group.id}
               className="bg-rcc-surface rounded-lg border border-rcc-border p-5 hover:border-rcc-accent/40 hover:shadow-md transition-all flex flex-col"
@@ -235,6 +242,8 @@ export function GroupListPage() {
         </div>
       )}
 
+      <PaginationControls {...controls} />
+
       {/* Enable/Disable confirmation modal */}
       <ConfirmDialog
         open={confirmState?.open ?? false}
@@ -263,6 +272,15 @@ export function GroupFormPage({ mode, groupId }: { mode: "create" | "edit"; grou
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Dirty detection
+  const snapshotRef = useRef<Record<string, unknown>>({});
+  const isDirty = useMemo(() => {
+    const current: Record<string, unknown> = { name, code, description, active };
+    return JSON.stringify(current) !== JSON.stringify(snapshotRef.current);
+  }, [name, code, description, active]);
+  useUnsavedChanges(isDirty);
+  const confirmNavigation = useNavigationGuard(isDirty);
+
   useEffect(() => {
     if (mode !== "edit" || !groupId) return;
     let cancelled = false;
@@ -276,6 +294,7 @@ export function GroupFormPage({ mode, groupId }: { mode: "create" | "edit"; grou
         setCode(g.code);
         setDescription(g.description ?? "");
         setActive(g.active);
+        snapshotRef.current = { name: g.name, code: g.code, description: g.description ?? "", active: g.active };
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load group.");
       } finally {
@@ -331,7 +350,7 @@ export function GroupFormPage({ mode, groupId }: { mode: "create" | "edit"; grou
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setCurrentPage("groups")}
+          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("groups"); }}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -408,7 +427,7 @@ export function GroupFormPage({ mode, groupId }: { mode: "create" | "edit"; grou
       {/* Footer */}
       <div className="flex justify-end gap-2 pt-2">
         <button
-          onClick={() => setCurrentPage("groups")}
+          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("groups"); }}
           disabled={saving}
           className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
         >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
   FileText, Settings, Users, CheckCircle2, X, Search,
@@ -8,6 +8,11 @@ import {
 import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore } from "@/store/auth-store";
+import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
+import {
+  usePagination,
+  PaginationControls,
+} from "@/components/shared/table-pagination-v2";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -206,16 +211,19 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
   const { setCurrentPage } = useAuthStore();
 
   useEffect(() => {
+    const controller = new AbortController();
     (async () => {
       try {
-        const data = await apiFetch<{ employees: FpassStatusEmployee[] }>("/api/fpass/status");
+        const data = await apiFetch<{ employees: FpassStatusEmployee[] }>("/api/fpass/status", { signal: controller.signal });
         setEmployees(data.employees ?? []);
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         // non-fatal
       } finally {
         setLoading(false);
       }
     })();
+    return () => controller.abort();
   }, []);
 
   const groups = useMemo(() => {
@@ -236,6 +244,8 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
       return true;
     });
   }, [employees, search, statusFilter, groupFilter]);
+
+  const { currentData, controls } = usePagination(filtered, { defaultPageSize: 15 });
 
   const submittedCount = employees.filter((e) => e.hasSubmission).length;
   const emptyCount = employees.length - submittedCount;
@@ -328,7 +338,7 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">No employees found.</td></tr>
               ) : (
-                filtered.map((e) => (
+                currentData.map((e) => (
                   <tr
                     key={e.employeeId}
                     onClick={() => e.hasSubmission && e.submission && setCurrentPage("fpass", `view:${e.submission.id}`)}
@@ -361,6 +371,8 @@ function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canM
           </table>
         </div>
       </div>
+
+      <PaginationControls {...controls} />
     </div>
   );
 }
@@ -456,20 +468,33 @@ function FpassFormPage({
   const [existingId, setExistingId] = useState<string | null>(submissionId ?? null);
   const [schoolYear, setSchoolYear] = useState(new Date().getFullYear() + "-" + (new Date().getFullYear() + 1));
 
+  // Dirty detection
+  const snapshotRef = useRef({ formData: JSON.stringify(DEFAULT_FORM_DATA), schoolYear: "" });
+  const isDirty = useMemo(() => {
+    return JSON.stringify(formData) !== snapshotRef.current.formData || schoolYear !== snapshotRef.current.schoolYear;
+  }, [formData, schoolYear]);
+  useUnsavedChanges(isDirty && !readOnly);
+  const confirmNavigation = useNavigationGuard(isDirty && !readOnly);
+
   // Load employee data
   useEffect(() => {
     (async () => {
       try {
         const data = await apiFetch<{ employee: EmployeeBrief }>(`/api/employees/${employeeId}`);
         setEmployee(data.employee);
-        setFormData((prev) => ({
-          ...prev,
-          header: {
-            ...prev.header,
-            name: `${data.employee.firstName} ${data.employee.middleName ? data.employee.middleName + " " : ""}${data.employee.lastName}`,
-            department: data.employee.groupName ?? "",
-          },
-        }));
+        setFormData((prev) => {
+          const updated = {
+            ...prev,
+            header: {
+              ...prev.header,
+              name: `${data.employee.firstName} ${data.employee.middleName ? data.employee.middleName + " " : ""}${data.employee.lastName}`,
+              department: data.employee.groupName ?? "",
+            },
+          };
+          // Update snapshot after initial employee data load so auto-filled fields aren't "dirty"
+          snapshotRef.current = { formData: JSON.stringify(updated), schoolYear: snapshotRef.current.schoolYear };
+          return updated;
+        });
       } catch {
         setError("Failed to load employee data.");
       } finally {
@@ -488,6 +513,7 @@ function FpassFormPage({
         setFormData(parsed);
         setSchoolYear(data.submission.schoolYear);
         setExistingId(data.submission.id);
+        snapshotRef.current = { formData: JSON.stringify(parsed), schoolYear: data.submission.schoolYear };
       } catch {
         // non-fatal
       }
@@ -498,6 +524,37 @@ function FpassFormPage({
     setSaving(true);
     setError(null);
     setSuccess(null);
+
+    // Validation
+    if (!formData.header.name.trim()) {
+      setError("Name is required.");
+      setSaving(false);
+      return;
+    }
+    if (!schoolYear || !/^\d{4}-\d{4}$/.test(schoolYear)) {
+      setError("School year is required (e.g., 2025-2026).");
+      setSaving(false);
+      return;
+    }
+    if (formData.criteria1.studentEvaluation === 0) {
+      setError("Select a student evaluation rating.");
+      setSaving(false);
+      return;
+    }
+    if (formData.criteria1.classroomPerformance === 0) {
+      setError("Select a classroom performance rating.");
+      setSaving(false);
+      return;
+    }
+
+    // Grand total check
+    const total = calculateTotal(formData);
+    if (total > 100) {
+      setError("Total score exceeds maximum (100).");
+      setSaving(false);
+      return;
+    }
+
     try {
       const payload = {
         employeeId,
@@ -519,6 +576,7 @@ function FpassFormPage({
         setExistingId(result.submission.id);
       }
       setSuccess("FPASS form saved successfully.");
+      snapshotRef.current = { formData: JSON.stringify(formData), schoolYear };
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
@@ -600,7 +658,7 @@ function FpassFormPage({
 
       {/* Header */}
       <div>
-        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
+        <button onClick={() => { if (!confirmNavigation()) return; onBack(); }} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
           <ArrowLeft className="h-4 w-4" /> Back to FPASS
         </button>
         <div className="flex items-center justify-between">
@@ -1083,6 +1141,14 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Dirty detection
+  const snapshotRef = useRef<string>("[]");
+  const isDirty = useMemo(() => {
+    return JSON.stringify(Array.from(enabledIds).sort()) !== snapshotRef.current;
+  }, [enabledIds]);
+  useUnsavedChanges(isDirty);
+  const confirmNavigation = useNavigationGuard(isDirty);
+
   useEffect(() => {
     (async () => {
       try {
@@ -1092,6 +1158,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
         ]);
         setGroups(groupsData.groups ?? []);
         setEnabledIds(new Set(settingsData.enabledGroupIds ?? []));
+        snapshotRef.current = JSON.stringify((settingsData.enabledGroupIds ?? []).sort());
       } catch {
         setError("Failed to load settings.");
       } finally {
@@ -1148,6 +1215,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ enabledGroupIds: Array.from(enabledIds) }),
       });
       setSuccess("Settings saved successfully.");
+      snapshotRef.current = JSON.stringify(Array.from(enabledIds).sort());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
@@ -1176,7 +1244,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
       )}
 
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
+        <button onClick={() => { if (!confirmNavigation()) return; onBack(); }} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div>
@@ -1437,6 +1505,7 @@ function DynamicTable({
                         type={col.type === "number" ? "number" : "text"}
                         value={String(row[col.key] ?? "")}
                         onChange={(e) => onUpdate(row.id, col.key, col.type === "number" ? parseFloat(e.target.value) || 0 : e.target.value)}
+                        min={col.type === "number" ? "0" : undefined}
                         className="w-full px-2 py-1 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-1 focus:ring-rcc-accent/40"
                         readOnly={readOnly}
                       />

@@ -110,6 +110,7 @@ export function AttendanceListPage() {
   const [groupId, setGroupId] = useState("");
   const [roleId, setRoleId] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [search, setSearch] = useState("");
 
   const [editing, setEditing] = useState<AttendanceRecord | null>(null);
 
@@ -133,7 +134,7 @@ export function AttendanceListPage() {
     })();
   }, []);
 
-  const loadRecords = useCallback(async () => {
+  const loadRecords = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
@@ -143,17 +144,21 @@ export function AttendanceListPage() {
       if (groupId) params.set("groupId", groupId);
       if (roleId) params.set("roleId", roleId);
       if (status !== "all") params.set("status", status);
-      const data = await apiFetch<{ attendance: AttendanceRecord[] }>(`/api/attendance?${params.toString()}`);
+      if (search.trim()) params.set("search", search.trim());
+      const data = await apiFetch<{ attendance: AttendanceRecord[] }>(`/api/attendance?${params.toString()}`, { signal });
       setRecords(data.attendance ?? []);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load attendance.");
     } finally {
       setLoading(false);
     }
-  }, [canSeeOthers, date, groupId, roleId, status]);
+  }, [canSeeOthers, date, groupId, roleId, status, search]);
 
   useEffect(() => {
-    loadRecords();
+    const controller = new AbortController();
+    loadRecords(controller.signal);
+    return () => controller.abort();
   }, [loadRecords]);
 
   const { currentData, controls } = usePagination(records, { defaultPageSize: 15 });
@@ -184,7 +189,17 @@ export function AttendanceListPage() {
 
       {/* Filters */}
       <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Search</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or employee ID..."
+              className={inputClass}
+            />
+          </div>
           <div>
             <label className="block text-xs font-semibold text-rcc-text-secondary mb-1.5">Date</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />

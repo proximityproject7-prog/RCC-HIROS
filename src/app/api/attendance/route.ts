@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") || undefined;
     const employeeId = searchParams.get("employeeId") || undefined;
     const scope = searchParams.get("scope") || "mine";
+    const search = searchParams.get("search") || undefined;
 
     // Determine effective scope: "all" requires attendance.view_all or scopeAllAttendance
     let effectiveScope: "mine" | "all" = "mine";
@@ -135,6 +136,19 @@ export async function GET(request: NextRequest) {
       where.employee = { ...empFilter, role: { isSystem: false } };
     }
 
+    // Text search on employee name or employeeId
+    if (search) {
+      const empFilter = (where.employee as Record<string, unknown>) || {};
+      where.employee = {
+        ...empFilter,
+        OR: [
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { employeeId: { contains: search, mode: "insensitive" } },
+        ],
+      };
+    }
+
     let records = await db.attendance.findMany({
       where,
       include: {
@@ -181,6 +195,15 @@ export async function GET(request: NextRequest) {
       if (groupId && canViewAllAttendance) empWhere.groupId = groupId;
       if (roleId) empWhere.roleId = roleId;
       if (employeeId) empWhere.id = employeeId;
+
+      // Text search on employee name or employeeId
+      if (search) {
+        empWhere.OR = [
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { employeeId: { contains: search, mode: "insensitive" } },
+        ];
+      }
 
       // Hide system admin from no_clock_in list for non-system-admin users
       if (!user.isSystem) {

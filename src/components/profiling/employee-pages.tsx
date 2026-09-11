@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
 import {
   Plus, Search, Pencil, ArrowLeft, Save, Users as UsersIcon, Upload,
   FileText, Download, Trash2, Eye, X, Lock, Mail, Phone, MapPin, Calendar,
@@ -146,7 +147,7 @@ export function EmployeeListPage() {
     })();
   }, []);
 
-  const loadEmployees = useCallback(async () => {
+  const loadEmployees = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
@@ -159,10 +160,12 @@ export function EmployeeListPage() {
       if (fpassFilter) params.set("fpassStatus", fpassFilter);
       const qs = params.toString();
       const data = await apiFetch<{ employees: Employee[] }>(
-        `/api/employees${qs ? `?${qs}` : ""}`
+        `/api/employees${qs ? `?${qs}` : ""}`,
+        { signal }
       );
       setEmployees(data.employees ?? []);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load employees.");
     } finally {
       setLoading(false);
@@ -170,7 +173,9 @@ export function EmployeeListPage() {
   }, [debouncedSearch, groupId, roleId, contractType, activeFilter, fpassFilter]);
 
   useEffect(() => {
-    loadEmployees();
+    const controller = new AbortController();
+    loadEmployees(controller.signal);
+    return () => controller.abort();
   }, [loadEmployees]);
 
   const { currentData, controls } = usePagination(employees, { defaultPageSize: 15 });
@@ -379,6 +384,18 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
   const [password, setPassword] = useState("");
   const [mustChangePwd, setMustChangePwd] = useState(true);
 
+  // Dirty detection
+  const snapshotRef = useRef<Record<string, string | boolean>>({});
+  const isDirty = useMemo(() => {
+    const current: Record<string, string | boolean> = {
+      employeeIdField, firstName, middleName, lastName, email, phone, address,
+      birthday, gender, groupId, roleId, contractType, hireDate, salary, active,
+    };
+    return JSON.stringify(current) !== JSON.stringify(snapshotRef.current);
+  }, [employeeIdField, firstName, middleName, lastName, email, phone, address, birthday, gender, groupId, roleId, contractType, hireDate, salary, active]);
+  useUnsavedChanges(isDirty);
+  const confirmNavigation = useNavigationGuard(isDirty);
+
   useEffect(() => {
     (async () => {
       try {
@@ -418,6 +435,15 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
         setHireDate(e.hireDate ? e.hireDate.slice(0, 10) : "");
         setSalary(e.salary != null ? String(e.salary) : "");
         setActive(e.active);
+        snapshotRef.current = {
+          employeeIdField: e.employeeId, firstName: e.firstName, middleName: e.middleName ?? "",
+          lastName: e.lastName, email: e.email, phone: e.phone ?? "", address: e.address ?? "",
+          birthday: e.birthday ? e.birthday.slice(0, 10) : "", gender: e.gender ?? "",
+          groupId: e.groupId ?? "", roleId: e.roleId ?? "",
+          contractType: e.contractType ?? "Regular",
+          hireDate: e.hireDate ? e.hireDate.slice(0, 10) : "",
+          salary: e.salary != null ? String(e.salary) : "", active: e.active,
+        };
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load employee.");
       } finally {
@@ -488,7 +514,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setCurrentPage("profiling")}
+          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("profiling"); }}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -658,7 +684,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
 
       <div className="flex justify-end gap-2 pt-2">
         <button
-          onClick={() => setCurrentPage("profiling")}
+          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("profiling"); }}
           disabled={saving}
           className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
         >
@@ -841,6 +867,12 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     contractType: "Regular", hireDate: "", salary: "",
     groupId: "", roleId: "", active: true,
   });
+  const editSnapshotRef = useRef<string>("");
+  const isInlineDirty = useMemo(() => {
+    if (!editing) return false;
+    return JSON.stringify(editFormData) !== editSnapshotRef.current;
+  }, [editing, editFormData]);
+  const confirmInlineNavigation = useNavigationGuard(isInlineDirty);
   const [editFormGroups, setEditFormGroups] = useState<GroupBrief[]>([]);
   const [editFormRoles, setEditFormRoles] = useState<RoleBrief[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
@@ -857,6 +889,12 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const [profileData, setProfileData] = useState<Record<string, any[]>>({});
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [sectionForm, setSectionForm] = useState<any[]>([]);
+  const sectionSnapshotRef = useRef<string>("[]");
+  const isSectionDirty = useMemo(() => {
+    if (editingSection === null) return false;
+    return JSON.stringify(sectionForm) !== sectionSnapshotRef.current;
+  }, [editingSection, sectionForm]);
+  const confirmSectionNavigation = useNavigationGuard(isSectionDirty);
   const [sectionSaving, setSectionSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
 
@@ -1089,6 +1127,22 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       setEditFormRoles(rolesData.roles ?? []);
     } catch { /* non-fatal — dropdowns will be empty */ }
     setEditing(true);
+    // Set dirty snapshot after populating form
+    setTimeout(() => {
+      editSnapshotRef.current = JSON.stringify({
+        employeeId: employee.employeeId, firstName: employee.firstName, middleName: employee.middleName ?? "",
+        lastName: employee.lastName, email: employee.email, phone: employee.phone ?? "", address: employee.address ?? "",
+        birthday: employee.birthday ? employee.birthday.slice(0, 10) : "", gender: employee.gender ?? "",
+        placeOfBirth: employee.placeOfBirth ?? "", rank: employee.rank ?? "",
+        civilStatus: employee.civilStatus ?? "", citizenship: employee.citizenship ?? "",
+        religion: employee.religion ?? "", height: employee.height ?? "",
+        weight: employee.weight ?? "", bloodType: employee.bloodType ?? "",
+        contractType: employee.contractType ?? "Regular",
+        hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
+        salary: employee.salary != null ? String(employee.salary) : "",
+        groupId: employee.groupId ?? "", roleId: employee.roleId ?? "", active: employee.active,
+      });
+    }, 0);
   };
 
   const cancelEditing = () => {
@@ -1276,7 +1330,9 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
   const startEditSection = (key: string) => {
     setEditingSection(key);
-    setSectionForm([...(profileData[key] || [])]);
+    const rows = [...(profileData[key] || [])];
+    setSectionForm(rows);
+    sectionSnapshotRef.current = JSON.stringify(rows);
   };
 
   const addSectionRow = (key: string) => {
@@ -1412,7 +1468,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         canEdit={canEditProfile}
         editing={editing}
         onEdit={startEditing}
-        onCancel={cancelEditing}
+        onCancel={() => { if (!confirmInlineNavigation()) return; cancelEditing(); }}
         onSave={saveEditing}
         saving={editSaving}
         editError={editError}
@@ -1531,7 +1587,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           editing={editingSection === key}
           canEdit={canEditProfile}
           onEdit={() => startEditSection(key)}
-          onCancel={() => setEditingSection(null)}
+          onCancel={() => { if (!confirmSectionNavigation()) return; setEditingSection(null); }}
           onSave={() => saveSection(key)}
           saving={sectionSaving}
           onAdd={() => addSectionRow(key)}
@@ -1547,7 +1603,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         canEdit={canEditProfile}
         editing={editingSection === "awards"}
         onEdit={() => startEditSection("awards")}
-        onCancel={() => setEditingSection(null)}
+        onCancel={() => { if (!confirmSectionNavigation()) return; setEditingSection(null); }}
         onSave={() => saveSection("awards")}
         saving={sectionSaving}
         noPadding

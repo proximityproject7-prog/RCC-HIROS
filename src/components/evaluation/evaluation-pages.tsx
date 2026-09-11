@@ -70,7 +70,7 @@ interface Evaluation {
   evaluator: { id: string; name: string } | null;
   employeeId: string;
   employee: { id: string; name: string; employeeId: string; groupId: string | null; group: { name: string } | null; role: { name: string } | null } | null;
-  status: "draft" | "submitted" | "acknowledged";
+  status: "draft" | "submitted";
   totalScore: number | null;
   remarks: string | null;
   submittedAt: string | null;
@@ -1310,7 +1310,6 @@ function ResultsTable({ scope }: { scope: string }) {
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${
                         ev.status === "submitted" ? "bg-green-50 text-green-700 border-green-200"
-                        : ev.status === "acknowledged" ? "bg-rcc-accent/10 text-rcc-accent border-rcc-accent/20"
                         : "bg-rcc-bg text-rcc-text-muted border-rcc-border"
                       }`}>
                         {ev.status}
