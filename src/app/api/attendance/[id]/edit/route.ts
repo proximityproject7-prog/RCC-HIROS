@@ -39,14 +39,6 @@ export async function POST(
       editRemarks?: string;
     };
 
-    const record = await db.attendance.findUnique({ where: { id } });
-    if (!record) {
-      return NextResponse.json(
-        { error: "Attendance record not found" },
-        { status: 404 }
-      );
-    }
-
     // Determine which permission tier is needed
     const wantsTimeEdit =
       clockInAt !== undefined || clockOutAt !== undefined;
@@ -73,8 +65,6 @@ export async function POST(
 
     // Re-check: each field requires its specific permission
     if (wantsTimeEdit && !user.isSystem && !user.permissions.includes("attendance.edit")) {
-      // If they only have edit_on_premise, they cannot edit times
-      // We already filtered above; this is a safety net.
       return NextResponse.json(
         { error: "Forbidden - attendance.edit permission required for time edits" },
         { status: 403 }
@@ -88,6 +78,15 @@ export async function POST(
       return NextResponse.json(
         { error: "Forbidden - attendance.edit_on_premise permission required for on-premise edits" },
         { status: 403 }
+      );
+    }
+
+    // DB access only after authentication
+    const record = await db.attendance.findUnique({ where: { id } });
+    if (!record) {
+      return NextResponse.json(
+        { error: "Attendance record not found" },
+        { status: 404 }
       );
     }
 

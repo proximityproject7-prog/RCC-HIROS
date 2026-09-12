@@ -2,7 +2,7 @@
 
 import { useState, FormEvent, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, LogIn, AlertCircle, Lock, Clock, Fingerprint, User } from "lucide-react";
+import { Eye, EyeOff, LogIn, AlertCircle, Lock, Clock, Fingerprint, User, X } from "lucide-react";
 import { useAuthContext } from "@/components/providers/auth-provider";
 import {
   startAuthentication,
@@ -47,6 +47,7 @@ export default function LoginPage() {
   const [fpResult, setFpResult] = useState<FPResult | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanCooldownRef = useRef(false);
+  const abortScanRef = useRef<AbortController | null>(null);
 
   // Check biometrics setting
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function LoginPage() {
 
     return () => {
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      abortScanRef.current?.abort();
     };
   }, []);
 
@@ -87,10 +89,16 @@ export default function LoginPage() {
     setPanelState("scanning");
     setFpResult(null);
 
+    const abortController = new AbortController();
+    abortScanRef.current = abortController;
+
+    const SCAN_TIMEOUT_MS = 15000;
+
     try {
       // Step 1: Get authentication options from server
       const optionsRes = await fetch("/api/biometric/webauthn/authenticate/options", {
         method: "POST",
+        signal: abortController.signal,
       });
 
       if (!optionsRes.ok) {
@@ -99,16 +107,24 @@ export default function LoginPage() {
 
       const options = await optionsRes.json();
 
-      // Step 2: Trigger browser's WebAuthn API (Windows Hello)
-      const authResponse = await startAuthentication({
-        optionsJSON: options,
-      });
+      // Step 2: Trigger browser's WebAuthn API (Windows Hello) with 15s timeout
+      const authResponse = await Promise.race([
+        startAuthentication({ optionsJSON: options }),
+        new Promise<never>((_, reject) => {
+          const id = setTimeout(() => {
+            abortController.abort();
+            reject(new Error("Scan timed out. Please try again."));
+          }, SCAN_TIMEOUT_MS);
+          abortController.signal.addEventListener("abort", () => clearTimeout(id), { once: true });
+        }),
+      ]);
 
       // Step 3: Verify authentication with server
       const verifyRes = await fetch("/api/biometric/webauthn/authenticate/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ response: authResponse }),
+        signal: abortController.signal,
       });
 
       const result = await verifyRes.json();
@@ -119,15 +135,27 @@ export default function LoginPage() {
         handleFPResult(result);
       }
     } catch (err) {
+      if (abortController.signal.aborted) return;
       const msg = err instanceof Error ? err.message : "Scan failed";
       if (msg.includes("cancelled")) {
         handleFPResult({ error: "Scan cancelled" });
       } else if (msg.includes("not allowed")) {
         handleFPResult({ error: "Not allowed" });
+      } else if (msg.includes("timed out")) {
+        handleFPResult({ error: "Scan timed out after 15 seconds. Please try again." });
       } else {
         handleFPResult({ error: msg });
       }
+    } finally {
+      abortScanRef.current = null;
     }
+  };
+
+  const handleCancelScan = () => {
+    abortScanRef.current?.abort();
+    abortScanRef.current = null;
+    setPanelState("idle");
+    setFpResult(null);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -149,6 +177,9 @@ export default function LoginPage() {
         setError("Your account has been locked. Please contact IT Support.");
       } else if (msg.includes("inactive") || msg.includes("Inactive")) {
         setError("Your account is inactive. Please contact HR.");
+      } else if (msg.includes("remaining")) {
+        // Pass through server message about remaining attempts
+        setError(msg);
       } else {
         setError("Invalid Employee ID/Email or password.");
       }
@@ -239,6 +270,15 @@ export default function LoginPage() {
               ? "Follow Windows Hello prompts"
               : "Place your finger on the reader"}
           </p>
+          {panelState === "scanning" && (
+            <button
+              onClick={handleCancelScan}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-rcc-text-muted hover:text-rcc-error transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+              Cancel scan
+            </button>
+          )}
         </div>
       </div>
     );

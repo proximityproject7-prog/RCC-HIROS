@@ -84,7 +84,7 @@ function computeWorkdays(startISO: string, endISO: string): number {
   return workdays;
 }
 
-/** Generate next requestNo like LR-2025-0001 */
+/** Generate next requestNo like LR-2025-0001 (with retry on collision). */
 async function generateRequestNo(): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `LR-${year}-`;
@@ -98,7 +98,17 @@ async function generateRequestNo(): Promise<string> {
     const m = last.requestNo.match(/-(\d+)$/);
     if (m) next = parseInt(m[1], 10) + 1;
   }
-  return `${prefix}${String(next).padStart(4, "0")}`;
+  // Retry up to 5 times on unique constraint collision
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = `${prefix}${String(next + attempt).padStart(4, "0")}`;
+    const exists = await db.leaveRequest.findFirst({
+      where: { requestNo: candidate },
+      select: { id: true },
+    });
+    if (!exists) return candidate;
+  }
+  // Fallback: use timestamp suffix
+  return `${prefix}${String(Date.now()).slice(-4)}`;
 }
 
 function serializeRequest(req: LeaveRequestFull) {

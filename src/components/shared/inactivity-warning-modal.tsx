@@ -29,6 +29,13 @@ export default function InactivityWarningModal({
 }: InactivityWarningModalProps) {
   const [secondsLeft, setSecondsLeft] = useState(countdownSeconds);
 
+  // Reset countdown when modal opens
+  useEffect(() => {
+    if (open) {
+      setSecondsLeft(countdownSeconds);
+    }
+  }, [open, countdownSeconds]);
+
   // Tick down every second while modal is open
   useEffect(() => {
     if (!open) return;

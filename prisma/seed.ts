@@ -181,6 +181,7 @@ async function upsertRole(
     scopeGroupAttendance?: boolean;
     canSelfApproveLeave?: boolean;
     canChangePassword?: boolean;
+    canManageBiometrics?: boolean;
     isSystem?: boolean;
   },
   permissions: string[]
@@ -197,6 +198,7 @@ async function upsertRole(
       scopeGroupAttendance: opts.scopeGroupAttendance ?? false,
       canSelfApproveLeave: opts.canSelfApproveLeave ?? false,
       canChangePassword: opts.canChangePassword ?? false,
+      canManageBiometrics: opts.canManageBiometrics ?? false,
       isSystem: opts.isSystem ?? false,
       active: true,
     },
@@ -211,6 +213,7 @@ async function upsertRole(
       scopeGroupAttendance: opts.scopeGroupAttendance ?? false,
       canSelfApproveLeave: opts.canSelfApproveLeave ?? false,
       canChangePassword: opts.canChangePassword ?? false,
+      canManageBiometrics: opts.canManageBiometrics ?? false,
       isSystem: opts.isSystem ?? false,
       active: true,
     },
@@ -301,6 +304,7 @@ async function main() {
       scopeAllAttendance: true,
       canSelfApproveLeave: false,
       canChangePassword: true,
+      canManageBiometrics: true,
       isSystem: true,
     },
     ALL_PERMISSIONS

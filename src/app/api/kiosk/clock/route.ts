@@ -8,6 +8,10 @@ import { db } from "@/lib/db";
 // Kiosk is on premises by definition — no geolocation check.
 // ═══════════════════════════════════════════════════════════════
 
+// Rate limit: one request per employeeId per 5 seconds
+const lastRequest = new Map<string, number>();
+const RATE_LIMIT_MS = 5000;
+
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
@@ -26,6 +30,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Rate limit: reject if same employeeId within 5 seconds
+    const ts = Date.now();
+    const last = lastRequest.get(employeeId);
+    if (last && ts - last < RATE_LIMIT_MS) {
+      return NextResponse.json(
+        { error: "Please wait before scanning again" },
+        { status: 429 }
+      );
+    }
+    lastRequest.set(employeeId, ts);
 
     // Verify employee exists and is active
     const employee = await db.employee.findFirst({

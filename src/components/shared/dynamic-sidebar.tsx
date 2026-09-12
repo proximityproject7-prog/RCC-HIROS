@@ -16,7 +16,7 @@ const ICONS: Record<string, LucideIcon> = {
 export function DynamicSidebar() {
   const { visibleModules, has } = usePermissions();
   const { user } = useAuth();
-  const { currentPage, setCurrentPage, sidebarCollapsed, setSidebarCollapsed } = useAuthStore();
+  const { currentPage, setCurrentPage, sidebarCollapsed, setSidebarCollapsed, currentSubpage } = useAuthStore();
 
   function handleClick(m: typeof MODULES[0]) {
     if (m.key === "leave" || m.key === "evaluation") {
@@ -49,7 +49,7 @@ export function DynamicSidebar() {
         )}
         {visibleModules.map((m) => {
           const Icon = ICONS[m.icon] || LayoutDashboard;
-          const active = currentPage === m.key && !(m.key === "profiling" && useAuthStore.getState().currentSubpage === "myprofile");
+          const active = currentPage === m.key && !(m.key === "profiling" && currentSubpage === "myprofile");
           return (
             <button key={m.key} onClick={() => handleClick(m)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors ${active ? "bg-rcc-accent/15 text-rcc-accent" : "text-rcc-primary-foreground/70 hover:bg-white/5 hover:text-rcc-primary-foreground"}`}
@@ -66,10 +66,10 @@ export function DynamicSidebar() {
             <div className="my-2 border-t border-white/10" />
             <button
               onClick={() => setCurrentPage("profiling", `myprofile`)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors ${currentPage === "profiling" && useAuthStore.getState().currentSubpage === "myprofile" ? "bg-rcc-accent/15 text-rcc-accent" : "text-rcc-primary-foreground/70 hover:bg-white/5 hover:text-rcc-primary-foreground"}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors ${currentPage === "profiling" && currentSubpage === "myprofile" ? "bg-rcc-accent/15 text-rcc-accent" : "text-rcc-primary-foreground/70 hover:bg-white/5 hover:text-rcc-primary-foreground"}`}
               title={sidebarCollapsed ? "My Profile" : undefined}
             >
-              <UserCircle className={`h-4 w-4 shrink-0 ${currentPage === "profiling" && useAuthStore.getState().currentSubpage === "myprofile" ? "text-rcc-accent" : ""}`} />
+              <UserCircle className={`h-4 w-4 shrink-0 ${currentPage === "profiling" && currentSubpage === "myprofile" ? "text-rcc-accent" : ""}`} />
               {!sidebarCollapsed && <span>My Profile</span>}
             </button>
           </>
