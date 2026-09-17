@@ -22,6 +22,10 @@ const ALL_PERMISSIONS = [
   "profiling.view_inactive",
   "profiling.create",
   "profiling.edit",
+  "profiling.editIdentity",
+  "profiling.editEmployment",
+  "profiling.editSalary",
+  "profiling.editStatus",
   "profiling.delete",
   "profile.selfEdit",
   "profile.editAll",
@@ -47,7 +51,9 @@ const ALL_PERMISSIONS = [
   "roles.edit",
   "roles.delete",
   "groups.view",
-  "groups.manage",
+  "groups.create",
+  "groups.edit",
+  "groups.delete",
   "biometric.enroll",
   "biometric.manage",
 ];
@@ -77,7 +83,9 @@ const HR_PERMS = [
   "profiling.view",
   "profiling.view_inactive",
   "profiling.create",
-  "profiling.edit",
+  "profiling.editIdentity",
+  "profiling.editEmployment",
+  "profiling.editStatus",
   "profile.selfEdit",
   "profile.editAll",
   "attendance.view",
@@ -95,7 +103,8 @@ const HR_PERMS = [
   "reports.view",
   "reports.export",
   "groups.view",
-  "groups.manage",
+  "groups.create",
+  "groups.edit",
   "roles.view",
   "biometric.enroll",
   "biometric.manage",
@@ -120,7 +129,8 @@ const IT_STAFF_PERMS = [
   "profiling.view",
   "profiling.view_inactive",
   "profiling.create",
-  "profiling.edit",
+  "profiling.editIdentity",
+  "profiling.editEmployment",
   "profile.selfEdit",
   "profile.editAll",
   "attendance.view",
@@ -138,7 +148,9 @@ const IT_STAFF_PERMS = [
   "roles.create",
   "roles.edit",
   "groups.view",
-  "groups.manage",
+  "groups.create",
+  "groups.edit",
+  "groups.delete",
   "biometric.enroll",
   "biometric.manage",
 ];
@@ -563,7 +575,28 @@ async function main() {
   }
 
   // ═════════════════════════════════════════════════════════════
-  // 4. Leave types
+  // 4. Contract types
+  // ═════════════════════════════════════════════════════════════
+  console.log("• Creating contract types...");
+  const regularCT = await prisma.contractType.upsert({
+    where: { code: "REG" },
+    update: { name: "Regular", active: true },
+    create: { name: "Regular", code: "REG", active: true },
+  });
+  const contractualCT = await prisma.contractType.upsert({
+    where: { code: "CTR" },
+    update: { name: "Contractual", active: true },
+    create: { name: "Contractual", code: "CTR", active: true },
+  });
+  const partTimeCT = await prisma.contractType.upsert({
+    where: { code: "PT" },
+    update: { name: "Part-Time", active: true },
+    create: { name: "Part-Time", code: "PT", active: true },
+  });
+  console.log("  ✓ Contract types seeded: REG, CTR, PT");
+
+  // ═════════════════════════════════════════════════════════════
+  // 5. Leave types
   // ═════════════════════════════════════════════════════════════
   console.log("• Creating leave types...");
   const sickLeave = await prisma.leaveType.upsert({

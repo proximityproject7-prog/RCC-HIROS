@@ -24,6 +24,10 @@ export const PERMISSIONS = [
   "profiling.view_inactive",
   "profiling.create",
   "profiling.edit",
+  "profiling.editIdentity",
+  "profiling.editEmployment",
+  "profiling.editSalary",
+  "profiling.editStatus",
   "profiling.delete",
   "profile.selfEdit",
   "profile.editAll",
@@ -65,7 +69,9 @@ export const PERMISSIONS = [
 
   // Groups
   "groups.view",
-  "groups.manage",
+  "groups.create",
+  "groups.edit",
+  "groups.delete",
 
   // Biometric / Fingerprint
   "biometric.enroll",
@@ -108,6 +114,10 @@ export const MODULES: readonly ModuleDef[] = [
       "profiling.view_inactive",
       "profiling.create",
       "profiling.edit",
+      "profiling.editIdentity",
+      "profiling.editEmployment",
+      "profiling.editSalary",
+      "profiling.editStatus",
       "profiling.delete",
     ],
   },
@@ -162,7 +172,7 @@ export const MODULES: readonly ModuleDef[] = [
     key: "groups",
     label: "Groups",
     icon: "Building2",
-    permissions: ["groups.view", "groups.manage"],
+    permissions: ["groups.view", "groups.create", "groups.edit", "groups.delete"],
   },
 ] as const;
 

@@ -12,7 +12,7 @@ const HR_PERMS = [
   "evaluation.view", "evaluation.submit", "evaluation.manage_forms", "evaluation.reset",
   "leave.request", "leave.approve_l2", "leave.view_all", "leave.manage_types",
   "reports.view", "reports.export",
-  "groups.view", "groups.manage", "roles.view",
+  "groups.view", "groups.create", "groups.edit", "groups.delete", "roles.view",
 ];
 
 const DEAN_PERMS = [

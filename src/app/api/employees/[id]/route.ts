@@ -36,6 +36,7 @@ export async function GET(
       include: {
         group: true,
         role: { select: { id: true, name: true } },
+        contractTypeRel: { select: { id: true, name: true, code: true } },
         certificates: { orderBy: { issueDate: "desc" } },
         files: {
           orderBy: { createdAt: "desc" },
@@ -99,6 +100,8 @@ export async function GET(
         roleId: employee.roleId,
         roleName: employee.role?.name ?? null,
         contractType: employee.contractType,
+        contractTypeId: employee.contractTypeId,
+        contractTypeName: employee.contractTypeRel?.name ?? null,
         employmentType: employee.employmentType,
         hireDate: employee.hireDate?.toISOString() ?? null,
         salary: employee.salary ?? null,
@@ -156,8 +159,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Require either full profiling.edit, profile self-edit, or canEditProfile permissions
-    const auth = await requireAnyPermission(request, ["profiling.edit", "profile.editAll", "profile.selfEdit"]);
+    // Require any edit permission
+    const auth = await requireAnyPermission(request, [
+      "profiling.edit", "profiling.editIdentity", "profiling.editEmployment",
+      "profiling.editSalary", "profiling.editStatus",
+      "profile.editAll", "profile.selfEdit",
+    ]);
     if (!auth.ok) return auth.response;
 
     const { id } = await params;
@@ -184,7 +191,13 @@ export async function PATCH(
       canFillProfile = emp?.role?.canEditProfile ?? false;
     }
 
-    if (!isAdminEdit && !isEditAll && !isSelfEdit && !canFillProfile) {
+    // Granular field-level permissions (profiling.edit grants all)
+    const canEditIdentity = isAdminEdit || auth.user.permissions.includes("profiling.editIdentity");
+    const canEditEmployment = isAdminEdit || auth.user.permissions.includes("profiling.editEmployment");
+    const canEditSalary = isAdminEdit || auth.user.permissions.includes("profiling.editSalary");
+    const canEditStatus = isAdminEdit || auth.user.permissions.includes("profiling.editStatus");
+
+    if (!canEditIdentity && !canEditEmployment && !canEditSalary && !canEditStatus && !isEditAll && !isSelfEdit && !canFillProfile) {
       return NextResponse.json(
         { error: "Forbidden: insufficient permissions" },
         { status: 403 }
@@ -194,15 +207,9 @@ export async function PATCH(
     const body = await request.json();
     const data: Record<string, unknown> = {};
 
-    // Full admin edit — all fields
-    const canEditAllFields = isAdminEdit;
-
-    if (canEditAllFields) {
-      const {
-        employeeId, firstName, middleName, lastName, email, phone, address,
-        birthday, gender, groupId, roleId, contractType, employmentType, hireDate, salary, active, password,
-        placeOfBirth, rank, civilStatus, citizenship, religion, height, weight, bloodType, profileData,
-      } = body as Record<string, unknown>;
+    // Identity fields (name, email, employee ID, basic info)
+    if (canEditIdentity) {
+      const { employeeId, firstName, middleName, lastName, email, phone, address, birthday, gender } = body as Record<string, unknown>;
 
       if (typeof employeeId === "string" && employeeId.trim() && employeeId !== employee.employeeId) {
         const dup = await db.employee.findUnique({
@@ -230,15 +237,45 @@ export async function PATCH(
       if (address !== undefined) data.address = (address as string | null)?.trim() || null;
       if (birthday !== undefined) data.birthday = birthday ? new Date(birthday as string) : null;
       if (gender !== undefined) data.gender = (gender as string | null) || null;
+    }
+
+    // Employment fields (contract, department, role, hire date)
+    if (canEditEmployment) {
+      const { groupId, roleId, contractType, contractTypeId, employmentType, hireDate } = body as Record<string, unknown>;
       if (groupId !== undefined) data.groupId = (groupId as string | null) || null;
       if (roleId !== undefined) data.roleId = (roleId as string | null) || null;
-      if (typeof contractType === "string" && contractType.trim()) data.contractType = contractType.trim();
+      if (contractTypeId !== undefined) {
+        if (contractTypeId && typeof contractTypeId === "string") {
+          const ct = await db.contractType.findUnique({ where: { id: contractTypeId } });
+          if (ct) {
+            data.contractType = ct.name;
+            data.contractTypeId = ct.id;
+          }
+        } else if (!contractTypeId) {
+          data.contractTypeId = null;
+        }
+      } else if (typeof contractType === "string" && contractType.trim()) {
+        data.contractType = contractType.trim();
+      }
       if (typeof employmentType === "string" && employmentType.trim()) data.employmentType = employmentType.trim();
       if (hireDate !== undefined) data.hireDate = hireDate ? new Date(hireDate as string) : null;
-      if (salary !== undefined) data.salary = (salary as number | null) ?? null;
-      if (active !== undefined) data.active = !!active;
+    }
 
-      // Profile fields (LinkedIn-style)
+    // Salary
+    if (canEditSalary) {
+      const { salary } = body as Record<string, unknown>;
+      if (salary !== undefined) data.salary = (salary as number | null) ?? null;
+    }
+
+    // Active/inactive status
+    if (canEditStatus) {
+      const { active } = body as Record<string, unknown>;
+      if (active !== undefined) data.active = !!active;
+    }
+
+    // Profile fields (LinkedIn-style) — available to profile.editAll, canFillProfile, or self-edit
+    if (isEditAll || canFillProfile || isSelfEdit) {
+      const { placeOfBirth, rank, civilStatus, citizenship, religion, height, weight, bloodType, profileData } = body as Record<string, unknown>;
       if (placeOfBirth !== undefined) data.placeOfBirth = (placeOfBirth as string | null)?.trim() || null;
       if (rank !== undefined) data.rank = (rank as string | null)?.trim() || null;
       if (civilStatus !== undefined) data.civilStatus = (civilStatus as string | null)?.trim() || null;
@@ -248,7 +285,11 @@ export async function PATCH(
       if (weight !== undefined) data.weight = (weight as string | null)?.trim() || null;
       if (bloodType !== undefined) data.bloodType = (bloodType as string | null)?.trim() || null;
       if (profileData !== undefined) data.profileData = (typeof profileData === "string" ? profileData : JSON.stringify(profileData)) || null;
+    }
 
+    // Password — only admin can reset
+    if (canEditIdentity) {
+      const { password } = body as Record<string, unknown>;
       if (password !== undefined) {
         if (typeof password !== "string" || password.length < 8) {
           return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
@@ -257,8 +298,10 @@ export async function PATCH(
         data.passwordHash = await bcrypt.hash(password, salt);
         data.mustChangePwd = true;
       }
-    } else {
-      // Self-edit / editAll mode — basic info + profile data
+    }
+
+    // Self-edit fallback: limited fields
+    if (!canEditIdentity && !canEditEmployment && !canEditSalary && !canEditStatus && (isSelfEdit || isEditAll)) {
       const SELF_EDITABLE = new Set(["phone", "address", "birthday", "gender"]);
       for (const key of SELF_EDITABLE) {
         if (body[key] !== undefined) {
@@ -299,6 +342,7 @@ export async function PATCH(
       include: {
         group: true,
         role: { select: { id: true, name: true } },
+        contractTypeRel: { select: { id: true, name: true, code: true } },
         _count: { select: { certificates: true } },
       },
     });
@@ -330,6 +374,8 @@ export async function PATCH(
         roleId: updated.roleId,
         roleName: updated.role?.name ?? null,
         contractType: updated.contractType,
+        contractTypeId: updated.contractTypeId,
+        contractTypeName: updated.contractTypeRel?.name ?? null,
         employmentType: updated.employmentType,
         hireDate: updated.hireDate?.toISOString() ?? null,
         salary: updated.salary ?? null,

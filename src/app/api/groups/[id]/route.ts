@@ -7,9 +7,9 @@ import {
 
 // ═══════════════════════════════════════════════════════════════
 // /api/groups/[id]
-// GET    groups.view OR groups.manage — single group
-// PATCH  groups.manage — update
-// DELETE groups.manage — block if employees assigned
+// GET    groups.view — single group
+// PATCH  groups.edit — update
+// DELETE groups.delete — block if employees assigned
 // ═══════════════════════════════════════════════════════════════
 
 export async function GET(
@@ -19,7 +19,7 @@ export async function GET(
   try {
     const auth = await requireAnyPermission(request, [
       "groups.view",
-      "groups.manage",
+      "groups.edit",
     ]);
     if (!auth.ok) return auth.response;
 
@@ -59,7 +59,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requirePermission(request, "groups.manage");
+    const auth = await requirePermission(request, "groups.edit");
     if (!auth.ok) return auth.response;
 
     const { id } = await params;
@@ -137,7 +137,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requirePermission(request, "groups.manage");
+    const auth = await requirePermission(request, "groups.delete");
     if (!auth.ok) return auth.response;
 
     const { id } = await params;

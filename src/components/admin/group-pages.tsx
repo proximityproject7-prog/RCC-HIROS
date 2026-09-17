@@ -113,7 +113,7 @@ export function GroupListPage() {
             Departments / organizational units used for scoping.
           </p>
         </div>
-        {has("groups.manage") && (
+        {has("groups.create") && (
           <button
             onClick={() => setCurrentPage("groups", "create")}
             className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors"
@@ -165,7 +165,7 @@ export function GroupListPage() {
                   <Building2 className="h-5 w-5" />
                 </div>
                 <div className="flex items-center gap-1">
-                  {has("groups.manage") && (
+                  {has("groups.edit") && (
                     <>
                       <button
                         onClick={() => setCurrentPage("groups", `edit:${group.id}`)}
@@ -228,7 +228,7 @@ export function GroupListPage() {
                   <UsersIcon className="h-3.5 w-3.5" />
                   {group.employeeCount ?? 0} employee{(group.employeeCount ?? 0) === 1 ? "" : "s"}
                 </span>
-                {has("groups.manage") && (
+                {has("groups.edit") && (
                   <button
                     onClick={() => setCurrentPage("groups", `edit:${group.id}`)}
                     className="text-xs font-medium text-rcc-accent hover:underline"

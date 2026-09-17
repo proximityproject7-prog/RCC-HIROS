@@ -81,8 +81,9 @@ model Employee {
   gender         String? // "Male" | "Female"
   groupId        String?
   roleId         String?
-  contractType   String   @default("Regular") // "Regular" | "Contractual" | "Part-Time" | ...
-  employmentType String   @default("Teaching") // "Teaching" | "Non-Teaching"
+  contractType    String   @default("Regular") // "Regular" | "Contractual" | "Part-Time" | ...
+  contractTypeId  String?  // FK to ContractType
+  employmentType  String   @default("Teaching") // "Teaching" | "Non-Teaching"
   active         Boolean  @default(true)
   hireDate       DateTime?
   salary         Float?     @default(0) // Monthly salary
@@ -125,6 +126,7 @@ model Employee {
   fpassSubmissions FpassSubmission[]
   auditLogs      AuditLog[]
   biometricTemplates BiometricTemplate[]
+  contractTypeRel    ContractType?  @relation(fields: [contractTypeId], references: [id])
 }
 
 model EmployeeCertificate {
@@ -171,6 +173,17 @@ model LeaveType {
 
   leaveBalances LeaveBalance[]
   leaveRequests LeaveRequest[]
+}
+
+model ContractType {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  code       String   @unique
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  employees Employee[]
 }
 
 model LeaveBalance {

@@ -84,7 +84,11 @@ const PERMISSION_LABELS: Record<string, { label: string; description: string }> 
   "profiling.view": { label: "View Employees", description: "See employee records within scope." },
   "profiling.view_inactive": { label: "View Inactive", description: "See deactivated / soft-deleted employees." },
   "profiling.create": { label: "Create Employees", description: "Add new employee records." },
-  "profiling.edit": { label: "Edit Employees", description: "Update employee fields, certs, and files." },
+  "profiling.edit": { label: "Edit Employees (All)", description: "Full access to all employee fields. Grants all sub-permissions below." },
+  "profiling.editIdentity": { label: "Edit Identity", description: "Edit name, email, employee ID, phone, address, birthday, gender." },
+  "profiling.editEmployment": { label: "Edit Employment", description: "Edit contract type, employment type, hire date, department, and role assignment." },
+  "profiling.editSalary": { label: "Edit Salary", description: "Edit employee monthly salary." },
+  "profiling.editStatus": { label: "Edit Status", description: "Activate or deactivate employee accounts." },
   "profiling.delete": { label: "Deactivate Employees", description: "Soft-delete an employee record." },
   "profile.selfEdit": { label: "Edit Own Profile", description: "Edit own basic profile fields (email, phone, address, birthday, gender)." },
   "profile.editAll": { label: "Edit All Profiles", description: "Edit any employee's basic profile fields inline." },
@@ -116,7 +120,9 @@ const PERMISSION_LABELS: Record<string, { label: string; description: string }> 
   "roles.delete": { label: "Delete Roles", description: "Remove unused roles." },
 
   "groups.view": { label: "View Groups", description: "List groups / departments." },
-  "groups.manage": { label: "Manage Groups", description: "Create, edit, and delete groups." },
+  "groups.create": { label: "Create Groups", description: "Create new groups / departments." },
+  "groups.edit": { label: "Edit Groups", description: "Edit group names, codes, and descriptions." },
+  "groups.delete": { label: "Delete Groups", description: "Deactivate / remove groups." },
 
   "fpass.fill": { label: "Fill FPASS Form", description: "Fill out the Faculty Performance Appraisal form." },
   "fpass.manage": { label: "Manage FPASS", description: "View all FPASS submissions and manage group access." },
@@ -132,7 +138,7 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
   },
   {
     label: "Employee Profiling",
-    permissions: ["profiling.view", "profiling.view_inactive", "profiling.create", "profiling.edit", "profiling.delete", "profile.selfEdit", "profile.editAll"],
+    permissions: ["profiling.view", "profiling.view_inactive", "profiling.create", "profiling.edit", "profiling.editIdentity", "profiling.editEmployment", "profiling.editSalary", "profiling.editStatus", "profiling.delete", "profile.selfEdit", "profile.editAll"],
     scopes: [
       { key: "scopeAllProfiling" as const, label: "All Profiling", description: "See employee records across all groups." },
       { key: "canEditProfile" as const, label: "Fill Profile Data", description: "Allow users to fill/edit their own profile sections (education, experience, etc.)." },
@@ -176,7 +182,7 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
   },
   {
     label: "Groups",
-    permissions: ["groups.view", "groups.manage"],
+    permissions: ["groups.view", "groups.create", "groups.edit", "groups.delete"],
   },
   {
     label: "FPASS (Faculty Appraisal)",

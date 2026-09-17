@@ -11,6 +11,7 @@ import { DynamicDashboard } from "@/components/shared/dashboard";
 import { useEffect, useState, Component, type ReactNode } from "react";
 
 import { EmployeeListPage, EmployeeFormPage, EmployeeProfilePage } from "@/components/profiling/employee-pages";
+import { ContractTypeManagementPage } from "@/components/profiling/contract-type-pages";
 import { AttendanceListPage, PremisesSettingsPage } from "@/components/attendance/attendance-pages";
 import { LeavePage } from "@/components/leave/leave-pages";
 import { EvaluationPage } from "@/components/evaluation/evaluation-pages";
@@ -74,6 +75,8 @@ export default function HomePage() {
     case "profiling":
       content = currentSubpage === "myprofile" ? (
         user?.id ? <EmployeeProfilePage employeeId={user.id} /> : <PermissionDenied />
+      ) : currentSubpage === "contract-types" ? (
+        <PermissionGuard require="profiling.edit" fallback={<PermissionDenied />}><ContractTypeManagementPage /></PermissionGuard>
       ) : (
         <PermissionGuard require="profiling.view" fallback={<PermissionDenied />}>
           {currentSubpage === "create" ? (
@@ -119,9 +122,9 @@ export default function HomePage() {
       content = (
         <PermissionGuard require="groups.view" fallback={<PermissionDenied />}>
           {currentSubpage === "create" ? (
-            <PermissionGuard require="groups.manage" fallback={<PermissionDenied />}><GroupFormPage mode="create" /></PermissionGuard>
+            <PermissionGuard require="groups.create" fallback={<PermissionDenied />}><GroupFormPage mode="create" /></PermissionGuard>
           ) : currentSubpage?.startsWith("edit:") ? (
-            <PermissionGuard require="groups.manage" fallback={<PermissionDenied />}><GroupFormPage mode="edit" groupId={currentSubpage.slice(5)} /></PermissionGuard>
+            <PermissionGuard require="groups.edit" fallback={<PermissionDenied />}><GroupFormPage mode="edit" groupId={currentSubpage.slice(5)} /></PermissionGuard>
           ) : <GroupListPage />}
         </PermissionGuard>
       ); break;

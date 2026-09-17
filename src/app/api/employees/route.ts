@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
       include: {
         group: true,
         role: { select: { id: true, name: true, isSystem: true } },
+        contractTypeRel: { select: { id: true, name: true, code: true } },
         _count: { select: { certificates: true } },
       },
       orderBy: [{ employeeId: "asc" }],
@@ -108,6 +109,8 @@ export async function GET(request: NextRequest) {
         birthday: e.birthday?.toISOString() ?? null,
         gender: e.gender,
         contractType: e.contractType,
+        contractTypeId: e.contractTypeId,
+        contractTypeName: e.contractTypeRel?.name ?? null,
         employmentType: e.employmentType,
         hireDate: e.hireDate?.toISOString() ?? null,
         salary: e.salary ?? null,
@@ -149,6 +152,7 @@ export async function POST(request: NextRequest) {
       groupId,
       roleId,
       contractType = "Regular",
+      contractTypeId,
       employmentType = "Teaching",
       hireDate,
       salary = 0,
@@ -168,6 +172,7 @@ export async function POST(request: NextRequest) {
       groupId?: string;
       roleId?: string;
       contractType?: string;
+      contractTypeId?: string;
       employmentType?: string;
       hireDate?: string;
       salary?: number;
@@ -253,6 +258,17 @@ export async function POST(request: NextRequest) {
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    // Resolve contractType name from contractTypeId if provided
+    let resolvedContractType = contractType || "Regular";
+    let resolvedContractTypeId = contractTypeId || null;
+    if (contractTypeId) {
+      const ct = await db.contractType.findUnique({ where: { id: contractTypeId } });
+      if (ct) {
+        resolvedContractType = ct.name;
+        resolvedContractTypeId = ct.id;
+      }
+    }
+
     const employee = await db.employee.create({
       data: {
         employeeId: employeeId.trim(),
@@ -266,7 +282,8 @@ export async function POST(request: NextRequest) {
         gender: gender || null,
         groupId: groupId || null,
         roleId: roleId || null,
-        contractType: contractType || "Regular",
+        contractType: resolvedContractType,
+        contractTypeId: resolvedContractTypeId,
         employmentType: employmentType || "Teaching",
         hireDate: hireDate ? new Date(hireDate) : null,
         salary: salary ?? 0,
@@ -277,6 +294,7 @@ export async function POST(request: NextRequest) {
       include: {
         group: true,
         role: { select: { id: true, name: true } },
+        contractTypeRel: { select: { id: true, name: true, code: true } },
         _count: { select: { certificates: true } },
       },
     });
@@ -312,6 +330,8 @@ export async function POST(request: NextRequest) {
           roleId: employee.roleId,
           roleName: employee.role?.name ?? null,
           contractType: employee.contractType,
+          contractTypeId: employee.contractTypeId,
+          contractTypeName: employee.contractTypeRel?.name ?? null,
           employmentType: employee.employmentType,
           hireDate: employee.hireDate?.toISOString() ?? null,
           salary: employee.salary ?? null,

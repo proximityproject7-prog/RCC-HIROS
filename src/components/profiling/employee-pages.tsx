@@ -32,6 +32,7 @@ interface ConfirmDialogState {
 }
 
 interface GroupBrief { id: string; name: string; code: string; }
+interface ContractTypeBrief { id: string; name: string; code: string; }
 interface RoleBrief { id: string; name: string; }
 
 interface Employee {
@@ -46,6 +47,8 @@ interface Employee {
   birthday: string | null;
   gender: string | null;
   contractType: string;
+  contractTypeId: string | null;
+  contractTypeName: string | null;
   employmentType: string;
   hireDate: string | null;
   salary: number | null;
@@ -98,7 +101,6 @@ interface EmployeeFile {
   uploadedAt: string;
 }
 
-const CONTRACT_TYPES = ["Regular", "Contractual", "Part-Time"];
 const EMPLOYMENT_TYPES = ["Teaching", "Non-Teaching"];
 const GENDER_OPTIONS = ["Male", "Female"];
 
@@ -116,6 +118,7 @@ export function EmployeeListPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [groups, setGroups] = useState<GroupBrief[]>([]);
   const [roles, setRoles] = useState<RoleBrief[]>([]);
+  const [contractTypes, setContractTypes] = useState<ContractTypeBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,16 +137,18 @@ export function EmployeeListPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Load groups & roles once for filters
+  // Load groups, roles & contract types once for filters
   useEffect(() => {
     (async () => {
       try {
-        const [g, r] = await Promise.all([
+        const [g, r, ct] = await Promise.all([
           apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
           apiFetch<{ roles: RoleBrief[] }>("/api/roles/active"),
+          apiFetch<{ contractTypes: ContractTypeBrief[] }>("/api/contract-types"),
         ]);
         setGroups(g.groups ?? []);
         setRoles(r.roles ?? []);
+        setContractTypes(ct.contractTypes ?? []);
       } catch {
         // non-fatal
       }
@@ -196,15 +201,25 @@ export function EmployeeListPage() {
             Click a row to view the full employee profile.
           </p>
         </div>
-        {has("profiling.create") && (
-          <button
-            onClick={() => setCurrentPage("profiling", "create")}
-            className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            New Employee
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {has("profiling.edit") && (
+            <button
+              onClick={() => setCurrentPage("profiling", "contract-types")}
+              className="inline-flex items-center gap-2 bg-rcc-surface border border-rcc-border text-rcc-text-secondary px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-bg transition-colors"
+            >
+              Contract Types
+            </button>
+          )}
+          {has("profiling.create") && (
+            <button
+              onClick={() => setCurrentPage("profiling", "create")}
+              className="inline-flex items-center gap-2 bg-rcc-primary text-rcc-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              New Employee
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -234,8 +249,8 @@ export function EmployeeListPage() {
           </select>
           <select value={contractType} onChange={(e) => setContractType(e.target.value)} className={inputClass}>
             <option value="">All contracts</option>
-            {CONTRACT_TYPES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {contractTypes.map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
             ))}
           </select>
           <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className={inputClass}>
@@ -379,6 +394,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
 
   const [groups, setGroups] = useState<GroupBrief[]>([]);
   const [roles, setRoles] = useState<RoleBrief[]>([]);
+  const [contractTypes, setContractTypes] = useState<ContractTypeBrief[]>([]);
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -395,7 +411,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
   const [gender, setGender] = useState("");
   const [groupId, setGroupId] = useState("");
   const [roleId, setRoleId] = useState("");
-  const [contractType, setContractType] = useState("Regular");
+  const [contractTypeId, setContractTypeId] = useState("");
   const [employmentType, setEmploymentType] = useState("Teaching");
   const [hireDate, setHireDate] = useState("");
   const [salary, setSalary] = useState("");
@@ -410,22 +426,24 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
   const isDirty = useMemo(() => {
     const current: Record<string, string | boolean> = {
       employeeIdField, firstName, middleName, lastName, email, phone, address,
-      birthday, gender, groupId, roleId, contractType, employmentType, hireDate, salary, active,
+      birthday, gender, groupId, roleId, contractTypeId, employmentType, hireDate, salary, active,
     };
     return JSON.stringify(current) !== JSON.stringify(snapshotRef.current);
-  }, [employeeIdField, firstName, middleName, lastName, email, phone, address, birthday, gender, groupId, roleId, contractType, employmentType, hireDate, salary, active]);
+  }, [employeeIdField, firstName, middleName, lastName, email, phone, address, birthday, gender, groupId, roleId, contractTypeId, employmentType, hireDate, salary, active]);
   useUnsavedChanges(isDirty);
   const confirmNavigation = useNavigationGuard(isDirty);
 
   useEffect(() => {
     (async () => {
       try {
-        const [g, r] = await Promise.all([
+        const [g, r, ct] = await Promise.all([
           apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
           apiFetch<{ roles: RoleBrief[] }>("/api/roles/active"),
+          apiFetch<{ contractTypes: ContractTypeBrief[] }>("/api/contract-types"),
         ]);
         setGroups(g.groups ?? []);
         setRoles(r.roles ?? []);
+        setContractTypes(ct.contractTypes ?? []);
       } catch {
         // non-fatal
       }
@@ -452,7 +470,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
         setGender(e.gender ?? "");
         setGroupId(e.groupId ?? "");
         setRoleId(e.roleId ?? "");
-        setContractType(e.contractType ?? "Regular");
+        setContractTypeId(e.contractTypeId ?? "");
         setEmploymentType(e.employmentType ?? "Teaching");
         setHireDate(e.hireDate ? e.hireDate.slice(0, 10) : "");
         setSalary(e.salary != null ? String(e.salary) : "");
@@ -462,7 +480,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
           lastName: e.lastName, email: e.email, phone: e.phone ?? "", address: e.address ?? "",
           birthday: e.birthday ? e.birthday.slice(0, 10) : "", gender: e.gender ?? "",
           groupId: e.groupId ?? "", roleId: e.roleId ?? "",
-          contractType: e.contractType ?? "Regular",
+          contractTypeId: e.contractTypeId ?? "",
           employmentType: e.employmentType ?? "Teaching",
           hireDate: e.hireDate ? e.hireDate.slice(0, 10) : "",
           salary: e.salary != null ? String(e.salary) : "", active: e.active,
@@ -502,7 +520,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
         gender: gender || null,
         groupId: groupId || null,
         roleId: roleId || null,
-        contractType,
+        contractTypeId: contractTypeId || null,
         employmentType,
         hireDate: hireDate || null,
         salary: salary ? parseFloat(salary) : 0,
@@ -622,9 +640,10 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
             </select>
           </Field>
           <Field label="Contract Type">
-            <select value={contractType} onChange={(e) => setContractType(e.target.value)} className={inputClass}>
-              {CONTRACT_TYPES.map((c) => (
-                <option key={c} value={c}>{c}</option>
+            <select value={contractTypeId} onChange={(e) => setContractTypeId(e.target.value)} className={inputClass}>
+              <option value="">Unassigned</option>
+              {contractTypes.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </Field>
@@ -889,13 +908,17 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const canSelfEdit = employeeId === user?.id && has("profile.selfEdit");
   const canManageFiles = has("profiling.edit") || has("profile.editAll") || canSelfEdit;
   const isAdmin = has("profiling.edit") || has("profile.editAll");
+  const canEditIdentity = isAdmin || has("profiling.editIdentity");
+  const canEditEmployment = isAdmin || has("profiling.editEmployment");
+  const canEditSalary = isAdmin || has("profiling.editSalary");
+  const canEditStatus = isAdmin || has("profiling.editStatus");
   const [editing, setEditing] = useState(false);
   const [editFormData, setEditFormData] = useState({
     employeeId: "", firstName: "", middleName: "", lastName: "", email: "",
     phone: "", address: "", birthday: "", gender: "",
     placeOfBirth: "", rank: "", civilStatus: "", citizenship: "",
     religion: "", height: "", weight: "", bloodType: "",
-    contractType: "Regular", employmentType: "Teaching", hireDate: "", salary: "",
+    contractTypeId: "", employmentType: "Teaching", hireDate: "", salary: "",
     groupId: "", roleId: "", active: true,
   });
   const editSnapshotRef = useRef<string>("");
@@ -906,6 +929,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const confirmInlineNavigation = useNavigationGuard(isInlineDirty);
   const [editFormGroups, setEditFormGroups] = useState<GroupBrief[]>([]);
   const [editFormRoles, setEditFormRoles] = useState<RoleBrief[]>([]);
+  const [editFormContractTypes, setEditFormContractTypes] = useState<ContractTypeBrief[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
@@ -1142,7 +1166,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       height: employee.height ?? "",
       weight: employee.weight ?? "",
       bloodType: employee.bloodType ?? "",
-      contractType: employee.contractType ?? "Regular",
+      contractTypeId: employee.contractTypeId ?? "",
       employmentType: employee.employmentType ?? "Teaching",
       hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
       salary: employee.salary != null ? String(employee.salary) : "",
@@ -1151,12 +1175,14 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       active: employee.active,
     });
     try {
-      const [groupsData, rolesData] = await Promise.all([
+      const [groupsData, rolesData, ctData] = await Promise.all([
         apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
         apiFetch<{ roles: RoleBrief[] }>("/api/roles/active"),
+        apiFetch<{ contractTypes: ContractTypeBrief[] }>("/api/contract-types"),
       ]);
       setEditFormGroups(groupsData.groups ?? []);
       setEditFormRoles(rolesData.roles ?? []);
+      setEditFormContractTypes(ctData.contractTypes ?? []);
     } catch { /* non-fatal — dropdowns will be empty */ }
     setEditing(true);
     // Set dirty snapshot after populating form
@@ -1169,7 +1195,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         civilStatus: employee.civilStatus ?? "", citizenship: employee.citizenship ?? "",
         religion: employee.religion ?? "", height: employee.height ?? "",
         weight: employee.weight ?? "", bloodType: employee.bloodType ?? "",
-        contractType: employee.contractType ?? "Regular",
+        contractTypeId: employee.contractTypeId ?? "",
         employmentType: employee.employmentType ?? "Teaching",
         hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
         salary: employee.salary != null ? String(employee.salary) : "",
@@ -1192,24 +1218,34 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     setEditSaving(true);
     try {
       const body: Record<string, unknown> = {};
-      // Admin-editable fields
-      if (isAdmin) {
+      // Identity fields
+      if (canEditIdentity) {
         body.employeeId = editFormData.employeeId.trim();
         body.firstName = editFormData.firstName.trim();
         body.middleName = editFormData.middleName.trim() || null;
         body.lastName = editFormData.lastName.trim();
         body.email = editFormData.email.trim();
+      }
+      // Employment fields
+      if (canEditEmployment) {
         body.groupId = editFormData.groupId || null;
         body.roleId = editFormData.roleId || null;
-        body.contractType = editFormData.contractType;
+        body.contractTypeId = editFormData.contractTypeId || null;
         body.employmentType = editFormData.employmentType;
+      }
+      // Salary
+      if (canEditSalary) {
         body.salary = editFormData.salary ? parseFloat(editFormData.salary) : 0;
+      }
+      // Status
+      if (canEditStatus) {
         body.active = editFormData.active;
-      } else {
-        // Self-edit: limited fields, email disabled
+      }
+      // Self-edit fallback
+      if (!canEditIdentity && !canEditEmployment && !canEditSalary && !canEditStatus) {
         body.middleName = editFormData.middleName.trim() || null;
       }
-      // Shared fields
+      // Shared fields (always sent)
       body.phone = editFormData.phone.trim() || null;
       body.address = editFormData.address.trim() || null;
       body.birthday = editFormData.birthday || null;
@@ -1509,11 +1545,11 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       >
         {editing ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
-            <EditField icon={Hash} label="Employee ID" type="text" value={editFormData.employeeId} onChange={(v) => setEditFormData(f => ({ ...f, employeeId: v }))} disabled={!isAdmin} className="font-mono" />
-            <EditField icon={User} label="First Name" type="text" value={editFormData.firstName} onChange={(v) => setEditFormData(f => ({ ...f, firstName: v }))} disabled={!isAdmin} />
+            <EditField icon={Hash} label="Employee ID" type="text" value={editFormData.employeeId} onChange={(v) => setEditFormData(f => ({ ...f, employeeId: v }))} disabled={!canEditIdentity} className="font-mono" />
+            <EditField icon={User} label="First Name" type="text" value={editFormData.firstName} onChange={(v) => setEditFormData(f => ({ ...f, firstName: v }))} disabled={!canEditIdentity} />
             <EditField icon={User} label="Middle Name" type="text" value={editFormData.middleName} onChange={(v) => setEditFormData(f => ({ ...f, middleName: v }))} />
-            <EditField icon={User} label="Last Name" type="text" value={editFormData.lastName} onChange={(v) => setEditFormData(f => ({ ...f, lastName: v }))} disabled={!isAdmin} />
-            <EditField icon={Mail} label="Email" type="email" value={editFormData.email} onChange={(v) => setEditFormData(f => ({ ...f, email: v }))} disabled={!isAdmin} />
+            <EditField icon={User} label="Last Name" type="text" value={editFormData.lastName} onChange={(v) => setEditFormData(f => ({ ...f, lastName: v }))} disabled={!canEditIdentity} />
+            <EditField icon={Mail} label="Email" type="email" value={editFormData.email} onChange={(v) => setEditFormData(f => ({ ...f, email: v }))} disabled={!canEditIdentity} />
             <EditField icon={Phone} label="Phone" type="text" value={editFormData.phone} onChange={(v) => setEditFormData(f => ({ ...f, phone: v }))} />
             <EditField icon={Calendar} label="Birthday" type="date" value={editFormData.birthday} onChange={(v) => setEditFormData(f => ({ ...f, birthday: v }))} />
             <SelectField icon={UsersIcon} label="Gender" value={editFormData.gender} options={["", "Male", "Female"]} onChange={(v) => setEditFormData(f => ({ ...f, gender: v }))} />
@@ -1526,19 +1562,19 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <EditField icon={UsersIcon} label="Height" type="text" value={editFormData.height} onChange={(v) => setEditFormData(f => ({ ...f, height: v }))} />
             <EditField icon={UsersIcon} label="Weight" type="text" value={editFormData.weight} onChange={(v) => setEditFormData(f => ({ ...f, weight: v }))} />
             <EditField icon={Award} label="Blood Type" type="text" value={editFormData.bloodType} onChange={(v) => setEditFormData(f => ({ ...f, bloodType: v }))} />
-            <SelectField icon={Briefcase} label="Contract Type" value={editFormData.contractType} options={CONTRACT_TYPES} onChange={(v) => setEditFormData(f => ({ ...f, contractType: v }))} disabled={!isAdmin} />
-            <SelectField icon={Briefcase} label="Employment Type" value={editFormData.employmentType} options={EMPLOYMENT_TYPES} onChange={(v) => setEditFormData(f => ({ ...f, employmentType: v }))} disabled={!isAdmin} />
-            <EditField icon={Calendar} label="Hire Date" type="date" value={editFormData.hireDate} onChange={(v) => setEditFormData(f => ({ ...f, hireDate: v }))} disabled={!isAdmin} />
-            {isAdmin && (
+            <SelectField icon={Briefcase} label="Contract Type" value={editFormData.contractTypeId} options={["", ...editFormContractTypes.map(c => c.id)]} optionLabels={["None", ...editFormContractTypes.map(c => c.name)]} onChange={(v) => setEditFormData(f => ({ ...f, contractTypeId: v }))} disabled={!canEditEmployment} />
+            <SelectField icon={Briefcase} label="Employment Type" value={editFormData.employmentType} options={EMPLOYMENT_TYPES} onChange={(v) => setEditFormData(f => ({ ...f, employmentType: v }))} disabled={!canEditEmployment} />
+            <EditField icon={Calendar} label="Hire Date" type="date" value={editFormData.hireDate} onChange={(v) => setEditFormData(f => ({ ...f, hireDate: v }))} disabled={!canEditEmployment} />
+            {canEditSalary && (
               <EditField icon={DollarSign} label="Monthly Salary" type="number" value={editFormData.salary} onChange={(v) => setEditFormData(f => ({ ...f, salary: v }))} />
             )}
-            {isAdmin && (
+            {canEditEmployment && (
               <SelectField icon={Building2} label="Department" value={editFormData.groupId} options={["", ...editFormGroups.map(g => g.id)]} optionLabels={["Unassigned", ...editFormGroups.map(g => `${g.name} (${g.code})`)]} onChange={(v) => setEditFormData(f => ({ ...f, groupId: v }))} />
             )}
-            {isAdmin && (
+            {canEditEmployment && (
               <SelectField icon={Shield} label="Role" value={editFormData.roleId} options={["", ...editFormRoles.map(r => r.id)]} optionLabels={["Unassigned", ...editFormRoles.map(r => r.name)]} onChange={(v) => setEditFormData(f => ({ ...f, roleId: v }))} />
             )}
-            {isAdmin && (
+            {canEditStatus && (
               <label className="col-span-full sm:col-span-2 lg:col-span-3 flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors mt-1" style={{ borderColor: editFormData.active ? "var(--rcc-accent)" : "var(--rcc-border)", backgroundColor: editFormData.active ? "color-mix(in srgb, var(--rcc-accent) 5%, transparent)" : undefined }}>
                 <input type="checkbox" checked={editFormData.active} onChange={(e) => setEditFormData(f => ({ ...f, active: e.target.checked }))} className="mt-0.5 h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40" />
                 <div>
@@ -1774,8 +1810,8 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </div>
       </SectionCard>
 
-      {/* System Configuration (visible to roles.edit users) */}
-      {has("roles.edit") && (
+      {/* System Configuration (visible to fpass.manage users) */}
+      {has("fpass.manage") && (
         <SectionCard title="System Configuration" icon={Settings}>
           <div className="space-y-4">
             {/* FPASS Enabled Groups — inline checkboxes */}

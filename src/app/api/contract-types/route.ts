@@ -1,36 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requirePermission } from "@/lib/auth-token";
+import { requireAuth, requirePermission } from "@/lib/auth-token";
 
 // ═══════════════════════════════════════════════════════════════
-// GET    /api/groups       groups.view   — list groups + employeeCount
-// POST   /api/groups       groups.create — create group
+// GET   /api/contract-types   auth only        — list contract types
+// POST  /api/contract-types   profiling.edit   — create
 // ═══════════════════════════════════════════════════════════════
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requirePermission(request, "groups.view");
+    const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
 
-    const groups = await db.group.findMany({
-      include: { _count: { select: { employees: true } } },
+    const isAdmin = auth.user.isSystem || auth.user.permissions.includes("profiling.edit");
+
+    const contractTypes = await db.contractType.findMany({
+      where: isAdmin ? {} : { active: true },
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({
-      groups: groups.map((g) => ({
-        id: g.id,
-        name: g.name,
-        code: g.code,
-        description: g.description,
-        active: g.active,
-        createdAt: g.createdAt.toISOString(),
-        updatedAt: g.updatedAt.toISOString(),
-        employeeCount: g._count.employees,
-      })),
-    });
+    return NextResponse.json({ contractTypes });
   } catch (error) {
-    console.error("[API /groups GET] Error:", error);
+    console.error("[API /contract-types GET] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -40,54 +31,54 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requirePermission(request, "groups.create");
+    const auth = await requirePermission(request, "profiling.edit");
     if (!auth.ok) return auth.response;
 
     const body = await request.json();
-    const { name, code, description, active = true } = body as {
+    const { name, code, active = true } = body as {
       name?: string;
       code?: string;
-      description?: string;
       active?: boolean;
     };
 
     if (!name || !name.trim()) {
       return NextResponse.json(
-        { error: "Group name is required" },
+        { error: "Contract type name is required" },
         { status: 400 }
       );
     }
     if (!code || !code.trim()) {
       return NextResponse.json(
-        { error: "Group code is required" },
+        { error: "Contract type code is required" },
         { status: 400 }
       );
     }
 
     const upperCode = code.trim().toUpperCase();
 
-    const dupName = await db.group.findFirst({
-      where: { name: name.trim().toLowerCase() },
+    const dupName = await db.contractType.findFirst({
+      where: { name: { equals: name.trim(), mode: "insensitive" } },
     });
     if (dupName) {
       return NextResponse.json(
-        { error: "Group with this name already exists" },
+        { error: "Contract type with this name already exists" },
         { status: 409 }
       );
     }
-    const dupCode = await db.group.findUnique({ where: { code: upperCode } });
+    const dupCode = await db.contractType.findUnique({
+      where: { code: upperCode },
+    });
     if (dupCode) {
       return NextResponse.json(
-        { error: "Group with this code already exists" },
+        { error: "Contract type with this code already exists" },
         { status: 409 }
       );
     }
 
-    const group = await db.group.create({
+    const contractType = await db.contractType.create({
       data: {
         name: name.trim(),
         code: upperCode,
-        description: description?.trim() || null,
         active: !!active,
       },
     });
@@ -95,16 +86,16 @@ export async function POST(request: NextRequest) {
     await db.auditLog.create({
       data: {
         userId: auth.user.id,
-        action: "Create Group",
-        entity: "Group",
-        entityId: group.id,
-        metadata: JSON.stringify({ name: group.name, code: group.code }),
+        action: "Create Contract Type",
+        entity: "ContractType",
+        entityId: contractType.id,
+        metadata: JSON.stringify({ name: contractType.name, code: contractType.code }),
       },
     });
 
-    return NextResponse.json({ group }, { status: 201 });
+    return NextResponse.json({ contractType }, { status: 201 });
   } catch (error) {
-    console.error("[API /groups POST] Error:", error);
+    console.error("[API /contract-types POST] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
