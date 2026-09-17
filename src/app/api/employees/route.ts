@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const groupId = searchParams.get("groupId") || undefined;
     const roleId = searchParams.get("roleId") || undefined;
     const contractType = searchParams.get("contractType") || undefined;
+    const employmentType = searchParams.get("employmentType") || undefined;
     const activeParam = searchParams.get("active");
     const fpassStatus = searchParams.get("fpassStatus") || undefined;
     const scope = searchParams.get("scope") || "profiling";
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
     if (effectiveGroupId) where.groupId = effectiveGroupId;
     if (roleId) where.roleId = roleId;
     if (contractType) where.contractType = contractType;
+    if (employmentType) where.employmentType = employmentType;
 
     if (search) {
       const lower = search.toLowerCase();
@@ -106,6 +108,7 @@ export async function GET(request: NextRequest) {
         birthday: e.birthday?.toISOString() ?? null,
         gender: e.gender,
         contractType: e.contractType,
+        employmentType: e.employmentType,
         hireDate: e.hireDate?.toISOString() ?? null,
         salary: e.salary ?? null,
         active: e.active,
@@ -146,6 +149,7 @@ export async function POST(request: NextRequest) {
       groupId,
       roleId,
       contractType = "Regular",
+      employmentType = "Teaching",
       hireDate,
       salary = 0,
       active = true,
@@ -164,6 +168,7 @@ export async function POST(request: NextRequest) {
       groupId?: string;
       roleId?: string;
       contractType?: string;
+      employmentType?: string;
       hireDate?: string;
       salary?: number;
       active?: boolean;
@@ -262,6 +267,7 @@ export async function POST(request: NextRequest) {
         groupId: groupId || null,
         roleId: roleId || null,
         contractType: contractType || "Regular",
+        employmentType: employmentType || "Teaching",
         hireDate: hireDate ? new Date(hireDate) : null,
         salary: salary ?? 0,
         active: !!active,
@@ -306,6 +312,7 @@ export async function POST(request: NextRequest) {
           roleId: employee.roleId,
           roleName: employee.role?.name ?? null,
           contractType: employee.contractType,
+          employmentType: employee.employmentType,
           hireDate: employee.hireDate?.toISOString() ?? null,
           salary: employee.salary ?? null,
           active: employee.active,

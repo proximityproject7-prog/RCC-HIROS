@@ -99,6 +99,7 @@ export async function GET(
         roleId: employee.roleId,
         roleName: employee.role?.name ?? null,
         contractType: employee.contractType,
+        employmentType: employee.employmentType,
         hireDate: employee.hireDate?.toISOString() ?? null,
         salary: employee.salary ?? null,
         active: employee.active,
@@ -199,7 +200,7 @@ export async function PATCH(
     if (canEditAllFields) {
       const {
         employeeId, firstName, middleName, lastName, email, phone, address,
-        birthday, gender, groupId, roleId, contractType, hireDate, salary, active, password,
+        birthday, gender, groupId, roleId, contractType, employmentType, hireDate, salary, active, password,
         placeOfBirth, rank, civilStatus, citizenship, religion, height, weight, bloodType, profileData,
       } = body as Record<string, unknown>;
 
@@ -232,6 +233,7 @@ export async function PATCH(
       if (groupId !== undefined) data.groupId = (groupId as string | null) || null;
       if (roleId !== undefined) data.roleId = (roleId as string | null) || null;
       if (typeof contractType === "string" && contractType.trim()) data.contractType = contractType.trim();
+      if (typeof employmentType === "string" && employmentType.trim()) data.employmentType = employmentType.trim();
       if (hireDate !== undefined) data.hireDate = hireDate ? new Date(hireDate as string) : null;
       if (salary !== undefined) data.salary = (salary as number | null) ?? null;
       if (active !== undefined) data.active = !!active;
@@ -328,6 +330,7 @@ export async function PATCH(
         roleId: updated.roleId,
         roleName: updated.role?.name ?? null,
         contractType: updated.contractType,
+        employmentType: updated.employmentType,
         hireDate: updated.hireDate?.toISOString() ?? null,
         salary: updated.salary ?? null,
         active: updated.active,

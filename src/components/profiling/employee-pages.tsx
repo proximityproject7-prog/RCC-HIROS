@@ -46,6 +46,7 @@ interface Employee {
   birthday: string | null;
   gender: string | null;
   contractType: string;
+  employmentType: string;
   hireDate: string | null;
   salary: number | null;
   active: boolean;
@@ -98,6 +99,7 @@ interface EmployeeFile {
 }
 
 const CONTRACT_TYPES = ["Regular", "Contractual", "Part-Time"];
+const EMPLOYMENT_TYPES = ["Teaching", "Non-Teaching"];
 const GENDER_OPTIONS = ["Male", "Female"];
 
 const inputClass =
@@ -122,6 +124,7 @@ export function EmployeeListPage() {
   const [groupId, setGroupId] = useState("");
   const [roleId, setRoleId] = useState("");
   const [contractType, setContractType] = useState("");
+  const [employmentType, setEmploymentType] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [fpassFilter, setFpassFilter] = useState("");
 
@@ -156,6 +159,7 @@ export function EmployeeListPage() {
       if (groupId) params.set("groupId", groupId);
       if (roleId) params.set("roleId", roleId);
       if (contractType) params.set("contractType", contractType);
+      if (employmentType) params.set("employmentType", employmentType);
       if (activeFilter) params.set("active", activeFilter);
       if (fpassFilter) params.set("fpassStatus", fpassFilter);
       const qs = params.toString();
@@ -205,7 +209,7 @@ export function EmployeeListPage() {
 
       {/* Filters */}
       <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
           <div className="lg:col-span-2 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-rcc-text-muted" />
             <input
@@ -232,6 +236,12 @@ export function EmployeeListPage() {
             <option value="">All contracts</option>
             {CONTRACT_TYPES.map((c) => (
               <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className={inputClass}>
+            <option value="">All types</option>
+            {EMPLOYMENT_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
             ))}
           </select>
           <select value={fpassFilter} onChange={(e) => setFpassFilter(e.target.value)} className={inputClass}>
@@ -277,19 +287,20 @@ export function EmployeeListPage() {
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Group</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Role</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Contract</th>
+                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Type</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-rcc-border">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">
+                  <td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">
                     Loading employees...
                   </td>
                 </tr>
               ) : currentData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">
+                  <td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">
                     No employees found. Adjust filters or create a new record.
                   </td>
                 </tr>
@@ -325,6 +336,15 @@ export function EmployeeListPage() {
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-accent/10 text-rcc-accent border border-rcc-accent/20">
                         {emp.contractType}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                        emp.employmentType === "Teaching"
+                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                          : "bg-purple-50 text-purple-700 border-purple-200"
+                      }`}>
+                        {emp.employmentType}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -376,6 +396,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
   const [groupId, setGroupId] = useState("");
   const [roleId, setRoleId] = useState("");
   const [contractType, setContractType] = useState("Regular");
+  const [employmentType, setEmploymentType] = useState("Teaching");
   const [hireDate, setHireDate] = useState("");
   const [salary, setSalary] = useState("");
   const [active, setActive] = useState(true);
@@ -389,10 +410,10 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
   const isDirty = useMemo(() => {
     const current: Record<string, string | boolean> = {
       employeeIdField, firstName, middleName, lastName, email, phone, address,
-      birthday, gender, groupId, roleId, contractType, hireDate, salary, active,
+      birthday, gender, groupId, roleId, contractType, employmentType, hireDate, salary, active,
     };
     return JSON.stringify(current) !== JSON.stringify(snapshotRef.current);
-  }, [employeeIdField, firstName, middleName, lastName, email, phone, address, birthday, gender, groupId, roleId, contractType, hireDate, salary, active]);
+  }, [employeeIdField, firstName, middleName, lastName, email, phone, address, birthday, gender, groupId, roleId, contractType, employmentType, hireDate, salary, active]);
   useUnsavedChanges(isDirty);
   const confirmNavigation = useNavigationGuard(isDirty);
 
@@ -432,6 +453,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
         setGroupId(e.groupId ?? "");
         setRoleId(e.roleId ?? "");
         setContractType(e.contractType ?? "Regular");
+        setEmploymentType(e.employmentType ?? "Teaching");
         setHireDate(e.hireDate ? e.hireDate.slice(0, 10) : "");
         setSalary(e.salary != null ? String(e.salary) : "");
         setActive(e.active);
@@ -441,6 +463,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
           birthday: e.birthday ? e.birthday.slice(0, 10) : "", gender: e.gender ?? "",
           groupId: e.groupId ?? "", roleId: e.roleId ?? "",
           contractType: e.contractType ?? "Regular",
+          employmentType: e.employmentType ?? "Teaching",
           hireDate: e.hireDate ? e.hireDate.slice(0, 10) : "",
           salary: e.salary != null ? String(e.salary) : "", active: e.active,
         };
@@ -480,6 +503,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
         groupId: groupId || null,
         roleId: roleId || null,
         contractType,
+        employmentType,
         hireDate: hireDate || null,
         salary: salary ? parseFloat(salary) : 0,
         active,
@@ -601,6 +625,13 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
             <select value={contractType} onChange={(e) => setContractType(e.target.value)} className={inputClass}>
               {CONTRACT_TYPES.map((c) => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Employment Type">
+            <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className={inputClass}>
+              {EMPLOYMENT_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
               ))}
             </select>
           </Field>
@@ -864,7 +895,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     phone: "", address: "", birthday: "", gender: "",
     placeOfBirth: "", rank: "", civilStatus: "", citizenship: "",
     religion: "", height: "", weight: "", bloodType: "",
-    contractType: "Regular", hireDate: "", salary: "",
+    contractType: "Regular", employmentType: "Teaching", hireDate: "", salary: "",
     groupId: "", roleId: "", active: true,
   });
   const editSnapshotRef = useRef<string>("");
@@ -1112,6 +1143,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       weight: employee.weight ?? "",
       bloodType: employee.bloodType ?? "",
       contractType: employee.contractType ?? "Regular",
+      employmentType: employee.employmentType ?? "Teaching",
       hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
       salary: employee.salary != null ? String(employee.salary) : "",
       groupId: employee.groupId ?? "",
@@ -1138,6 +1170,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         religion: employee.religion ?? "", height: employee.height ?? "",
         weight: employee.weight ?? "", bloodType: employee.bloodType ?? "",
         contractType: employee.contractType ?? "Regular",
+        employmentType: employee.employmentType ?? "Teaching",
         hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
         salary: employee.salary != null ? String(employee.salary) : "",
         groupId: employee.groupId ?? "", roleId: employee.roleId ?? "", active: employee.active,
@@ -1169,6 +1202,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         body.groupId = editFormData.groupId || null;
         body.roleId = editFormData.roleId || null;
         body.contractType = editFormData.contractType;
+        body.employmentType = editFormData.employmentType;
         body.salary = editFormData.salary ? parseFloat(editFormData.salary) : 0;
         body.active = editFormData.active;
       } else {
@@ -1493,6 +1527,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <EditField icon={UsersIcon} label="Weight" type="text" value={editFormData.weight} onChange={(v) => setEditFormData(f => ({ ...f, weight: v }))} />
             <EditField icon={Award} label="Blood Type" type="text" value={editFormData.bloodType} onChange={(v) => setEditFormData(f => ({ ...f, bloodType: v }))} />
             <SelectField icon={Briefcase} label="Contract Type" value={editFormData.contractType} options={CONTRACT_TYPES} onChange={(v) => setEditFormData(f => ({ ...f, contractType: v }))} disabled={!isAdmin} />
+            <SelectField icon={Briefcase} label="Employment Type" value={editFormData.employmentType} options={EMPLOYMENT_TYPES} onChange={(v) => setEditFormData(f => ({ ...f, employmentType: v }))} disabled={!isAdmin} />
             <EditField icon={Calendar} label="Hire Date" type="date" value={editFormData.hireDate} onChange={(v) => setEditFormData(f => ({ ...f, hireDate: v }))} disabled={!isAdmin} />
             {isAdmin && (
               <EditField icon={DollarSign} label="Monthly Salary" type="number" value={editFormData.salary} onChange={(v) => setEditFormData(f => ({ ...f, salary: v }))} />
@@ -1531,6 +1566,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <InfoItem icon={UsersIcon} label="Weight" value={employee.weight} />
             <InfoItem icon={Award} label="Blood Type" value={employee.bloodType} />
             <InfoItem icon={Briefcase} label="Contract" value={employee.contractType} />
+            <InfoItem icon={Briefcase} label="Employment Type" value={employee.employmentType} />
             <InfoItem icon={Calendar} label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : null} />
             <InfoItem icon={Building2} label="Department" value={employee.group?.name} />
             <InfoItem icon={Shield} label="Role" value={employee.roleName} />

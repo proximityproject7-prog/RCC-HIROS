@@ -82,6 +82,7 @@ model Employee {
   groupId        String?
   roleId         String?
   contractType   String   @default("Regular") // "Regular" | "Contractual" | "Part-Time" | ...
+  employmentType String   @default("Teaching") // "Teaching" | "Non-Teaching"
   active         Boolean  @default(true)
   hireDate       DateTime?
   salary         Float?     @default(0) // Monthly salary
