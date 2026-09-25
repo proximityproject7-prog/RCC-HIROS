@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
     const scope = searchParams.get("scope") || "mine";
     const { user } = auth;
 
-    let where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {};
 
     if (scope === "mine") {
       where.employeeId = user.id;

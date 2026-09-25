@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const upperCode = code.trim().toUpperCase();
 
     const dupName = await db.contractType.findFirst({
-      where: { name: { equals: name.trim(), mode: "insensitive" } },
+      where: { name: name.trim() },
     });
     if (dupName) {
       return NextResponse.json(

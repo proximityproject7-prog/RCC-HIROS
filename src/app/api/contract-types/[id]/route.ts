@@ -36,7 +36,7 @@ export async function PATCH(
         return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
       }
       const dup = await db.contractType.findFirst({
-        where: { name: { equals: name.trim(), mode: "insensitive" }, NOT: { id } },
+        where: { name: name.trim(), NOT: { id } },
       });
       if (dup) {
         return NextResponse.json({ error: "Name already exists" }, { status: 409 });
