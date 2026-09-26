@@ -12,6 +12,7 @@ import {
   usePagination,
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
+import { Switch } from "@/components/ui/switch";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -620,6 +621,8 @@ export function PremisesSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [biometricsSaving, setBiometricsSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -634,6 +637,15 @@ export function PremisesSettingsPage() {
         setError(err instanceof Error ? err.message : "Failed to load premises config.");
       } finally {
         setLoading(false);
+      }
+    })();
+
+    (async () => {
+      try {
+        const bio = await apiFetch<{ enabled: boolean }>("/api/settings/biometrics");
+        setBiometricsEnabled(bio.enabled);
+      } catch {
+        // non-fatal — default keeps the panel hidden
       }
     })();
   }, []);
@@ -681,6 +693,22 @@ export function PremisesSettingsPage() {
       setError(err instanceof Error ? err.message : "Save failed.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleBiometrics = async (checked: boolean) => {
+    setError(null);
+    setBiometricsSaving(true);
+    try {
+      await apiFetch("/api/settings/biometrics", {
+        method: "POST",
+        body: JSON.stringify({ enabled: checked }),
+      });
+      setBiometricsEnabled(checked);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update biometric login setting.");
+    } finally {
+      setBiometricsSaving(false);
     }
   };
 
@@ -758,6 +786,26 @@ export function PremisesSettingsPage() {
             </a>
           )}
         </div>
+      </div>
+
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-rcc-text-primary">Biometric Login</p>
+            <p className="text-xs text-rcc-text-muted mt-0.5">
+              Show the fingerprint (Windows Hello) scan panel on the login page.
+            </p>
+          </div>
+          <Switch
+            checked={biometricsEnabled}
+            onCheckedChange={handleToggleBiometrics}
+            disabled={biometricsSaving}
+            aria-label="Biometric login"
+          />
+        </div>
+        {biometricsSaving && (
+          <p className="text-xs text-rcc-text-muted mt-2">Saving...</p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2">

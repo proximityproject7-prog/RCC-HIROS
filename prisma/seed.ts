@@ -1230,6 +1230,18 @@ async function main() {
     },
   });
 
+  // Biometric (fingerprint) login panel — create-if-missing only,
+  // so an admin's toggle choice survives reseeds.
+  await prisma.systemSetting.upsert({
+    where: { key: "biometrics_enabled" },
+    update: {},
+    create: {
+      key: "biometrics_enabled",
+      value: "true",
+      category: "biometrics",
+    },
+  });
+
   // ═════════════════════════════════════════════════════════════
   // Done
   // ═════════════════════════════════════════════════════════════
