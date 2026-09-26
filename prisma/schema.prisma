@@ -232,13 +232,15 @@ model LeaveApproval {
   leaveRequestId String
   level         Int      // 1 = L1 (Dean), 2 = L2 (HR/Accountant)
   approverId    String
-  status        String   // "approved" | "rejected" | "pending"
+  status        String   // "approved" | "rejected" | "recalled"
   remarks       String?  @db.Text
   actedAt       DateTime?
   createdAt     DateTime @default(now())
 
   leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
   approver     Employee     @relation(fields: [approverId], references: [id])
+
+  @@unique([leaveRequestId, level])
 }
 
 // ═══════════════════════════════════════════════════════════════

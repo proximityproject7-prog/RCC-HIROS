@@ -8,7 +8,8 @@ import { requireAuth } from "@/lib/auth-token";
 // PATCH auth — recall (Edge Case 6)
 //   Only the L1 approver who approved can recall, and only while
 //   the request is in pending_l2 status. Recall moves the request
-//   back to pending_l1 (re-opens L1) and removes the L1 approval.
+//   back to pending_l1 (re-opens L1) and marks the L1 approval as
+//   "recalled" (row preserved for audit; re-approval upserts it).
 // ═══════════════════════════════════════════════════════════════
 
 const REQUEST_INCLUDE = {
@@ -178,7 +179,9 @@ export async function PATCH(
       );
     }
 
-    const l1Approval = req.approvals.find((a) => a.level === 1);
+    const l1Approval = req.approvals.find(
+      (a) => a.level === 1 && a.status === "approved"
+    );
     if (!l1Approval) {
       return NextResponse.json(
         { error: "No L1 approval exists on this request" },
@@ -193,25 +196,40 @@ export async function PATCH(
     }
 
     await db.$transaction(async (tx) => {
-      await tx.leaveApproval.delete({ where: { id: l1Approval.id } });
-      await tx.leaveRequest.update({
-        where: { id },
+      // Conditional gate: recall only while still pending L2 (race-safe).
+      const gate = await tx.leaveRequest.updateMany({
+        where: { id, status: "pending_l2" },
         data: { status: "pending_l1" },
       });
-    });
-
-    await db.auditLog.create({
-      data: {
-        userId: user.id,
-        action: "Recall Leave Request",
-        entity: "LeaveRequest",
-        entityId: id,
-        metadata: JSON.stringify({ requestNo: req.requestNo }),
-      },
+      if (gate.count === 0) throw new Error("ERR_STALE_STATUS");
+      // D — mark recalled instead of deleting: preserves the audit trail
+      // and keeps the (request, level) row for the re-approval upsert.
+      await tx.leaveApproval.update({
+        where: { id: l1Approval.id },
+        data: { status: "recalled", actedAt: new Date() },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: "Recall Leave Request",
+          entity: "LeaveRequest",
+          entityId: id,
+          metadata: JSON.stringify({ requestNo: req.requestNo }),
+        },
+      });
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof Error && error.message === "ERR_STALE_STATUS") {
+      return NextResponse.json(
+        {
+          error:
+            "Request status changed — it is no longer pending L2 approval. Please refresh.",
+        },
+        { status: 400 }
+      );
+    }
     console.error("[API /leave-requests/[id] PATCH] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

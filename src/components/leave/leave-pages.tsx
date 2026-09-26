@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   usePagination,
@@ -489,13 +490,16 @@ export function MyLeavePage() {
 // ═══════════════════════════════════════════════════════════════
 
 export function LeaveApprovalPage() {
-  const { has } = usePermissions();
+  const { has, isSystemAdmin } = usePermissions();
+  const { user } = useAuth();
+  const myId = user?.id ?? null;
   const canL1 = has("leave.approve_l1");
   const canL2 = has("leave.approve_l2");
-  const [tab, setTab] = useState<"l1" | "l2">(canL1 ? "l1" : "l2");
+  const [tab, setTab] = useState<"l1" | "l2" | "recall">(canL1 ? "l1" : "l2");
 
   const [l1Reqs, setL1Reqs] = useState<LeaveRequest[]>([]);
   const [l2Reqs, setL2Reqs] = useState<LeaveRequest[]>([]);
+  const [recallReqs, setRecallReqs] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -514,6 +518,12 @@ export function LeaveApprovalPage() {
           apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l1", { signal })
             .then((d) => { if (!signal?.aborted) setL1Reqs(d.requests ?? []); })
             .catch(() => { if (!signal?.aborted) setL1Reqs([]); })
+        );
+        // Recallable: pending L2 requests carrying my approved L1 row
+        tasks.push(
+          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=recallable", { signal })
+            .then((d) => { if (!signal?.aborted) setRecallReqs(d.requests ?? []); })
+            .catch(() => { if (!signal?.aborted) setRecallReqs([]); })
         );
       }
       if (canL2) {
@@ -572,12 +582,20 @@ export function LeaveApprovalPage() {
     }
   };
 
-  const list = tab === "l1" ? l1Reqs : l2Reqs;
-  const level: 1 | 2 = tab === "l1" ? 1 : 2;
+  const list = tab === "l1" ? l1Reqs : tab === "l2" ? l2Reqs : recallReqs;
+  const level: 1 | 2 = tab === "l2" ? 2 : 1;
+  const recallOnly = tab === "recall";
 
   const l1Pagination = usePagination(l1Reqs, { defaultPageSize: 10 });
   const l2Pagination = usePagination(l2Reqs, { defaultPageSize: 10 });
-  const activePagination = tab === "l1" ? l1Pagination : l2Pagination;
+  const recallPagination = usePagination(recallReqs, { defaultPageSize: 10 });
+  const activePagination = tab === "l1" ? l1Pagination : tab === "l2" ? l2Pagination : recallPagination;
+
+  // Identity gate: recall only my own approved L1 row (system may recall any)
+  const canRecall = (req: LeaveRequest) =>
+    req.approvals.some(
+      (a) => a.level === 1 && a.status === "approved" && (a.approverId === myId || isSystemAdmin)
+    );
 
   return (
     <div className="space-y-4">
@@ -614,6 +632,16 @@ export function LeaveApprovalPage() {
             L2 (Pending HR/Final) <span className="ml-1 px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700">{l2Reqs.length}</span>
           </button>
         )}
+        {canL1 && (
+          <button
+            onClick={() => setTab("recall")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === "recall" ? "border-rcc-accent text-rcc-accent" : "border-transparent text-rcc-text-muted hover:text-rcc-text-primary"
+            }`}
+          >
+            Recallable <span className="ml-1 px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700">{recallReqs.length}</span>
+          </button>
+        )}
       </div>
 
       {/* Cards */}
@@ -623,7 +651,9 @@ export function LeaveApprovalPage() {
         </div>
       ) : list.length === 0 ? (
         <div className="bg-rcc-surface rounded-lg border border-rcc-border p-8 text-center text-sm text-rcc-text-muted">
-          No pending L{level} approvals. You&apos;re all caught up!
+          {recallOnly
+            ? "No requests with your L1 approval awaiting L2. You're all caught up!"
+            : <>No pending L{level} approvals. You&apos;re all caught up!</>}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -632,6 +662,8 @@ export function LeaveApprovalPage() {
               key={req.id}
               req={req}
               level={level}
+              recallOnly={recallOnly}
+              showRecall={canRecall(req)}
               onApprove={() => setActionTarget({ req, level, action: "approve" })}
               onReject={() => setActionTarget({ req, level, action: "reject" })}
               onRecall={() => {
@@ -671,7 +703,7 @@ export function LeaveApprovalPage() {
             </p>
             {actionTarget.action === "recall" ? (
               <p className="text-sm text-rcc-text-secondary">
-                Recalling will return this request to <strong>Pending L1</strong> status and remove your prior L1 approval.
+                Recalling will return this request to <strong>Pending L1</strong> status and mark your prior L1 approval as recalled (kept for audit).
                 The L2 approver will be notified that the request is no longer ready for final approval.
               </p>
             ) : (
@@ -719,12 +751,16 @@ export function LeaveApprovalPage() {
 function RequestCard({
   req,
   level,
+  recallOnly,
+  showRecall,
   onApprove,
   onReject,
   onRecall,
 }: {
   req: LeaveRequest;
   level: 1 | 2;
+  recallOnly: boolean;
+  showRecall: boolean;
   onApprove: () => void;
   onReject: () => void;
   onRecall: () => void;
@@ -796,7 +832,7 @@ function RequestCard({
                 <span className="text-rcc-text-secondary">
                   L{a.level}: {a.approverName ?? "Unknown"}
                 </span>
-                <span className={`font-semibold ${a.status === "approved" ? "text-green-700" : a.status === "rejected" ? "text-rcc-error" : "text-amber-700"}`}>
+                <span className={`font-semibold ${a.status === "approved" ? "text-green-700" : a.status === "rejected" ? "text-rcc-error" : a.status === "recalled" ? "text-rcc-text-muted italic" : "text-amber-700"}`}>
                   {a.status}
                   {a.actedAt && <span className="ml-1 text-rcc-text-muted font-normal">· {new Date(a.actedAt).toLocaleString()}</span>}
                 </span>
@@ -808,19 +844,23 @@ function RequestCard({
 
       {/* Actions */}
       <div className="mt-4 flex items-center gap-2 flex-wrap">
-        <button
-          onClick={onApprove}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors"
-        >
-          <ThumbsUp className="h-3.5 w-3.5" /> Approve L{level}
-        </button>
-        <button
-          onClick={onReject}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-error text-white hover:bg-red-700 transition-colors"
-        >
-          <ThumbsDown className="h-3.5 w-3.5" /> Reject
-        </button>
-        {level === 2 && req.approvals.some((a) => a.level === 1 && a.status === "approved") && (
+        {!recallOnly && (
+          <button
+            onClick={onApprove}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors"
+          >
+            <ThumbsUp className="h-3.5 w-3.5" /> Approve L{level}
+          </button>
+        )}
+        {!recallOnly && (
+          <button
+            onClick={onReject}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-rcc-error text-white hover:bg-red-700 transition-colors"
+          >
+            <ThumbsDown className="h-3.5 w-3.5" /> Reject
+          </button>
+        )}
+        {showRecall && (recallOnly || level === 2) && (
           <button
             onClick={onRecall}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors ml-auto"

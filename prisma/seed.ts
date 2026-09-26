@@ -541,14 +541,6 @@ async function main() {
       status: "pending_l1",
     },
   });
-  await prisma.leaveApproval.create({
-    data: {
-      leaveRequestId: lr2.id,
-      level: 1,
-      approverId: deanId,
-      status: "pending",
-    },
-  });
 
   // ── (3) Pending L2 — Maria, Vacation Leave, 5 days, Dean approved, awaiting HR ──
   const lr3 = await prisma.leaveRequest.create({
@@ -571,14 +563,6 @@ async function main() {
       status: "approved",
       remarks: "Approved — coverage arranged with other faculty.",
       actedAt: dayTime(-5, 10, 0),
-    },
-  });
-  await prisma.leaveApproval.create({
-    data: {
-      leaveRequestId: lr3.id,
-      level: 2,
-      approverId: hrId,
-      status: "pending",
     },
   });
 
@@ -699,17 +683,6 @@ async function main() {
       workdays: 1,
       reason: "Medical check-up scheduled.",
       status: "pending_l1",
-    },
-  });
-  // HR staff reports to... who approves L1? 
-  // For HR group, L1 might be handled differently. We'll use a generic setup.
-  // Since there's no Dean for HR, we can leave it with a pending approval.
-  await prisma.leaveApproval.create({
-    data: {
-      leaveRequestId: lr8.id,
-      level: 1,
-      approverId: hrId, // HR head approves L1 for HR staff
-      status: "pending",
     },
   });
 

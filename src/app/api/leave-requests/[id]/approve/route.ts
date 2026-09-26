@@ -13,6 +13,12 @@ import { requireAuth } from "@/lib/auth-token";
 //   2 — block self-approval unless canSelfApproveLeave; block L2 if same
 //       person performed L1
 //   5 — rejection wins: any rejection finalizes the request as rejected
+//   7 — status flip is gated INSIDE the transaction (updateMany on the
+//       expected pending status; count 0 ⇒ 400, race-safe)
+//   8 — one LeaveApproval row per (request, level): upsert, so re-approval
+//       after an L1 recall overwrites instead of duplicating
+//   10 — rejection requires non-empty remarks
+//   11 — audit log is written inside the same transaction
 // On final approval, increment leave balance usedDays for the year of
 // the leave's start date.
 // ═══════════════════════════════════════════════════════════════
@@ -93,9 +99,12 @@ export async function POST(
       );
     }
 
-    // Edge Case 2 — Block L2 if same person did L1
+    // Edge Case 2 — Block L2 if same person did L1 (approved row only;
+    // a recalled L1 row must not block a different L2 approver)
     if (level === 2) {
-      const l1Approval = req.approvals.find((a) => a.level === 1);
+      const l1Approval = req.approvals.find(
+        (a) => a.level === 1 && a.status === "approved"
+      );
       if (l1Approval && l1Approval.approverId === user.id && !user.isSystem) {
         return NextResponse.json(
           {
@@ -122,31 +131,54 @@ export async function POST(
 
     // Edge Case 5 — Rejection wins
     if (action === "reject") {
+      // E10 — rejection requires a reason
+      const cleanRemarks = remarks?.trim() ?? "";
+      if (!cleanRemarks) {
+        return NextResponse.json(
+          { error: "Remarks are required when rejecting a request" },
+          { status: 400 }
+        );
+      }
+      const expectedStatus = level === 1 ? "pending_l1" : "pending_l2";
       await db.$transaction(async (tx) => {
-        await tx.leaveApproval.create({
-          data: {
+        // In-tx status gate: flips pending→rejected only if still pending.
+        // count 0 ⇒ another actor already moved it (race) → 400, not 500.
+        const gate = await tx.leaveRequest.updateMany({
+          where: { id, status: expectedStatus },
+          data: { status: "rejected" },
+        });
+        if (gate.count === 0) throw new Error("ERR_STALE_STATUS");
+        // One row per (request, level): re-decision after recall overwrites.
+        await tx.leaveApproval.upsert({
+          where: { leaveRequestId_level: { leaveRequestId: id, level } },
+          update: {
+            approverId: user.id,
+            status: "rejected",
+            remarks: cleanRemarks,
+            actedAt: new Date(),
+          },
+          create: {
             leaveRequestId: id,
             level,
             approverId: user.id,
             status: "rejected",
-            remarks: remarks?.trim() || null,
+            remarks: cleanRemarks,
             actedAt: new Date(),
           },
         });
-        await tx.leaveRequest.update({
-          where: { id },
-          data: { status: "rejected" },
+        // E11 — audit inside the same transaction
+        await tx.auditLog.create({
+          data: {
+            userId: user.id,
+            action: `Reject Leave (L${level})`,
+            entity: "LeaveRequest",
+            entityId: id,
+            metadata: JSON.stringify({
+              requestNo: req.requestNo,
+              remarks: cleanRemarks,
+            }),
+          },
         });
-      });
-
-      await db.auditLog.create({
-        data: {
-          userId: user.id,
-          action: `Reject Leave (L${level})`,
-          entity: "LeaveRequest",
-          entityId: id,
-          metadata: JSON.stringify({ requestNo: req.requestNo, remarks }),
-        },
       });
 
       return NextResponse.json({ success: true, status: "rejected" });
@@ -187,20 +219,32 @@ export async function POST(
       finalApproval = true;
     }
 
+    const expectedStatus = level === 1 ? "pending_l1" : "pending_l2";
     await db.$transaction(async (tx) => {
-      await tx.leaveApproval.create({
-        data: {
+      // In-tx status gate (race-safe): only the first actor flips the status.
+      const gate = await tx.leaveRequest.updateMany({
+        where: { id, status: expectedStatus },
+        data: { status: newStatus },
+      });
+      if (gate.count === 0) throw new Error("ERR_STALE_STATUS");
+      // One row per (request, level): re-approval after recall overwrites.
+      const approvalRemarks = remarks?.trim() || null;
+      await tx.leaveApproval.upsert({
+        where: { leaveRequestId_level: { leaveRequestId: id, level } },
+        update: {
+          approverId: user.id,
+          status: "approved",
+          remarks: approvalRemarks,
+          actedAt: new Date(),
+        },
+        create: {
           leaveRequestId: id,
           level,
           approverId: user.id,
           status: "approved",
-          remarks: remarks?.trim() || null,
+          remarks: approvalRemarks,
           actedAt: new Date(),
         },
-      });
-      await tx.leaveRequest.update({
-        where: { id },
-        data: { status: newStatus },
       });
 
       if (finalApproval) {
@@ -233,24 +277,34 @@ export async function POST(
           });
         }
       }
-    });
 
-    await db.auditLog.create({
-      data: {
-        userId: user.id,
-        action: `Approve Leave (L${level})`,
-        entity: "LeaveRequest",
-        entityId: id,
-        metadata: JSON.stringify({
-          requestNo: req.requestNo,
-          newStatus,
-          finalApproval,
-        }),
-      },
+      // E11 — audit inside the same transaction
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: `Approve Leave (L${level})`,
+          entity: "LeaveRequest",
+          entityId: id,
+          metadata: JSON.stringify({
+            requestNo: req.requestNo,
+            newStatus,
+            finalApproval,
+          }),
+        },
+      });
     });
 
     return NextResponse.json({ success: true, status: newStatus, finalApproval });
   } catch (error) {
+    if (error instanceof Error && error.message === "ERR_STALE_STATUS") {
+      return NextResponse.json(
+        {
+          error:
+            "Request status changed — it is no longer pending approval at this level. Please refresh.",
+        },
+        { status: 400 }
+      );
+    }
     console.error("[API /leave-requests/[id]/approve] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

@@ -9,5 +9,8 @@ export default defineConfig({
   },
   datasource: {
     url: env("DATABASE_URL"),
+    shadowDatabaseUrl:
+      process.env.SHADOW_DATABASE_URL ??
+      "mysql://root:@localhost:3306/rcc_hiros_shadow",
   },
 });

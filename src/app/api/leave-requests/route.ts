@@ -7,7 +7,9 @@ import path from "path";
 
 // ═══════════════════════════════════════════════════════════════
 // /api/leave-requests
-// GET   auth            — list with scope=mine|pending_l1|pending_l2|all
+// GET   auth            — list with scope=mine|pending_l1|pending_l2|recallable|all
+//   recallable: pending_l2 requests carrying MY approved L1 row
+//   (the set I am allowed to recall). System sees all pending_l2.
 // POST  leave.request   — multipart form data create
 // ═══════════════════════════════════════════════════════════════
 
@@ -189,8 +191,18 @@ export async function GET(request: NextRequest) {
       where.employeeId = user.id;
     } else if (scope === "pending_l1") {
       where.status = "pending_l1";
-      if (!user.scopeAllLeave && user.groupId) {
-        where.employee = { groupId: user.groupId };
+      if (!user.isSystem && !user.scopeAllLeave) {
+        if (user.groupId) {
+          where.employee = { groupId: user.groupId };
+        } else {
+          // E7 — groupless approver: outside every group, sees nothing
+          return NextResponse.json({ requests: [] });
+        }
+      }
+      // E8 — approvers who cannot self-approve never see their own
+      // requests in the approval queue (acting on them is 403 anyway)
+      if (!user.isSystem && !user.canSelfApproveLeave) {
+        where.employeeId = { not: user.id };
       }
       if (!user.isSystem && !user.permissions.includes("leave.approve_l1")) {
         return NextResponse.json(
@@ -200,14 +212,49 @@ export async function GET(request: NextRequest) {
       }
     } else if (scope === "pending_l2") {
       where.status = "pending_l2";
-      if (!user.scopeAllLeave && user.groupId) {
-        where.employee = { groupId: user.groupId };
+      if (!user.isSystem && !user.scopeAllLeave) {
+        if (user.groupId) {
+          where.employee = { groupId: user.groupId };
+        } else {
+          // E7 — groupless approver: outside every group, sees nothing
+          return NextResponse.json({ requests: [] });
+        }
+      }
+      // E8 — approvers who cannot self-approve never see their own
+      // requests in the approval queue (acting on them is 403 anyway)
+      if (!user.isSystem && !user.canSelfApproveLeave) {
+        where.employeeId = { not: user.id };
       }
       if (!user.isSystem && !user.permissions.includes("leave.approve_l2")) {
         return NextResponse.json(
           { error: "Forbidden - insufficient permissions" },
           { status: 403 }
         );
+      }
+    } else if (scope === "recallable") {
+      // B — the set the caller may recall: pending L2 with MY approved L1 row
+      if (!user.isSystem && !user.permissions.includes("leave.approve_l1")) {
+        return NextResponse.json(
+          { error: "Forbidden - insufficient permissions" },
+          { status: 403 }
+        );
+      }
+      where.status = "pending_l2";
+      if (!user.isSystem) {
+        where.approvals = {
+          some: { level: 1, status: "approved", approverId: user.id },
+        };
+      }
+      if (!user.isSystem && !user.scopeAllLeave) {
+        if (user.groupId) {
+          where.employee = { groupId: user.groupId };
+        } else {
+          // E7 — groupless approver: outside every group, sees nothing
+          return NextResponse.json({ requests: [] });
+        }
+      }
+      if (!user.isSystem && !user.canSelfApproveLeave) {
+        where.employeeId = { not: user.id };
       }
     } else if (scope === "all") {
       if (
