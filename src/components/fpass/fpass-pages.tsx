@@ -3,17 +3,13 @@
 import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
-  FileText, Settings, Users, CheckCircle2, X, Search,
+  CheckCircle2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore } from "@/store/auth-store";
 import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import {
-  usePagination,
-  PaginationControls,
-} from "@/components/shared/table-pagination-v2";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -151,6 +147,13 @@ export function FpassPage({ employeeId, submissionId, showSettings: showSettings
 
   const [showSettings, setShowSettings] = useState(showSettingsProp ?? false);
 
+  // No list view: Employee Records (FPASS filter + status column) is the
+  // hub. Bare `fpass` navigation redirects there.
+  const showList = !showSettings && !employeeId && !submissionId;
+  useEffect(() => {
+    if (showList) setCurrentPage("profiling");
+  }, [showList, setCurrentPage]);
+
   // If admin clicks settings, show settings page
   if (showSettings && canManage) {
     return <FpassSettingsPage onBack={() => setShowSettings(false)} />;
@@ -161,7 +164,7 @@ export function FpassPage({ employeeId, submissionId, showSettings: showSettings
     return (
       <FpassSubmissionViewPage
         submissionId={submissionId}
-        onBack={() => setCurrentPage("fpass")}
+        onBack={() => setCurrentPage("profiling")}
         onSettings={() => setShowSettings(true)}
         canManage={canManage}
       />
@@ -181,201 +184,8 @@ export function FpassPage({ employeeId, submissionId, showSettings: showSettings
     );
   }
 
-  // Default: show submission list (for admins)
-  return (
-    <FpassListPage
-      onSettings={() => setShowSettings(true)}
-      canManage={canManage}
-    />
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
-// FPASS List Page (all employees + submission status)
-// ═══════════════════════════════════════════════════════════════
-
-interface FpassStatusEmployee {
-  employeeId: string;
-  name: string;
-  group: { id: string; name: string; code: string } | null;
-  roleName: string | null;
-  submission: { id: string; totalPoints: number; updatedAt: string; schoolYear: string } | null;
-  hasSubmission: boolean;
-}
-
-function FpassListPage({ onSettings, canManage }: { onSettings: () => void; canManage: boolean }) {
-  const [employees, setEmployees] = useState<FpassStatusEmployee[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "empty">("all");
-  const [groupFilter, setGroupFilter] = useState("all");
-  const { setCurrentPage } = useAuthStore();
-
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const data = await apiFetch<{ employees: FpassStatusEmployee[] }>("/api/fpass/status", { signal: controller.signal });
-        setEmployees(data.employees ?? []);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        // non-fatal
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => controller.abort();
-  }, []);
-
-  const groups = useMemo(() => {
-    const map = new Map<string, string>();
-    employees.forEach((e) => { if (e.group) map.set(e.group.id, e.group.name); });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [employees]);
-
-  const filtered = useMemo(() => {
-    return employees.filter((e) => {
-      if (search) {
-        const q = search.toLowerCase();
-        if (!e.employeeId.toLowerCase().includes(q) && !e.name.toLowerCase().includes(q)) return false;
-      }
-      if (groupFilter !== "all" && e.group?.id !== groupFilter) return false;
-      if (statusFilter === "submitted" && !e.hasSubmission) return false;
-      if (statusFilter === "empty" && e.hasSubmission) return false;
-      return true;
-    });
-  }, [employees, search, statusFilter, groupFilter]);
-
-  const { currentData, controls } = usePagination(filtered, { defaultPageSize: 15 });
-
-  const submittedCount = employees.filter((e) => e.hasSubmission).length;
-  const emptyCount = employees.length - submittedCount;
-
-  return (
-    <div className="space-y-4">
-      <button
-        onClick={() => setCurrentPage("dashboard")}
-        className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </button>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-rcc-text-primary">FPASS Submissions</h1>
-          <p className="text-sm text-rcc-text-muted mt-0.5">Track faculty performance appraisal status.</p>
-        </div>
-        {canManage && (
-          <button
-            onClick={onSettings}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-          >
-            <Settings className="h-4 w-4" /> Group Settings
-          </button>
-        )}
-      </div>
-
-      {/* Filters */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-4 space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-rcc-text-muted" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or employee ID..."
-              className="w-full pl-9 pr-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary placeholder:text-rcc-text-muted focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
-            />
-          </div>
-          <select
-            value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
-          >
-            <option value="all">All groups</option>
-            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-rcc-text-muted uppercase tracking-wide">Status:</span>
-          {(["all", "submitted", "empty"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                statusFilter === s
-                  ? "bg-rcc-primary text-rcc-primary-foreground"
-                  : "bg-rcc-bg border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg/80"
-              }`}
-            >
-              {s === "all" ? "All" : s === "submitted" ? `Submitted (${submittedCount})` : `Not Started (${emptyCount})`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-rcc-bg/50 border-b border-rcc-border">
-              <tr>
-                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Employee ID</th>
-                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Name</th>
-                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Department</th>
-                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Status</th>
-                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Total Points</th>
-                <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Last Updated</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-rcc-border">
-              {loading ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-rcc-primary border-t-transparent" />
-                    Loading...
-                  </div>
-                </td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-rcc-text-muted">No employees found.</td></tr>
-              ) : (
-                currentData.map((e) => (
-                  <tr
-                    key={e.employeeId}
-                    onClick={() => e.hasSubmission && e.submission && setCurrentPage("fpass", `view:${e.submission.id}`)}
-                    className={`transition-colors ${e.hasSubmission ? "cursor-pointer hover:bg-rcc-bg/30" : ""}`}
-                  >
-                    <td className="px-4 py-3 font-mono text-xs text-rcc-text-secondary">{e.employeeId}</td>
-                    <td className="px-4 py-3 font-medium text-rcc-text-primary">{e.name}</td>
-                    <td className="px-4 py-3 text-rcc-text-secondary">{e.group?.name ?? "Unassigned"}</td>
-                    <td className="px-4 py-3">
-                      {e.hasSubmission ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> SUBMITTED
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-bg text-rcc-text-muted border border-rcc-border">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rcc-text-muted" /> NOT STARTED
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-rcc-text-secondary tabular-nums font-medium">
-                      {e.submission ? e.submission.totalPoints.toFixed(1) : "-"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-rcc-text-muted">
-                      {e.submission ? new Date(e.submission.updatedAt).toLocaleDateString() : "-"}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <PaginationControls {...controls} />
-    </div>
-  );
+  // Default: no list view (removed) — redirect handled above.
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1248,17 +1058,17 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <button onClick={() => requestNavigation(() => onBack())} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
+      <div>
+        <button onClick={() => requestNavigation(() => onBack())} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div>
-          <h1 className="text-xl font-bold text-rcc-text-primary">FPASS Group Settings</h1>
+          <h1 className="text-xl font-bold text-rcc-text-primary">FPASS Configuration</h1>
           <p className="text-sm text-rcc-text-muted mt-0.5">Select groups, then enable or disable FPASS access for them.</p>
         </div>
       </div>
 
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border">
         {/* Header with actions */}
         <div className="px-4 py-3 border-b border-rcc-border flex items-center justify-between gap-4">
           <span className="text-sm font-semibold text-rcc-text-primary">

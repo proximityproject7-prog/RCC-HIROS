@@ -113,7 +113,8 @@ const inputClass =
 
 export function EmployeeListPage() {
   const { setCurrentPage } = useAuthStore();
-  const { has } = usePermissions();
+  const { has, hasAny } = usePermissions();
+  const { user } = useAuth();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [groups, setGroups] = useState<GroupBrief[]>([]);
@@ -190,6 +191,33 @@ export function EmployeeListPage() {
   const { currentData, controls } = usePagination(employees, { defaultPageSize: 15 });
 
   const canViewInactive = has("profiling.view_inactive");
+
+  // FPASS submission status per employee (EMP-code → status) for the FPASS
+  // column. Shown only to fill/manage holders; hidden if the fetch fails.
+  const canViewFpass = hasAny(["fpass.fill", "fpass.manage"]);
+  const [fpassMap, setFpassMap] = useState<Map<string, { hasSubmission: boolean; submissionId: string | null }> | null>(null);
+  useEffect(() => {
+    if (!canViewFpass) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const data = await apiFetch<{ employees: { employeeId: string; hasSubmission: boolean; submission: { id: string } | null }[] }>(
+          "/api/fpass/status",
+          { signal: controller.signal }
+        );
+        const map = new Map<string, { hasSubmission: boolean; submissionId: string | null }>();
+        for (const e of data.employees ?? []) {
+          map.set(e.employeeId, { hasSubmission: e.hasSubmission, submissionId: e.submission?.id ?? null });
+        }
+        if (!controller.signal.aborted) setFpassMap(map);
+      } catch {
+        // non-fatal — column stays hidden
+      }
+    })();
+    return () => controller.abort();
+  }, [canViewFpass]);
+  const showFpassCol = fpassMap !== null;
+  const canFillFor = (emp: Employee) => user?.id === emp.id || has("fpass.manage");
 
   return (
     <div className="space-y-4">
@@ -312,23 +340,43 @@ export function EmployeeListPage() {
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Contract</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Type</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Status</th>
+                {showFpassCol && (
+                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">FPASS</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-rcc-border">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">
+                  <td colSpan={showFpassCol ? 8 : 7} className="px-4 py-10 text-center text-rcc-text-muted">
                     Loading employees...
                   </td>
                 </tr>
               ) : currentData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-rcc-text-muted">
+                  <td colSpan={showFpassCol ? 8 : 7} className="px-4 py-10 text-center text-rcc-text-muted">
                     No employees found. Adjust filters or create a new record.
                   </td>
                 </tr>
               ) : (
-                currentData.map((emp) => (
+                currentData.map((emp) => {
+                  const fpassEntry = fpassMap?.get(emp.employeeId);
+                  const fpassSubmitted = !!fpassEntry?.hasSubmission && !!fpassEntry?.submissionId;
+                  const fpassTarget = fpassSubmitted
+                    ? `view:${fpassEntry!.submissionId}`
+                    : canFillFor(emp)
+                      ? `emp:${emp.id}`
+                      : null;
+                  const fpassBadge = fpassSubmitted ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> SUBMITTED
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rcc-bg text-rcc-text-muted border border-rcc-border">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rcc-text-muted" /> NOT STARTED
+                    </span>
+                  );
+                  return (
                   <tr
                     key={emp.id}
                     onClick={() => setCurrentPage("profiling", `view:${emp.id}`)}
@@ -381,8 +429,24 @@ export function EmployeeListPage() {
                         </span>
                       )}
                     </td>
+                    {showFpassCol && (
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        {fpassTarget ? (
+                          <button
+                            onClick={() => setCurrentPage("fpass", fpassTarget)}
+                            className="cursor-pointer hover:opacity-80 transition-opacity"
+                            title={fpassSubmitted ? "View FPASS submission" : "Fill FPASS form"}
+                          >
+                            {fpassBadge}
+                          </button>
+                        ) : (
+                          fpassBadge
+                        )}
+                      </td>
+                    )}
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
