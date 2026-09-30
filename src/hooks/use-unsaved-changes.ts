@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 
 /**
  * Warns before leaving the page or navigating when there are unsaved changes.
@@ -37,30 +37,89 @@ export function useUnsavedChanges(isDirty: boolean): boolean {
 }
 
 /**
- * Returns a `confirmNavigation` callback that prompts the user if there are
- * unsaved changes. Call it before any manual navigation (sidebar clicks,
- * Back buttons, etc.).
+ * In-app navigation guard for unsaved changes. Unlike the native
+ * `window.confirm`, this drives the shared `ConfirmDialog` component so
+ * dirty-navigation prompts match the app's UI/UX.
+ *
+ * Returns `requestNavigation(action)` — runs `action` immediately when
+ * clean, otherwise opens the dialog — plus `navDialogProps` to spread
+ * onto a single `<ConfirmDialog />` rendered by the component:
  *
  * @example
  * ```tsx
- * const confirmNavigation = useNavigationGuard(isDirty);
+ * const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty);
  *
- * <button onClick={() => {
- *   if (!confirmNavigation()) return;
- *   onBack();
- * }}>Back</button>
+ * <button onClick={() => requestNavigation(() => onBack())}>Back</button>
+ * ...
+ * {navDialogProps && <ConfirmDialog {...navDialogProps} />}
  * ```
  */
-export function useNavigationGuard(isDirty: boolean): () => boolean {
+export interface NavigationGuardDialogProps {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  variant: "danger" | "warning";
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export function useNavigationGuard(
+  isDirty: boolean,
+  opts?: {
+    title?: string;
+    message?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }
+): {
+  requestNavigation: (action: () => void) => void;
+  navDialogProps: NavigationGuardDialogProps | null;
+} {
   const isDirtyRef = useRef(isDirty);
   useEffect(() => {
     isDirtyRef.current = isDirty;
   }, [isDirty]);
 
-  const confirm = useCallback(() => {
-    if (!isDirtyRef.current) return true;
-    return window.confirm("You have unsaved changes. Leave anyway?");
+  const [pending, setPending] = useState<(() => void) | null>(null);
+  const pendingRef = useRef<(() => void) | null>(null);
+  pendingRef.current = pending;
+
+  const requestNavigation = useCallback((action: () => void) => {
+    if (!isDirtyRef.current) {
+      action();
+      return;
+    }
+    setPending(() => action);
   }, []);
 
-  return confirm;
+  const handleCancel = useCallback(() => {
+    pendingRef.current = null;
+    setPending(null);
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    const fn = pendingRef.current;
+    pendingRef.current = null;
+    setPending(null);
+    fn?.();
+  }, []);
+
+  return {
+    requestNavigation,
+    navDialogProps: pending
+      ? {
+          open: true,
+          title: opts?.title ?? "Unsaved changes",
+          message:
+            opts?.message ?? "You have unsaved changes. Leave anyway?",
+          confirmLabel: opts?.confirmLabel ?? "Leave",
+          cancelLabel: opts?.cancelLabel ?? "Stay",
+          variant: "warning" as const,
+          onConfirm: handleConfirm,
+          onCancel: handleCancel,
+        }
+      : null,
+  };
 }

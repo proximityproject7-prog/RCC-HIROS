@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } fro
 import { useAuth } from "@/hooks/use-auth";
 import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
 import {
-  Plus, Search, Pencil, ArrowLeft, Save, Users as UsersIcon, Upload,
+  Plus, Search, Pencil, ArrowLeft, ArrowRight, Save, Users as UsersIcon, Upload,
   FileText, Download, Trash2, Eye, X, Lock, Mail, Phone, MapPin, Calendar,
   IdCard, Briefcase, Award, Image as ImageIcon, AlertTriangle, Building2, Settings,
   Hash, User, DollarSign, Shield, Fingerprint,
@@ -208,6 +208,14 @@ export function EmployeeListPage() {
               className="inline-flex items-center gap-2 bg-rcc-surface border border-rcc-border text-rcc-text-secondary px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-bg transition-colors"
             >
               Contract Types
+            </button>
+          )}
+          {has("fpass.manage") && (
+            <button
+              onClick={() => setCurrentPage("fpass", "settings")}
+              className="inline-flex items-center gap-2 bg-rcc-surface border border-rcc-border text-rcc-text-secondary px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-bg transition-colors"
+            >
+              FPASS Configuration
             </button>
           )}
           {has("profiling.create") && (
@@ -431,7 +439,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
     return JSON.stringify(current) !== JSON.stringify(snapshotRef.current);
   }, [employeeIdField, firstName, middleName, lastName, email, phone, address, birthday, gender, groupId, roleId, contractTypeId, employmentType, hireDate, salary, active]);
   useUnsavedChanges(isDirty);
-  const confirmNavigation = useNavigationGuard(isDirty);
+  const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty);
 
   useEffect(() => {
     (async () => {
@@ -554,9 +562,10 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
 
   return (
     <div className="space-y-6">
+      {navDialogProps && <ConfirmDialog {...navDialogProps} />}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("profiling"); }}
+          onClick={() => requestNavigation(() => setCurrentPage("profiling"))}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -734,7 +743,7 @@ export function EmployeeFormPage({ mode, employeeId }: { mode: "create" | "edit"
 
       <div className="flex justify-end gap-2 pt-2">
         <button
-          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("profiling"); }}
+          onClick={() => requestNavigation(() => setCurrentPage("profiling"))}
           disabled={saving}
           className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
         >
@@ -926,7 +935,8 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     if (!editing) return false;
     return JSON.stringify(editFormData) !== editSnapshotRef.current;
   }, [editing, editFormData]);
-  const confirmInlineNavigation = useNavigationGuard(isInlineDirty);
+  const { requestNavigation: requestInlineNav, navDialogProps: inlineNavDialog } =
+    useNavigationGuard(isInlineDirty);
   const [editFormGroups, setEditFormGroups] = useState<GroupBrief[]>([]);
   const [editFormRoles, setEditFormRoles] = useState<RoleBrief[]>([]);
   const [editFormContractTypes, setEditFormContractTypes] = useState<ContractTypeBrief[]>([]);
@@ -949,15 +959,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     if (editingSection === null) return false;
     return JSON.stringify(sectionForm) !== sectionSnapshotRef.current;
   }, [editingSection, sectionForm]);
-  const confirmSectionNavigation = useNavigationGuard(isSectionDirty);
+  const { requestNavigation: requestSectionNav, navDialogProps: sectionNavDialog } =
+    useNavigationGuard(isSectionDirty);
   const [sectionSaving, setSectionSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
-
-  // System configuration (visible to roles.edit users)
-  const [configGroups, setConfigGroups] = useState<GroupBrief[]>([]);
-  const [configFpassGroupIds, setConfigFpassGroupIds] = useState<string[]>([]);
-  const [fpassConfigSaving, setFpassConfigSaving] = useState(false);
-  const [fpassConfigMsg, setFpassConfigMsg] = useState<string | null>(null);
 
   // Parse profileData JSON
   useEffect(() => {
@@ -995,25 +1000,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       }
     })();
   }, [employee?.groupId]);
-
-  // Load system configuration for roles.edit users
-  useEffect(() => {
-    if (!has("roles.edit")) return;
-    (async () => {
-      try {
-        const groupsData = await apiFetch<{ groups: GroupBrief[] }>("/api/groups");
-        setConfigGroups(groupsData.groups ?? []);
-      } catch {
-        // groups fetch failed — non-fatal
-      }
-      try {
-        const fpassData = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings");
-        setConfigFpassGroupIds(fpassData.enabledGroupIds ?? []);
-      } catch {
-        // fpass settings fetch failed — non-fatal
-      }
-    })();
-  }, [has]);
 
   // Revoke blob URLs when viewer closes
   useEffect(() => {
@@ -1269,25 +1255,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     }
   };
 
-  // ── FPASS config auto-save (inline in System Configuration) ──
-  const autoSaveFpassConfig = async (newIds: string[]) => {
-    setFpassConfigSaving(true);
-    try {
-      await apiFetch("/api/fpass/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ enabledGroupIds: newIds }),
-      });
-      setFpassConfigMsg("Saved");
-      setTimeout(() => setFpassConfigMsg(null), 2000);
-    } catch (err) {
-      // revert on error
-      setConfigFpassGroupIds(prev => prev);
-      setError(err instanceof Error ? err.message : "Failed to save FPASS settings.");
-    } finally {
-      setFpassConfigSaving(false);
-    }
-  };
-
   // ── Password change (profile page) ────────────────────────────
   const handlePasswordChange = async () => {
     if (!newPassword || newPassword.length < 8) {
@@ -1538,7 +1505,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         canEdit={canEditProfile}
         editing={editing}
         onEdit={startEditing}
-        onCancel={() => { if (!confirmInlineNavigation()) return; cancelEditing(); }}
+        onCancel={() => requestInlineNav(() => cancelEditing())}
         onSave={saveEditing}
         saving={editSaving}
         editError={editError}
@@ -1659,7 +1626,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           editing={editingSection === key}
           canEdit={canEditProfile}
           onEdit={() => startEditSection(key)}
-          onCancel={() => { if (!confirmSectionNavigation()) return; setEditingSection(null); }}
+          onCancel={() => requestSectionNav(() => setEditingSection(null))}
           onSave={() => saveSection(key)}
           saving={sectionSaving}
           onAdd={() => addSectionRow(key)}
@@ -1675,7 +1642,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         canEdit={canEditProfile}
         editing={editingSection === "awards"}
         onEdit={() => startEditSection("awards")}
-        onCancel={() => { if (!confirmSectionNavigation()) return; setEditingSection(null); }}
+        onCancel={() => requestSectionNav(() => setEditingSection(null))}
         onSave={() => saveSection("awards")}
         saving={sectionSaving}
         noPadding
@@ -1810,44 +1777,19 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </div>
       </SectionCard>
 
-      {/* System Configuration (visible to fpass.manage users) */}
+      {/* FPASS Configuration link (managed on the dedicated page) */}
       {has("fpass.manage") && (
         <SectionCard title="System Configuration" icon={Settings}>
-          <div className="space-y-4">
-            {/* FPASS Enabled Groups — inline checkboxes */}
-            <div>
-              <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide mb-2">FPASS Enabled Groups</h3>
-              <p className="text-xs text-rcc-text-muted mb-3">Select which departments can fill the Faculty Performance Appraisal form.</p>
-              {configGroups.length === 0 ? (
-                <p className="text-xs text-rcc-text-muted">Loading groups...</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {configGroups.map(g => (
-                    <label key={g.id} className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${configFpassGroupIds.includes(g.id) ? "border-rcc-accent/40 bg-rcc-accent/5" : "border-rcc-border hover:bg-rcc-bg/40"}`}>
-                      <input
-                        type="checkbox"
-                        checked={configFpassGroupIds.includes(g.id)}
-                        onChange={(e) => {
-                          const newIds = e.target.checked
-                            ? [...configFpassGroupIds, g.id]
-                            : configFpassGroupIds.filter(id => id !== g.id);
-                          setConfigFpassGroupIds(newIds);
-                          autoSaveFpassConfig(newIds);
-                        }}
-                        className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-rcc-text-primary">{g.name}</p>
-                        <p className="text-xs text-rcc-text-muted">{g.code}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-              {fpassConfigMsg && <p className="mt-2 text-xs text-green-600">{fpassConfigMsg}</p>}
-            </div>
-
-          </div>
+          <button
+            onClick={() => setCurrentPage("fpass", "settings")}
+            className="w-full flex items-center justify-between gap-2 p-3 rounded-md border border-rcc-border hover:bg-rcc-bg/40 transition-colors text-left"
+          >
+            <span>
+              <span className="block text-sm font-medium text-rcc-text-primary">FPASS Configuration</span>
+              <span className="block text-xs text-rcc-text-muted">Choose which departments can fill the appraisal form.</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-rcc-text-muted" />
+          </button>
         </SectionCard>
       )}
 
@@ -1960,6 +1902,8 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           onCancel={() => setConfirmState(null)}
         />
       )}
+      {inlineNavDialog && <ConfirmDialog {...inlineNavDialog} />}
+      {sectionNavDialog && <ConfirmDialog {...sectionNavDialog} />}
     </div>
   );
 }

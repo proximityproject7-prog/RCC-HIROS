@@ -279,7 +279,7 @@ export function GroupFormPage({ mode, groupId }: { mode: "create" | "edit"; grou
     return JSON.stringify(current) !== JSON.stringify(snapshotRef.current);
   }, [name, code, description, active]);
   useUnsavedChanges(isDirty);
-  const confirmNavigation = useNavigationGuard(isDirty);
+  const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty);
 
   useEffect(() => {
     if (mode !== "edit" || !groupId) return;
@@ -347,10 +347,11 @@ export function GroupFormPage({ mode, groupId }: { mode: "create" | "edit"; grou
 
   return (
     <div className="space-y-6 max-w-full">
+      {navDialogProps && <ConfirmDialog {...navDialogProps} />}
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("groups"); }}
+          onClick={() => requestNavigation(() => setCurrentPage("groups"))}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -427,7 +428,7 @@ export function GroupFormPage({ mode, groupId }: { mode: "create" | "edit"; grou
       {/* Footer */}
       <div className="flex justify-end gap-2 pt-2">
         <button
-          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("groups"); }}
+          onClick={() => requestNavigation(() => setCurrentPage("groups"))}
           disabled={saving}
           className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
         >

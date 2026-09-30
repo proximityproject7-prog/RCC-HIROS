@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore } from "@/store/auth-store";
 import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   usePagination,
   PaginationControls,
@@ -474,7 +475,7 @@ function FpassFormPage({
     return JSON.stringify(formData) !== snapshotRef.current.formData || schoolYear !== snapshotRef.current.schoolYear;
   }, [formData, schoolYear]);
   useUnsavedChanges(isDirty && !readOnly);
-  const confirmNavigation = useNavigationGuard(isDirty && !readOnly);
+  const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty && !readOnly);
 
   // Load employee data
   useEffect(() => {
@@ -647,6 +648,7 @@ function FpassFormPage({
 
   return (
     <div className="space-y-4">
+      {navDialogProps && <ConfirmDialog {...navDialogProps} />}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
       )}
@@ -658,7 +660,7 @@ function FpassFormPage({
 
       {/* Header */}
       <div>
-        <button onClick={() => { if (!confirmNavigation()) return; onBack(); }} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
+        <button onClick={() => requestNavigation(() => onBack())} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
           <ArrowLeft className="h-4 w-4" /> Back to FPASS
         </button>
         <div className="flex items-center justify-between">
@@ -1140,6 +1142,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Dirty detection
   const snapshotRef = useRef<string>("[]");
@@ -1147,7 +1150,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
     return JSON.stringify(Array.from(enabledIds).sort()) !== snapshotRef.current;
   }, [enabledIds]);
   useUnsavedChanges(isDirty);
-  const confirmNavigation = useNavigationGuard(isDirty);
+  const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty);
 
   useEffect(() => {
     (async () => {
@@ -1178,6 +1181,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
 
   const allSelected = groups.length > 0 && groups.every((g) => selectedIds.has(g.id));
   const someSelected = selectedIds.size > 0;
+  const enabledCount = groups.filter((g) => enabledIds.has(g.id)).length;
 
   const selectAll = () => {
     if (allSelected) {
@@ -1234,6 +1238,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-4">
+      {navDialogProps && <ConfirmDialog {...navDialogProps} />}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
       )}
@@ -1244,7 +1249,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
       )}
 
       <div className="flex items-center gap-3">
-        <button onClick={() => { if (!confirmNavigation()) return; onBack(); }} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
+        <button onClick={() => requestNavigation(() => onBack())} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div>
@@ -1254,20 +1259,12 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
-        {/* Header with select-all + actions */}
+        {/* Header with actions */}
         <div className="px-4 py-3 border-b border-rcc-border flex items-center justify-between gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={selectAll}
-              className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
-            />
-            <span className="text-sm font-semibold text-rcc-text-primary">
-              Department Access
-              {someSelected && <span className="ml-2 text-xs text-rcc-text-muted">({selectedIds.size} selected)</span>}
-            </span>
-          </label>
+          <span className="text-sm font-semibold text-rcc-text-primary">
+            Department Access
+            {someSelected && <span className="ml-2 text-xs text-rcc-text-muted">({selectedIds.size} selected)</span>}
+          </span>
           <div className="flex items-center gap-2">
             <button
               onClick={enableSelected}
@@ -1293,28 +1290,63 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
             </button>
           </div>
         </div>
-        {/* Group rows */}
-        <div className="divide-y divide-rcc-border">
-          {groups.map((g) => (
-            <label
-              key={g.id}
-              className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-rcc-bg/30 transition-colors"
+        {/* Department dropdown picker */}
+        <div className="p-4">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((v) => !v)}
+              aria-haspopup="listbox"
+              aria-expanded={dropdownOpen}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
             >
-              <input
-                type="checkbox"
-                checked={selectedIds.has(g.id)}
-                onChange={() => toggleSelect(g.id)}
-                className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-rcc-text-primary">{g.name}</p>
-                <p className="text-xs text-rcc-text-muted font-mono">{g.code}</p>
-              </div>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${enabledIds.has(g.id) ? "bg-green-50 text-green-700 border border-green-200" : "bg-rcc-bg text-rcc-text-muted border border-rcc-border"}`}>
-                {enabledIds.has(g.id) ? "Enabled" : "Disabled"}
+              <span className={someSelected ? "" : "text-rcc-text-muted"}>
+                {someSelected
+                  ? `${selectedIds.size} of ${groups.length} departments selected`
+                  : "Select departments…"}
               </span>
-            </label>
-          ))}
+              <ChevronDown className={`h-4 w-4 shrink-0 text-rcc-text-muted transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+            {dropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
+                <div role="listbox" className="absolute z-20 mt-1 w-full bg-rcc-surface border border-rcc-border rounded-md shadow-xl max-h-72 overflow-auto">
+                  <label className="flex items-center gap-2 px-4 py-2.5 cursor-pointer border-b border-rcc-border hover:bg-rcc-bg/30 text-sm font-medium text-rcc-text-primary">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={selectAll}
+                      className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
+                    />
+                    Select all
+                  </label>
+                  {groups.map((g) => (
+                    <label
+                      key={g.id}
+                      className="flex items-center gap-4 px-4 py-2.5 cursor-pointer hover:bg-rcc-bg/30 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(g.id)}
+                        onChange={() => toggleSelect(g.id)}
+                        className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-rcc-text-primary">{g.name}</p>
+                        <p className="text-xs text-rcc-text-muted font-mono">{g.code}</p>
+                      </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${enabledIds.has(g.id) ? "bg-green-50 text-green-700 border border-green-200" : "bg-rcc-bg text-rcc-text-muted border border-rcc-border"}`}>
+                        {enabledIds.has(g.id) ? "Enabled" : "Disabled"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-rcc-text-muted">
+            {enabledCount} of {groups.length} departments can fill the Faculty Performance Appraisal form. Changes apply after Save Changes.
+          </p>
         </div>
       </div>
     </div>

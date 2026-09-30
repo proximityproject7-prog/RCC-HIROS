@@ -64,6 +64,9 @@ export async function GET(
 
 // ═══════════════════════════════════════════════════════════════
 // PATCH /api/fpass/[id] — update a submission
+// Requires fpass.fill; owner or fpass.manage. Self-updates are
+// additionally blocked when the owner's group is not in the
+// enabled list (managers bypass; empty list = all enabled).
 // ═══════════════════════════════════════════════════════════════
 export async function PATCH(
   request: NextRequest,
@@ -77,7 +80,7 @@ export async function PATCH(
 
     const existing = await db.fpassSubmission.findUnique({
       where: { id },
-      select: { id: true, employeeId: true },
+      include: { employee: { select: { id: true, groupId: true } } },
     });
 
     if (!existing) {
@@ -94,6 +97,28 @@ export async function PATCH(
         { error: "Forbidden" },
         { status: 403 }
       );
+    }
+
+    // Hard gate: FPASS must be enabled for the owner's department.
+    // Managers bypass; an empty enabled list means all groups are enabled.
+    if (!canManage) {
+      const setting = await db.systemSetting.findUnique({
+        where: { key: "fpass_enabled_groups" },
+      });
+      let enabledGroupIds: string[] = [];
+      if (setting?.value) {
+        try { enabledGroupIds = JSON.parse(setting.value); } catch { enabledGroupIds = []; }
+      }
+      const ownerGroupId = existing.employee?.groupId ?? null;
+      if (
+        enabledGroupIds.length > 0 &&
+        (!ownerGroupId || !enabledGroupIds.includes(ownerGroupId))
+      ) {
+        return NextResponse.json(
+          { error: "Forbidden - FPASS is not enabled for this department" },
+          { status: 403 }
+        );
+      }
     }
 
     const body = await request.json();

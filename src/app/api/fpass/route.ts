@@ -65,6 +65,10 @@ export async function GET(request: NextRequest) {
 
 // ═══════════════════════════════════════════════════════════════
 // POST /api/fpass — create or update a submission (upsert)
+// Requires fpass.fill; filling for another employee requires
+// fpass.manage. Self-fills are additionally blocked when the
+// target's group is not in the enabled list (managers bypass;
+// empty list = all groups enabled).
 // ═══════════════════════════════════════════════════════════════
 export async function POST(request: NextRequest) {
   try {
@@ -102,13 +106,34 @@ export async function POST(request: NextRequest) {
     // Verify the target employee exists
     const targetEmployee = await db.employee.findUnique({
       where: { id: targetEmployeeId },
-      select: { id: true, active: true },
+      select: { id: true, active: true, groupId: true },
     });
     if (!targetEmployee || !targetEmployee.active) {
       return NextResponse.json(
         { error: "Employee not found or inactive" },
         { status: 404 }
       );
+    }
+
+    // Hard gate: FPASS must be enabled for the target's department.
+    // Managers bypass; an empty enabled list means all groups are enabled.
+    if (!canManage) {
+      const setting = await db.systemSetting.findUnique({
+        where: { key: "fpass_enabled_groups" },
+      });
+      let enabledGroupIds: string[] = [];
+      if (setting?.value) {
+        try { enabledGroupIds = JSON.parse(setting.value); } catch { enabledGroupIds = []; }
+      }
+      if (
+        enabledGroupIds.length > 0 &&
+        (!targetEmployee.groupId || !enabledGroupIds.includes(targetEmployee.groupId))
+      ) {
+        return NextResponse.json(
+          { error: "Forbidden - FPASS is not enabled for this department" },
+          { status: 403 }
+        );
+      }
     }
 
     // Upsert: one submission per employee per school year

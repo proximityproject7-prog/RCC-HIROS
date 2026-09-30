@@ -520,7 +520,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
     scopeAllAttendance, scopeGroupAttendance, canSelfApproveLeave, canEditProfile,
     canChangePassword, canManageBiometrics, active, perms]);
   useUnsavedChanges(isDirty);
-  const confirmNavigation = useNavigationGuard(isDirty);
+  const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty);
 
   // System configuration state (for config panel at bottom)
   const [cfgGroups, setCfgGroups] = useState<{ id: string; name: string; code: string }[]>([]);
@@ -655,10 +655,11 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
 
   return (
     <div className="space-y-6 max-w-full">
+      {navDialogProps && <ConfirmDialog {...navDialogProps} />}
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("roles"); }}
+          onClick={() => requestNavigation(() => setCurrentPage("roles"))}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -852,7 +853,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
                 })}
               </div>
             )}
-            <p className="text-xs text-rcc-text-muted">Configure in the Employee Profile page &rarr; System Configuration.</p>
+            <p className="text-xs text-rcc-text-muted">Configure in Employee Records &rarr; FPASS Configuration.</p>
           </div>
 
           <div className="border border-rcc-border rounded-lg p-4 space-y-2">
@@ -872,7 +873,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
       {/* Footer */}
       <div className="flex justify-end gap-2 pt-2">
         <button
-          onClick={() => { if (!confirmNavigation()) return; setCurrentPage("roles"); }}
+          onClick={() => requestNavigation(() => setCurrentPage("roles"))}
           disabled={saving}
           className="px-4 py-2 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
         >
