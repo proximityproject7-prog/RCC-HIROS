@@ -149,6 +149,16 @@ async function main() {
       active: true,
     },
   });
+  const ce = await prisma.group.upsert({
+    where: { code: "CE" },
+    update: { name: "Civil Engineering", description: "CE faculty & staff", active: true },
+    create: {
+      name: "Civil Engineering",
+      code: "CE",
+      description: "CE faculty & staff",
+      active: true,
+    },
+  });
 
   // ═════════════════════════════════════════════════════════════
   // 2. Roles
@@ -383,6 +393,140 @@ async function main() {
       roleId: accountant.id,
       contractType: "Regular",
     },
+    // ── Session-14 expansion: 11 new hires (EMP-0009…EMP-0019) ──
+    // Roles for EMP-0009…EMP-0013 assigned by random draw (2026-10-01).
+    {
+      employeeId: "EMP-0009",
+      firstName: "Russel",
+      lastName: "Guntang",
+      middleName: null,
+      email: "russel.guntang@rcc.edu.ph",
+      phone: "+63 917 000 0009",
+      gender: "Male",
+      groupId: hr.id,
+      roleId: hrPersonnel.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0010",
+      firstName: "Raven",
+      lastName: "Pangilinan",
+      middleName: null,
+      email: "raven.pangilinan@rcc.edu.ph",
+      phone: "+63 917 000 0010",
+      gender: "Male",
+      groupId: ccs.id,
+      roleId: itStaff.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0011",
+      firstName: "Lattrel",
+      lastName: "Reyes",
+      middleName: "J.",
+      email: "lattrel.reyes@rcc.edu.ph",
+      phone: "+63 917 000 0011",
+      gender: "Male",
+      groupId: ccs.id,
+      roleId: professor.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0012",
+      firstName: "Jerome",
+      lastName: "De Leon",
+      middleName: null,
+      email: "jerome.deleon@rcc.edu.ph",
+      phone: "+63 917 000 0012",
+      gender: "Male",
+      groupId: accounting.id,
+      roleId: accountant.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0013",
+      firstName: "Daenielle",
+      lastName: "Toribio",
+      middleName: null,
+      email: "daenielle.toribio@rcc.edu.ph",
+      phone: "+63 917 000 0013",
+      gender: "Male",
+      groupId: hr.id,
+      roleId: hrAssistant.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0014",
+      firstName: "Marco",
+      lastName: "Villanueva",
+      middleName: "S.",
+      email: "marco.villanueva@rcc.edu.ph",
+      phone: "+63 917 000 0014",
+      gender: "Male",
+      groupId: ce.id,
+      roleId: dean.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0015",
+      firstName: "Sofia",
+      lastName: "Ramos",
+      middleName: "M.",
+      email: "sofia.ramos@rcc.edu.ph",
+      phone: "+63 917 000 0015",
+      gender: "Female",
+      groupId: ce.id,
+      roleId: professor.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0016",
+      firstName: "Elena",
+      lastName: "Cruz",
+      middleName: "D.",
+      email: "elena.cruz@rcc.edu.ph",
+      phone: "+63 917 000 0016",
+      gender: "Female",
+      groupId: ce.id,
+      roleId: professor.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0017",
+      firstName: "Paolo",
+      lastName: "Aquino",
+      middleName: "R.",
+      email: "paolo.aquino@rcc.edu.ph",
+      phone: "+63 917 000 0017",
+      gender: "Male",
+      groupId: ccs.id,
+      roleId: professor.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0018",
+      firstName: "Grace",
+      lastName: "Lim",
+      middleName: "T.",
+      email: "grace.lim@rcc.edu.ph",
+      phone: "+63 917 000 0018",
+      gender: "Female",
+      groupId: accounting.id,
+      roleId: accountant.id,
+      contractType: "Regular",
+    },
+    {
+      employeeId: "EMP-0019",
+      firstName: "Isabel",
+      lastName: "Navarro",
+      middleName: "C.",
+      email: "isabel.navarro@rcc.edu.ph",
+      phone: "+63 917 000 0019",
+      gender: "Female",
+      groupId: ccs.id,
+      roleId: professor.id,
+      contractType: "Regular",
+    },
   ];
 
   const createdEmployees: Record<string, string> = {}; // employeeId -> db id
@@ -466,7 +610,7 @@ async function main() {
   const leaveTypes = [sickLeave, vacationLeave, emergencyLeave];
 
   // ═════════════════════════════════════════════════════════════
-  // 5. Leave balances — all 9 employees × 3 types × 2026
+  // 5. Leave balances — all 20 employees × 3 types × 2026
   // ═════════════════════════════════════════════════════════════
   console.log("• Creating leave balances...");
   await prisma.leaveBalance.deleteMany({});
@@ -481,6 +625,17 @@ async function main() {
     "EMP-0006": { SL: 1, VL: 0, EL: 0 },
     "EMP-0007": { SL: 0, VL: 2, EL: 1 },
     "EMP-0008": { SL: 2, VL: 0, EL: 0 },
+    "EMP-0009": { SL: 1, VL: 2, EL: 0 },
+    "EMP-0010": { SL: 0, VL: 0, EL: 0 },
+    "EMP-0011": { SL: 3, VL: 1, EL: 0 },
+    "EMP-0012": { SL: 0, VL: 4, EL: 2 },
+    "EMP-0013": { SL: 1, VL: 0, EL: 0 },
+    "EMP-0014": { SL: 2, VL: 6, EL: 1 },
+    "EMP-0015": { SL: 0, VL: 3, EL: 0 },
+    "EMP-0016": { SL: 1, VL: 1, EL: 0 },
+    "EMP-0017": { SL: 0, VL: 0, EL: 1 },
+    "EMP-0018": { SL: 2, VL: 2, EL: 0 },
+    "EMP-0019": { SL: 0, VL: 1, EL: 0 },
   };
 
   for (const emp of employees) {
@@ -513,6 +668,13 @@ async function main() {
   const hrStaffId = createdEmployees["EMP-0007"]; // John (HR Staff)
   const acctStaffId = createdEmployees["EMP-0008"]; // Ana (Accounting Staff)
   const itStaffId = createdEmployees["EMP-0004"]; // Leander (IT Staff)
+  const ceDeanId = createdEmployees["EMP-0014"]; // Marco (Dean, CE)
+  const lattrelId = createdEmployees["EMP-0011"]; // Lattrel (Professor, CCS)
+  const sofiaId = createdEmployees["EMP-0015"]; // Sofia (Professor, CE)
+  const elenaId = createdEmployees["EMP-0016"]; // Elena (Professor, CE)
+  const paoloId = createdEmployees["EMP-0017"]; // Paolo (Professor, CCS)
+  const daenielleId = createdEmployees["EMP-0013"]; // Daenielle (HR Assistant)
+  const jeromeId = createdEmployees["EMP-0012"]; // Jerome (Accountant, self-approve)
 
   // ── (1) Draft — Ana, Vacation Leave, 3 days, not yet submitted ──
   await prisma.leaveRequest.create({
@@ -683,6 +845,152 @@ async function main() {
       workdays: 1,
       reason: "Medical check-up scheduled.",
       status: "pending_l1",
+    },
+  });
+
+  // ── Session-14 expansion: requests from the new hires ──
+
+  // ── (9) Pending L1 — Lattrel, Sick Leave, 2 days, awaiting Dean (CCS) ──
+  await prisma.leaveRequest.create({
+    data: {
+      requestNo: "LR-0009",
+      employeeId: lattrelId,
+      leaveTypeId: sickLeave.id,
+      startDate: daysFromNow(2),
+      endDate: daysFromNow(3),
+      workdays: 2,
+      reason: "Down with the flu — resting at home per doctor's advice.",
+      status: "pending_l1",
+    },
+  });
+
+  // ── (10) Pending L2 — Sofia, Vacation Leave, 4 days, CE Dean approved ──
+  const lr10 = await prisma.leaveRequest.create({
+    data: {
+      requestNo: "LR-0010",
+      employeeId: sofiaId,
+      leaveTypeId: vacationLeave.id,
+      startDate: daysFromNow(21),
+      endDate: daysFromNow(24),
+      workdays: 4,
+      reason: "Family trip to El Nido — bookings already made.",
+      status: "pending_l2",
+    },
+  });
+  await prisma.leaveApproval.create({
+    data: {
+      leaveRequestId: lr10.id,
+      level: 1,
+      approverId: ceDeanId,
+      status: "approved",
+      remarks: "Approved — lab sessions covered by Elena.",
+      actedAt: dayTime(-3, 10, 30),
+    },
+  });
+
+  // ── (11) Approved — Elena, Emergency Leave, 2 days (CE Dean + HR) ──
+  const lr11 = await prisma.leaveRequest.create({
+    data: {
+      requestNo: "LR-0011",
+      employeeId: elenaId,
+      leaveTypeId: emergencyLeave.id,
+      startDate: daysFromNow(-20),
+      endDate: daysFromNow(-19),
+      workdays: 2,
+      reason: "Typhoon damage at home — needed to oversee repairs.",
+      status: "approved",
+    },
+  });
+  await prisma.leaveApproval.create({
+    data: {
+      leaveRequestId: lr11.id,
+      level: 1,
+      approverId: ceDeanId,
+      status: "approved",
+      remarks: "Approved — calamity-related.",
+      actedAt: dayTime(-21, 9, 0),
+    },
+  });
+  await prisma.leaveApproval.create({
+    data: {
+      leaveRequestId: lr11.id,
+      level: 2,
+      approverId: hrId,
+      status: "approved",
+      remarks: "Approved.",
+      actedAt: dayTime(-20, 13, 45),
+    },
+  });
+
+  // ── (12) Pending L1 — Daenielle, Sick Leave, 1 day, awaiting HR head ──
+  await prisma.leaveRequest.create({
+    data: {
+      requestNo: "LR-0012",
+      employeeId: daenielleId,
+      leaveTypeId: sickLeave.id,
+      startDate: daysFromNow(5),
+      endDate: daysFromNow(5),
+      workdays: 1,
+      reason: "Dental surgery scheduled — one day recovery.",
+      status: "pending_l1",
+    },
+  });
+
+  // ── (13) Rejected — Paolo, Emergency Leave, 1 day, rejected by Dean ──
+  const lr13 = await prisma.leaveRequest.create({
+    data: {
+      requestNo: "LR-0013",
+      employeeId: paoloId,
+      leaveTypeId: emergencyLeave.id,
+      startDate: daysFromNow(-50),
+      endDate: daysFromNow(-50),
+      workdays: 1,
+      reason: "Attending a friend's wedding out of town.",
+      status: "rejected",
+    },
+  });
+  await prisma.leaveApproval.create({
+    data: {
+      leaveRequestId: lr13.id,
+      level: 1,
+      approverId: deanId,
+      status: "rejected",
+      remarks: "Emergency leave is for genuine emergencies — please file VL instead.",
+      actedAt: dayTime(-51, 15, 20),
+    },
+  });
+
+  // ── (14) Approved — Jerome, Vacation Leave, 3 days (self-approved via Accountant role) ──
+  const lr14 = await prisma.leaveRequest.create({
+    data: {
+      requestNo: "LR-0014",
+      employeeId: jeromeId,
+      leaveTypeId: vacationLeave.id,
+      startDate: daysFromNow(-40),
+      endDate: daysFromNow(-38),
+      workdays: 3,
+      reason: "Year-end inventory break — short family outing.",
+      status: "approved",
+    },
+  });
+  await prisma.leaveApproval.create({
+    data: {
+      leaveRequestId: lr14.id,
+      level: 1,
+      approverId: jeromeId,
+      status: "approved",
+      remarks: "Self-approved (Accountant role).",
+      actedAt: dayTime(-41, 8, 30),
+    },
+  });
+  await prisma.leaveApproval.create({
+    data: {
+      leaveRequestId: lr14.id,
+      level: 2,
+      approverId: jeromeId,
+      status: "approved",
+      remarks: "Self-approved (Accountant role).",
+      actedAt: dayTime(-41, 8, 30),
     },
   });
 
@@ -1079,6 +1387,40 @@ async function main() {
     false
   );
 
+  // ── Session-14 expansion: CE evaluations (Marco evaluates CE faculty) ──
+
+  // Marco → Sofia (4.30) — submitted last semester
+  await createEvaluation(
+    closedPeriod.id,
+    sofiaId,
+    ceDeanId,
+    4.3,
+    "Sofia handles the CE laboratory subjects with admirable patience. Students consistently praise her step-by-step demonstrations.\n\n---\n\nThe hydraulics lab equipment needs calibration before the next semester.",
+    true,
+    new Date("2026-03-22T10:00:00.000Z")
+  );
+
+  // Marco → Elena (4.60) — submitted this semester
+  await createEvaluation(
+    openPeriod.id,
+    elenaId,
+    ceDeanId,
+    4.6,
+    "Elena's structural analysis classes have the highest passing rate in the department. Her board-exam review sessions are well attended.",
+    true,
+    dayTime(-10, 15, 0)
+  );
+
+  // Dean → Lattrel — still draft (not yet submitted)
+  await createEvaluation(
+    openPeriod.id,
+    lattrelId,
+    deanId,
+    4.0,
+    null,
+    false
+  );
+
   // ═════════════════════════════════════════════════════════════
   // 10. Attendance records — multiple days with various states
   // ═════════════════════════════════════════════════════════════
@@ -1113,6 +1455,27 @@ async function main() {
     [-3, "EMP-0001", 8, 0, true, 17, 5],
     [-3, "EMP-0002", 8, 15, true, 17, 10],
     [-3, "EMP-0003", 8, 30, true, 17, 30],
+    // ── Session-14 expansion: new hires ──
+    // Today
+    [0, "EMP-0009", 7, 58, true, 17, 3],
+    [0, "EMP-0010", 8, 5, false, 0, 0],
+    [0, "EMP-0011", 8, 20, true, 17, 10],
+    [0, "EMP-0014", 8, 0, true, 17, 30],
+    [0, "EMP-0015", 8, 12, false, 0, 0],
+    [0, "EMP-0018", 8, 40, true, 17, 20],
+    // Yesterday
+    [-1, "EMP-0009", 8, 1, true, 17, 5],
+    [-1, "EMP-0011", 8, 25, true, 17, 0],
+    [-1, "EMP-0012", 8, 10, true, 17, 15],
+    [-1, "EMP-0014", 7, 55, true, 17, 5],
+    [-1, "EMP-0015", 8, 8, true, 17, 12],
+    [-1, "EMP-0016", 8, 35, true, 16, 50],
+    [-1, "EMP-0019", 9, 0, true, 17, 0],
+    // 2 days ago
+    [-2, "EMP-0009", 7, 57, true, 17, 0],
+    [-2, "EMP-0013", 8, 22, true, 17, 8],
+    [-2, "EMP-0014", 8, 5, true, 17, 20],
+    [-2, "EMP-0017", 8, 45, true, 17, 5],
   ];
 
   // Track which employees have records for which days
@@ -1169,6 +1532,12 @@ async function main() {
     { empId: "EMP-0007", title: "Labor Law Seminar 2025", issuer: "DOLE Regional Office", certNo: "DOLE-LLS-2025-112", issueDate: new Date("2025-11-05") },
     // Maria (Professor)
     { empId: "EMP-0006", title: "TESDA Trainers Methodology", issuer: "TESDA", certNo: "TESDA-TM-2024-789", issueDate: new Date("2024-05-22") },
+    // Marco (Dean, CE)
+    { empId: "EMP-0014", title: "Professional Civil Engineer License", issuer: "PRC", certNo: "PRC-CE-2018-334", issueDate: new Date("2018-05-10") },
+    // Sofia (Professor, CE)
+    { empId: "EMP-0015", title: "AutoCAD Certified Professional", issuer: "Autodesk", certNo: "ADS-ACAD-2023-221", issueDate: new Date("2023-09-01") },
+    // Russel (HR Personnel)
+    { empId: "EMP-0009", title: "Certified HR Professional", issuer: "HR Philippines", certNo: "HRP-CHRP-2023-781", issueDate: new Date("2023-06-15") },
   ];
 
   for (const cert of certData) {
@@ -1233,6 +1602,17 @@ async function main() {
   console.log("EMP-0006 / maria.santos@rcc.edu.ph       → Professor");
   console.log("EMP-0007 / john.delacruz@rcc.edu.ph      → HR Assistant");
   console.log("EMP-0008 / ana.gonzales@rcc.edu.ph       → Accountant");
+  console.log("EMP-0009 / russel.guntang@rcc.edu.ph     → HR Personnel");
+  console.log("EMP-0010 / raven.pangilinan@rcc.edu.ph   → IT Staff");
+  console.log("EMP-0011 / lattrel.reyes@rcc.edu.ph      → Professor");
+  console.log("EMP-0012 / jerome.deleon@rcc.edu.ph      → Accountant");
+  console.log("EMP-0013 / daenielle.toribio@rcc.edu.ph  → HR Assistant");
+  console.log("EMP-0014 / marco.villanueva@rcc.edu.ph   → Dean (CE)");
+  console.log("EMP-0015 / sofia.ramos@rcc.edu.ph        → Professor");
+  console.log("EMP-0016 / elena.cruz@rcc.edu.ph         → Professor");
+  console.log("EMP-0017 / paolo.aquino@rcc.edu.ph       → Professor");
+  console.log("EMP-0018 / grace.lim@rcc.edu.ph          → Accountant");
+  console.log("EMP-0019 / isabel.navarro@rcc.edu.ph     → Professor");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("");
   console.log("📋 Leave workflow showcase:");
@@ -1244,6 +1624,12 @@ async function main() {
   console.log("  LR-0006 (John)         → Cancelled (withdrawn)");
   console.log("  LR-0007 (Leander)      → Approved (standard 2-level)");
   console.log("  LR-0008 (John)         → Pending L1 (awaiting HR head)");
+  console.log("  LR-0009 (Lattrel)      → Pending L1 (awaiting CCS Dean)");
+  console.log("  LR-0010 (Sofia)        → Pending L2 (CE Dean OK'd, awaiting HR)");
+  console.log("  LR-0011 (Elena)        → Approved (CE Dean + HR)");
+  console.log("  LR-0012 (Daenielle)    → Pending L1 (awaiting HR head)");
+  console.log("  LR-0013 (Paolo)        → Rejected (by CCS Dean)");
+  console.log("  LR-0014 (Jerome)       → Approved (self-approved)");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 }
 
