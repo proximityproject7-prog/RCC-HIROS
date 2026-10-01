@@ -219,6 +219,21 @@ export function EmployeeListPage() {
     return () => controller.abort();
   }, [canViewFpas]);
   const showFpasCol = fpasMap !== null;
+  // Enabled-group ids for the Fill badge gate. Null while loading/failed —
+  // treated as allowed (the form lock + submit API enforce regardless).
+  // An empty list means all groups are enabled.
+  const [fpasEnabledIds, setFpasEnabledIds] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!canViewFpas) return;
+    (async () => {
+      try {
+        const data = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings");
+        setFpasEnabledIds(new Set(data.enabledGroupIds ?? []));
+      } catch {
+        // non-fatal — fall back to offering Fill (form + API enforce)
+      }
+    })();
+  }, [canViewFpas]);
 
   return (
     <div className="space-y-4">
@@ -367,7 +382,17 @@ export function EmployeeListPage() {
                   const fpasSubmitted = !!fpasEntry?.hasSubmission && !!fpasEntry?.submissionId;
                   // Nobody files for anyone else: fill form only for the
                   // viewer's own row when they hold Fill.
-                  const mayFillRow = user?.id === emp.id && has("fpas.fill");
+                  // Fill badge only for the viewer's own row when they hold
+                  // Fill and the row's group is enabled (managers bypass
+                  // the group gate for their own fills). Otherwise the
+                  // form-level lock + submit API explain and enforce.
+                  const rowGroupOk =
+                    !fpasEnabledIds ||
+                    fpasEnabledIds.size === 0 ||
+                    !emp.groupId ||
+                    fpasEnabledIds.has(emp.groupId) ||
+                    has("fpas.manage");
+                  const mayFillRow = user?.id === emp.id && has("fpas.fill") && rowGroupOk;
                   const fpasBadge = fpasSubmitted ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> SUBMITTED
@@ -1069,13 +1094,15 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     loadEmployee();
   }, [loadEmployee]);
 
-  // Check FPAS enabled for employee's group
+  // Check FPAS enabled for employee's group. An empty enabled list
+  // means ALL groups are enabled (matches the submit-API semantics).
   useEffect(() => {
     if (!employee?.groupId) return;
     (async () => {
       try {
         const data = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings");
-        setFpasEnabled(data.enabledGroupIds?.includes(employee.groupId!) ?? false);
+        const ids = data.enabledGroupIds ?? [];
+        setFpasEnabled(ids.length === 0 || ids.includes(employee.groupId!));
       } catch {
         // non-fatal
       }

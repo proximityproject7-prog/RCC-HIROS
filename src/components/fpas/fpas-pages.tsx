@@ -265,7 +265,7 @@ function FpasSubmissionViewPage({
 
 function FpasFormPage({
   employeeId,
-  readOnly,
+  readOnly: readOnlyProp,
   onBack,
   onSettings,
   canManage,
@@ -283,6 +283,12 @@ function FpasFormPage({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [employee, setEmployee] = useState<EmployeeBrief | null>(null);
+  // True when the target's group is switched off in FPAS Configuration
+  // (managers bypass for their own fills). Starts false (optimistic —
+  // the submit API remains the enforcer) to avoid a locked-form flash.
+  const [groupBlocked, setGroupBlocked] = useState(false);
+  // Effective editability: view mode, or a switched-off group.
+  const readOnly = readOnlyProp || groupBlocked;
   const [formData, setFormData] = useState<FpasFormData>(DEFAULT_FORM_DATA);
   const [existingId, setExistingId] = useState<string | null>(submissionId ?? null);
   const [schoolYear, setSchoolYear] = useState(new Date().getFullYear() + "-" + (new Date().getFullYear() + 1));
@@ -321,6 +327,24 @@ function FpasFormPage({
       }
     })();
   }, [employeeId]);
+
+  // Group gate: a switched-off group locks the form (Save hidden).
+  // Empty enabled list = all enabled; managers bypass for their own fills.
+  useEffect(() => {
+    setGroupBlocked(false);
+    if (canManage || !employee?.groupId) return;
+    (async () => {
+      try {
+        const data = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings");
+        const ids = data.enabledGroupIds ?? [];
+        if (ids.length > 0 && !ids.includes(employee.groupId!)) {
+          setGroupBlocked(true);
+        }
+      } catch {
+        // non-fatal — submit API remains the enforcer
+      }
+    })();
+  }, [employee?.groupId, canManage]);
 
   // Load existing submission if submissionId provided
   useEffect(() => {
@@ -474,6 +498,12 @@ function FpasFormPage({
       {success && (
         <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-700 flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4" /> {success}
+        </div>
+      )}
+      {groupBlocked && !readOnlyProp && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+          Your department ({employee?.groupName ?? formData.header.department ?? "Unassigned"}) is not
+          enabled for FPAS. Switch it on in FPAS Configuration to fill this form.
         </div>
       )}
 
