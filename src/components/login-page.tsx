@@ -4,9 +4,11 @@ import { useState, FormEvent, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, LogIn, AlertCircle, Lock, Clock, Fingerprint, User, X } from "lucide-react";
 import { useAuthContext } from "@/components/providers/auth-provider";
+import { readJsonResponse, ApiError } from "@/lib/api-client";
 import {
   startAuthentication,
   type AuthenticationResponseJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
 
 // ═══════════════════════════════════════════════════════════════
@@ -54,8 +56,8 @@ export default function LoginPage() {
     async function checkBiometrics() {
       try {
         const res = await fetch("/api/settings/biometrics");
-        const data = await res.json();
-        setBiometricsEnabled(data.enabled);
+        const data = await readJsonResponse<{ enabled?: boolean }>(res);
+        setBiometricsEnabled(Boolean(data.enabled));
       } catch (e) {
         console.error("[Login] Biometrics check failed:", e);
       }
@@ -105,7 +107,7 @@ export default function LoginPage() {
         throw new Error("Failed to get authentication options");
       }
 
-      const options = await optionsRes.json();
+      const options = await readJsonResponse<PublicKeyCredentialRequestOptionsJSON>(optionsRes);
 
       // Step 2: Trigger browser's WebAuthn API (Windows Hello) with 15s timeout
       const authResponse = await Promise.race([
@@ -127,7 +129,7 @@ export default function LoginPage() {
         signal: abortController.signal,
       });
 
-      const result = await verifyRes.json();
+      const result = await readJsonResponse<{ error?: string } & Record<string, unknown>>(verifyRes);
 
       if (!verifyRes.ok) {
         handleFPResult({ error: result.error || "Authentication failed" });
@@ -136,15 +138,19 @@ export default function LoginPage() {
       }
     } catch (err) {
       if (abortController.signal.aborted) return;
-      const msg = err instanceof Error ? err.message : "Scan failed";
-      if (msg.includes("cancelled")) {
-        handleFPResult({ error: "Scan cancelled" });
-      } else if (msg.includes("not allowed")) {
-        handleFPResult({ error: "Not allowed" });
-      } else if (msg.includes("timed out")) {
-        handleFPResult({ error: "Scan timed out after 15 seconds. Please try again." });
+      if (err instanceof ApiError || (err instanceof TypeError && err.message.includes("fetch"))) {
+        handleFPResult({ error: "Could not reach the authentication server. Please try again." });
       } else {
-        handleFPResult({ error: msg });
+        const msg = err instanceof Error ? err.message : "Scan failed";
+        if (msg.includes("cancelled")) {
+          handleFPResult({ error: "Scan cancelled" });
+        } else if (msg.includes("not allowed")) {
+          handleFPResult({ error: "Not allowed" });
+        } else if (msg.includes("timed out")) {
+          handleFPResult({ error: "Scan timed out after 15 seconds. Please try again." });
+        } else {
+          handleFPResult({ error: msg });
+        }
       }
     } finally {
       abortScanRef.current = null;
@@ -180,6 +186,14 @@ export default function LoginPage() {
       } else if (msg.includes("remaining")) {
         // Pass through server message about remaining attempts
         setError(msg);
+      } else if (
+        (err instanceof ApiError && (err.status === 404 || err.status >= 500)) ||
+        msg.includes("Failed to fetch") ||
+        msg.includes("NetworkError") ||
+        msg.includes("Load failed")
+      ) {
+        // Server unreachable — never blame the credentials for this.
+        setError("Cannot reach the server. Please try again in a moment.");
       } else {
         setError("Invalid Employee ID/Email or password.");
       }

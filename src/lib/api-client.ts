@@ -116,5 +116,35 @@ export async function apiFetch<T = unknown>(
   return (data ?? ({} as T)) as T;
 }
 
+/**
+ * readJsonResponse — guarded JSON body read for raw `fetch` calls that
+ * cannot use `apiFetch` (login, WebAuthn, change-password).
+ *
+ * Throws `ApiError` (never a raw `SyntaxError`) when the server answers
+ * with non-JSON — e.g. an HTML 404 page while the dev server is unhealthy
+ * — so callers always get a meaningful, displayable message.
+ */
+export async function readJsonResponse<T = unknown>(
+  res: Response
+): Promise<T> {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new ApiError(
+      `Expected JSON but received "${
+        contentType || "empty content-type"
+      }" (HTTP ${res.status}) — the API route may be unavailable.`,
+      res.status
+    );
+  }
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new ApiError(
+      `Failed to parse JSON response (HTTP ${res.status}).`,
+      res.status
+    );
+  }
+}
+
 /** Alias for use in React Query hooks. */
 export const authFetchJSON = apiFetch;

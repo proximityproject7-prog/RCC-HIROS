@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { useAuthStore } from "@/store/auth-store";
-import { getToken, setToken, removeToken, apiFetch } from "@/lib/api-client";
+import { getToken, setToken, removeToken, apiFetch, readJsonResponse } from "@/lib/api-client";
 
 // ═══════════════════════════════════════════════════════════════
 // AuthUser — mirrors server-side AuthUser (src/lib/auth-token.ts)
@@ -136,7 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ identifier, password }),
       });
 
-      const data = await res.json();
+      // NOTE: raw fetch (not apiFetch) on purpose — apiFetch's 401 handler
+      // would hijack bad-credential responses ("Session expired").
+      const data = await readJsonResponse<{ token: string; user: AuthUser; error?: string }>(res);
 
       if (!res.ok) {
         throw new Error(data.error || "Login failed");

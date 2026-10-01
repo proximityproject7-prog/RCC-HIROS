@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, KeyRound, AlertCircle, Check } from "lucide-react";
 import { useAuthContext } from "@/components/providers/auth-provider";
+import { readJsonResponse, ApiError } from "@/lib/api-client";
 
 export default function ChangePasswordModal() {
   const { logout } = useAuthContext();
@@ -62,7 +63,7 @@ export default function ChangePasswordModal() {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse<{ error?: string }>(res);
 
       if (!res.ok) {
         setError(data.error || "Failed to change password.");
@@ -74,8 +75,8 @@ export default function ChangePasswordModal() {
       setTimeout(() => {
         logout();
       }, 2000);
-    } catch {
-      setError("An unexpected error occurred. Please try again.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
