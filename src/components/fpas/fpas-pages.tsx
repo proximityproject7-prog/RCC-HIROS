@@ -309,19 +309,17 @@ function FpasFormPage({
       try {
         const data = await apiFetch<{ employee: EmployeeBrief }>(`/api/employees/${employeeId}`);
         setEmployee(data.employee);
-        setFormData((prev) => {
-          const updated = {
-            ...prev,
-            header: {
-              ...prev.header,
-              name: `${data.employee.firstName} ${data.employee.middleName ? data.employee.middleName + " " : ""}${data.employee.lastName}`,
-              department: data.employee.groupName ?? "",
-            },
-          };
-          // Update snapshot after initial employee data load so auto-filled fields aren't "dirty"
-          setSnapshot((s) => ({ formData: JSON.stringify(updated), schoolYear: s.schoolYear }));
-          return updated;
-        });
+        // Pure updater — the snapshot is re-baselined by the effect below once
+        // this commit lands. Calling setSnapshot in here would be a render-phase
+        // side effect, and StrictMode double-invokes updaters in dev.
+        setFormData((prev) => ({
+          ...prev,
+          header: {
+            ...prev.header,
+            name: `${data.employee.firstName} ${data.employee.middleName ? data.employee.middleName + " " : ""}${data.employee.lastName}`,
+            department: data.employee.groupName ?? "",
+          },
+        }));
       } catch {
         setError("Failed to load employee data.");
       } finally {
@@ -329,6 +327,17 @@ function FpasFormPage({
       }
     })();
   }, [employeeId]);
+
+  // Re-baseline the snapshot once the employee load has committed, so the
+  // auto-filled header fields are not counted as unsaved edits. Reading the
+  // committed formData here keeps the updater above pure, and snapshotting the
+  // live schoolYear fixes a fresh form starting out "dirty" — the seed uses
+  // schoolYear: "" while the state default is a "YYYY-YYYY" string.
+  useEffect(() => {
+    if (loading) return;
+    setSnapshot({ formData: JSON.stringify(formData), schoolYear });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, employee]);
 
   // Group gate: a switched-off group locks the form (Save hidden).
   // Empty enabled list = all enabled; managers bypass for their own fills.
