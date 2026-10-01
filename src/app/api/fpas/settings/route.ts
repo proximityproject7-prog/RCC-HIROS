@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth-token";
 
-const SETTING_KEY = "fpass_enabled_groups";
+const SETTING_KEY = "fpas_enabled_groups";
 
 // ═══════════════════════════════════════════════════════════════
-// GET /api/fpass/settings — returns enabled group IDs
+// GET /api/fpas/settings — returns enabled group IDs
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requirePermission(request, "fpass.fill");
+    const auth = await requirePermission(request, "fpas.fill");
     if (!auth.ok) return auth.response;
 
     const setting = await db.systemSetting.findUnique({
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ enabledGroupIds });
   } catch (error) {
-    console.error("[API /fpass/settings] Error:", error);
+    console.error("[API /fpas/settings] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PATCH /api/fpass/settings — update enabled group IDs
+// PATCH /api/fpas/settings — update enabled group IDs
 // ═══════════════════════════════════════════════════════════════
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await requirePermission(request, "fpass.manage");
+    const auth = await requirePermission(request, "fpas.manage");
     if (!auth.ok) return auth.response;
 
     const body = await request.json();
@@ -57,7 +57,7 @@ export async function PATCH(request: NextRequest) {
 
     await db.systemSetting.upsert({
       where: { key: SETTING_KEY },
-      create: { key: SETTING_KEY, value, category: "fpass" },
+      create: { key: SETTING_KEY, value, category: "fpas" },
       update: { value },
     });
 
@@ -66,14 +66,14 @@ export async function PATCH(request: NextRequest) {
       data: {
         userId: auth.user.id,
         action: "update",
-        entity: "fpass_settings",
+        entity: "fpas_settings",
         metadata: JSON.stringify({ enabledGroupIds }),
       },
     });
 
     return NextResponse.json({ enabledGroupIds });
   } catch (error) {
-    console.error("[API /fpass/settings] Error:", error);
+    console.error("[API /fpas/settings] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

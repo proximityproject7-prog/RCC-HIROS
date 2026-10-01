@@ -130,7 +130,7 @@ export function EmployeeListPage() {
   const [contractType, setContractType] = useState("");
   const [employmentType, setEmploymentType] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
-  const [fpassFilter, setFpassFilter] = useState("");
+  const [fpasFilter, setFpasFilter] = useState("");
 
   // Debounce search input by 300ms
   useEffect(() => {
@@ -167,7 +167,7 @@ export function EmployeeListPage() {
       if (contractType) params.set("contractType", contractType);
       if (employmentType) params.set("employmentType", employmentType);
       if (activeFilter) params.set("active", activeFilter);
-      if (fpassFilter) params.set("fpassStatus", fpassFilter);
+      if (fpasFilter) params.set("fpasStatus", fpasFilter);
       const qs = params.toString();
       const data = await apiFetch<{ employees: Employee[] }>(
         `/api/employees${qs ? `?${qs}` : ""}`,
@@ -180,7 +180,7 @@ export function EmployeeListPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, groupId, roleId, contractType, activeFilter, fpassFilter]);
+  }, [debouncedSearch, groupId, roleId, contractType, activeFilter, fpasFilter]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -192,33 +192,34 @@ export function EmployeeListPage() {
 
   const canViewInactive = has("profiling.view_inactive");
 
-  // FPASS submission status per employee (EMP-code → status) for the FPASS
-  // column. Shown to fill/manage/view_all holders; hidden if the fetch
-  // fails. The endpoint pre-scopes rows server-side: an absent entry means
-  // out of the viewer's department scope (rendered as "—", no status leak).
-  const canViewFpass = hasAny(["fpass.fill", "fpass.manage", "fpass.view_all"]);
-  const [fpassMap, setFpassMap] = useState<Map<string, { hasSubmission: boolean; submissionId: string | null }> | null>(null);
+  // FPAS submission status per employee (EMP-code → status) for the FPAS
+  // column. Shown to fill/group-view/institution-view holders; hidden if
+  // the fetch fails. fpas.manage grants no viewing. The endpoint
+  // pre-scopes rows server-side: an absent entry means out of the
+  // viewer's department scope (rendered as "—", no status leak).
+  const canViewFpas = hasAny(["fpas.fill", "fpas.view_all", "fpas.view_institution"]);
+  const [fpasMap, setFpasMap] = useState<Map<string, { hasSubmission: boolean; submissionId: string | null }> | null>(null);
   useEffect(() => {
-    if (!canViewFpass) return;
+    if (!canViewFpas) return;
     const controller = new AbortController();
     (async () => {
       try {
         const data = await apiFetch<{ employees: { employeeId: string; hasSubmission: boolean; submission: { id: string } | null }[] }>(
-          "/api/fpass/status",
+          "/api/fpas/status",
           { signal: controller.signal }
         );
         const map = new Map<string, { hasSubmission: boolean; submissionId: string | null }>();
         for (const e of data.employees ?? []) {
           map.set(e.employeeId, { hasSubmission: e.hasSubmission, submissionId: e.submission?.id ?? null });
         }
-        if (!controller.signal.aborted) setFpassMap(map);
+        if (!controller.signal.aborted) setFpasMap(map);
       } catch {
         // non-fatal — column stays hidden
       }
     })();
     return () => controller.abort();
-  }, [canViewFpass]);
-  const showFpassCol = fpassMap !== null;
+  }, [canViewFpas]);
+  const showFpasCol = fpasMap !== null;
 
   return (
     <div className="space-y-4">
@@ -239,12 +240,12 @@ export function EmployeeListPage() {
               Contract Types
             </button>
           )}
-          {has("fpass.manage") && (
+          {has("fpas.manage") && (
             <button
-              onClick={() => setCurrentPage("fpass", "settings")}
+              onClick={() => setCurrentPage("fpas", "settings")}
               className="inline-flex items-center gap-2 bg-rcc-surface border border-rcc-border text-rcc-text-secondary px-4 py-2 rounded-md text-sm font-semibold hover:bg-rcc-bg transition-colors"
             >
-              FPASS Configuration
+              FPAS Configuration
             </button>
           )}
           {has("profiling.create") && (
@@ -296,11 +297,13 @@ export function EmployeeListPage() {
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
-          <select value={fpassFilter} onChange={(e) => setFpassFilter(e.target.value)} className={inputClass}>
-            <option value="">All FPASS</option>
-            <option value="submitted">FPASS Submitted</option>
-            <option value="empty">FPASS Not Started</option>
-          </select>
+          {canViewFpas && (
+            <select value={fpasFilter} onChange={(e) => setFpasFilter(e.target.value)} className={inputClass} aria-label="FPAS submission status filter">
+              <option value="">All FPAS</option>
+              <option value="submitted">FPAS Submitted</option>
+              <option value="empty">FPAS Not Started</option>
+            </select>
+          )}
         </div>
         {canViewInactive && (
           <div className="mt-3 flex items-center gap-2">
@@ -341,30 +344,32 @@ export function EmployeeListPage() {
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Contract</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Type</th>
                 <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">Status</th>
-                {showFpassCol && (
-                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">FPASS</th>
+                {showFpasCol && (
+                  <th className="text-left text-xs font-semibold text-rcc-text-muted uppercase tracking-wide px-4 py-3">FPAS</th>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-rcc-border">
               {loading ? (
                 <tr>
-                  <td colSpan={showFpassCol ? 8 : 7} className="px-4 py-10 text-center text-rcc-text-muted">
+                  <td colSpan={showFpasCol ? 8 : 7} className="px-4 py-10 text-center text-rcc-text-muted">
                     Loading employees...
                   </td>
                 </tr>
               ) : currentData.length === 0 ? (
                 <tr>
-                  <td colSpan={showFpassCol ? 8 : 7} className="px-4 py-10 text-center text-rcc-text-muted">
+                  <td colSpan={showFpasCol ? 8 : 7} className="px-4 py-10 text-center text-rcc-text-muted">
                     No employees found. Adjust filters or create a new record.
                   </td>
                 </tr>
               ) : (
                 currentData.map((emp) => {
-                  const fpassEntry = fpassMap?.get(emp.employeeId);
-                  const fpassSubmitted = !!fpassEntry?.hasSubmission && !!fpassEntry?.submissionId;
-                  const mayFillRow = (user?.id === emp.id && has("fpass.fill")) || has("fpass.manage");
-                  const fpassBadge = fpassSubmitted ? (
+                  const fpasEntry = fpasMap?.get(emp.employeeId);
+                  const fpasSubmitted = !!fpasEntry?.hasSubmission && !!fpasEntry?.submissionId;
+                  // Nobody files for anyone else: fill form only for the
+                  // viewer's own row when they hold Fill.
+                  const mayFillRow = user?.id === emp.id && has("fpas.fill");
+                  const fpasBadge = fpasSubmitted ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> SUBMITTED
                     </span>
@@ -375,13 +380,14 @@ export function EmployeeListPage() {
                   );
                   // View target when a submission exists (presence in the
                   // pre-scoped map already authorizes viewing it); otherwise
-                  // the fill form, but only for those who may fill.
-                  const fpassTarget = fpassSubmitted
-                    ? `view:${fpassEntry!.submissionId}`
-                    : mayFillRow
+                  // the fill form, but only for the owner's own row when
+                  // they hold Fill. Nobody files for anyone else.
+                  const fpasTarget = fpasSubmitted
+                    ? `view:${fpasEntry!.submissionId}`
+                    : (user?.id === emp.id && has("fpas.fill"))
                       ? `emp:${emp.id}`
                       : null;
-                  const fpassTitle = fpassSubmitted ? "View FPASS submission" : "Fill FPASS form";
+                  const fpasTitle = fpasSubmitted ? "View FPAS submission" : "Fill FPAS form";
                   return (
                   <tr
                     key={emp.id}
@@ -435,20 +441,20 @@ export function EmployeeListPage() {
                         </span>
                       )}
                     </td>
-                    {showFpassCol && (
+                    {showFpasCol && (
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        {!fpassEntry ? (
+                        {!fpasEntry ? (
                           <span className="text-rcc-text-muted">—</span>
-                        ) : fpassTarget ? (
+                        ) : fpasTarget ? (
                           <button
-                            onClick={() => setCurrentPage("fpass", fpassTarget)}
+                            onClick={() => setCurrentPage("fpas", fpasTarget)}
                             className="cursor-pointer hover:opacity-80 transition-opacity"
-                            title={fpassTitle}
+                            title={fpasTitle}
                           >
-                            {fpassBadge}
+                            {fpasBadge}
                           </button>
                         ) : (
-                          fpassBadge
+                          fpasBadge
                         )}
                       </td>
                     )}
@@ -982,12 +988,12 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
   const [confirmState, setConfirmState] = useState<ConfirmDialogState | null>(null);
 
-  // FPASS enabled state
-  const [fpassEnabled, setFpassEnabled] = useState(false);
+  // FPAS enabled state
+  const [fpasEnabled, setFpasEnabled] = useState(false);
   // This profile's submission id (current school year) for the View button.
   // The status endpoint pre-scopes rows server-side, so presence here means
   // the viewer is authorized to see it.
-  const [profileFpassSubId, setProfileFpassSubId] = useState<string | null>(null);
+  const [profileFpasSubId, setProfileFpasSubId] = useState<string | null>(null);
 
   // Inline edit mode — unified for all fields
   const canSelfEdit = employeeId === user?.id && has("profile.selfEdit");
@@ -1064,34 +1070,34 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     loadEmployee();
   }, [loadEmployee]);
 
-  // Check FPASS enabled for employee's group
+  // Check FPAS enabled for employee's group
   useEffect(() => {
     if (!employee?.groupId) return;
     (async () => {
       try {
-        const data = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings");
-        setFpassEnabled(data.enabledGroupIds?.includes(employee.groupId!) ?? false);
+        const data = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings");
+        setFpasEnabled(data.enabledGroupIds?.includes(employee.groupId!) ?? false);
       } catch {
         // non-fatal
       }
     })();
   }, [employee?.groupId]);
 
-  // This profile's current-year submission (for the View FPASS button).
-  // Only fetched when the viewer may see FPASS at all; the endpoint
+  // This profile's current-year submission (for the View FPAS button).
+  // Only fetched when the viewer may see FPAS at all; the endpoint
   // pre-scopes rows, so a hit means authorized.
   useEffect(() => {
-    setProfileFpassSubId(null);
+    setProfileFpasSubId(null);
     if (!employee?.employeeId) return;
-    if (!hasAny(["fpass.fill", "fpass.manage", "fpass.view_all"])) return;
+    if (!hasAny(["fpas.fill", "fpas.view_all", "fpas.view_institution"])) return;
     const code = employee.employeeId;
     (async () => {
       try {
         const data = await apiFetch<{ employees: { employeeId: string; submission: { id: string } | null }[] }>(
-          "/api/fpass/status"
+          "/api/fpas/status"
         );
         const row = (data.employees ?? []).find((e) => e.employeeId === code);
-        setProfileFpassSubId(row?.submission?.id ?? null);
+        setProfileFpasSubId(row?.submission?.id ?? null);
       } catch {
         // non-fatal — View button stays hidden
       }
@@ -1585,14 +1591,14 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
               </div>
             </div>
             <div className="flex items-center gap-2 pb-1">
-              {(((employeeId === user?.id && fpassEnabled && has("fpass.fill")) || has("fpass.manage"))) && (
-                <button onClick={() => setCurrentPage("fpass", `emp:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-accent/30 text-rcc-accent hover:bg-rcc-accent/5 transition-colors">
-                  <FileText className="h-3.5 w-3.5" /> Fill FPASS
+              {(((employeeId === user?.id && fpasEnabled && has("fpas.fill")))) && (
+                <button onClick={() => setCurrentPage("fpas", `emp:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-accent/30 text-rcc-accent hover:bg-rcc-accent/5 transition-colors">
+                  <FileText className="h-3.5 w-3.5" /> Fill FPAS
                 </button>
               )}
-              {profileFpassSubId && ((employeeId === user?.id) || has("fpass.manage") || has("fpass.view_all")) && (
-                <button onClick={() => setCurrentPage("fpass", `view:${profileFpassSubId}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
-                  <Eye className="h-3.5 w-3.5" /> View FPASS
+              {profileFpasSubId && ((employeeId === user?.id) || has("fpas.view_institution") || has("fpas.view_all")) && (
+                <button onClick={() => setCurrentPage("fpas", `view:${profileFpasSubId}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                  <Eye className="h-3.5 w-3.5" /> View FPAS
                 </button>
               )}
             </div>
@@ -1879,15 +1885,15 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </div>
       </SectionCard>
 
-      {/* FPASS Configuration link (managed on the dedicated page) */}
-      {has("fpass.manage") && (
+      {/* FPAS Configuration link (managed on the dedicated page) */}
+      {has("fpas.manage") && (
         <SectionCard title="System Configuration" icon={Settings}>
           <button
-            onClick={() => setCurrentPage("fpass", "settings")}
+            onClick={() => setCurrentPage("fpas", "settings")}
             className="w-full flex items-center justify-between gap-2 p-3 rounded-md border border-rcc-border hover:bg-rcc-bg/40 transition-colors text-left"
           >
             <span>
-              <span className="block text-sm font-medium text-rcc-text-primary">FPASS Configuration</span>
+              <span className="block text-sm font-medium text-rcc-text-primary">FPAS Configuration</span>
               <span className="block text-xs text-rcc-text-muted">Choose which departments can fill the appraisal form.</span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 text-rcc-text-muted" />

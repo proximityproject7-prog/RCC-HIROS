@@ -18,7 +18,7 @@ import { EvaluationPage } from "@/components/evaluation/evaluation-pages";
 import { ReportsPage } from "@/components/reports/report-pages";
 import { RoleListPage, RoleFormPage } from "@/components/admin/role-pages";
 import { GroupListPage, GroupFormPage } from "@/components/admin/group-pages";
-import { FpassPage } from "@/components/fpass/fpass-pages";
+import { FpasPage } from "@/components/fpas/fpas-pages";
 
 // ═══════════════════════════════════════════════════════════════
 // Error Boundary — catches render errors in page components
@@ -128,14 +128,14 @@ export default function HomePage() {
           ) : <GroupListPage />}
         </PermissionGuard>
       ); break;
-    case "fpass":
+    case "fpas":
       content = currentSubpage === "settings" ? (
-        <PermissionGuard require="fpass.manage" fallback={<PermissionDenied />}>
-          <FpassPage showSettings />
+        <PermissionGuard require="fpas.manage" fallback={<PermissionDenied />}>
+          <FpasPage showSettings />
         </PermissionGuard>
       ) : (
-        <PermissionGuard any={["fpass.fill", "fpass.manage"]} fallback={<PermissionDenied />}>
-          <FpassPage
+        <PermissionGuard any={["fpas.fill", "fpas.view_all", "fpas.view_institution"]} fallback={<PermissionDenied />}>
+          <FpasPage
             employeeId={currentSubpage?.startsWith("emp:") ? currentSubpage.slice(4) : undefined}
             submissionId={currentSubpage?.startsWith("view:") ? currentSubpage.slice(5) : undefined}
           />

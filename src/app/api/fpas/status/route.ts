@@ -2,28 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAnyPermission } from "@/lib/auth-token";
 
-const SETTING_KEY = "fpass_enabled_groups";
+const SETTING_KEY = "fpas_enabled_groups";
 
 // ═══════════════════════════════════════════════════════════════
-// GET /api/fpass/status — all employees with FPASS submission status
-// Entry: fpass.fill, fpass.manage, or fpass.view_all.
-// Scope: fpass.manage sees all groups; fpass.view_all sees own group
+// GET /api/fpas/status — all employees with FPAS submission status
+// Entry: fpas.fill, fpas.manage, or fpas.view_all.
+// Scope: fpas.manage sees all groups; fpas.view_all sees own group
 // (+ self); everyone else sees only their own row. Only returns
-// employees in FPASS-enabled groups (when any are configured).
+// employees in FPAS-enabled groups (when any are configured).
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAnyPermission(request, [
-      "fpass.fill",
-      "fpass.manage",
-      "fpass.view_all",
+      "fpas.fill",
+      "fpas.manage",
+      "fpas.view_all",
     ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
 
-    const canManage = user.isSystem || user.permissions.includes("fpass.manage");
+    const canViewAll =
+      user.isSystem || user.permissions.includes("fpas.view_institution");
     const canViewGroup =
-      canManage || user.permissions.includes("fpass.view_all");
+      canViewAll || user.permissions.includes("fpas.view_all");
 
     // Get enabled group IDs from settings
     const setting = await db.systemSetting.findUnique({
@@ -44,14 +45,15 @@ export async function GET(request: NextRequest) {
       role: { isSystem: false },
     };
 
-    // Only show employees in FPASS-enabled groups (if any are configured)
+    // Only show employees in FPAS-enabled groups (if any are configured)
     if (enabledGroupIds.length > 0) {
       employeeWhere.groupId = { in: enabledGroupIds };
     }
 
-    // Non-managers are scoped: view_all holders see their own group
-    // (+ themselves even if groupless); everyone else sees only self.
-    if (!canManage) {
+    // Institution viewers see all groups; group viewers see their own
+    // group (+ self even if groupless); everyone else sees only self.
+    // fpas.manage grants no viewing.
+    if (!canViewAll) {
       if (canViewGroup && user.groupId) {
         employeeWhere.OR = [{ groupId: user.groupId }, { id: user.id }];
       } else {
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
         lastName: true,
         group: { select: { id: true, name: true, code: true } },
         role: { select: { id: true, name: true } },
-        fpassSubmissions: {
+        fpasSubmissions: {
           where: { schoolYear },
           select: {
             id: true,
@@ -93,13 +95,13 @@ export async function GET(request: NextRequest) {
       name: `${emp.firstName} ${emp.middleName ? emp.middleName + " " : ""}${emp.lastName}`,
       group: emp.group,
       roleName: emp.role?.name ?? null,
-      submission: emp.fpassSubmissions[0] ?? null,
-      hasSubmission: emp.fpassSubmissions.length > 0,
+      submission: emp.fpasSubmissions[0] ?? null,
+      hasSubmission: emp.fpasSubmissions.length > 0,
     }));
 
     return NextResponse.json({ employees: result, schoolYear });
   } catch (error) {
-    console.error("[API /fpass/status] Error:", error);
+    console.error("[API /fpas/status] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

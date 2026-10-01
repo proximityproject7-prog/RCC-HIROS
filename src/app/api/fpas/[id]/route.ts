@@ -3,8 +3,8 @@ import { db } from "@/lib/db";
 import { requireAnyPermission, requirePermission } from "@/lib/auth-token";
 
 // ═══════════════════════════════════════════════════════════════
-// GET /api/fpass/[id] — get a single submission
-// Access: owner, fpass.manage (all), or fpass.view_all when the
+// GET /api/fpas/[id] — get a single submission
+// Access: owner, fpas.manage (all), or fpas.view_all when the
 // owner is in the viewer's own group.
 // ═══════════════════════════════════════════════════════════════
 export async function GET(
@@ -13,15 +13,15 @@ export async function GET(
 ) {
   try {
     const auth = await requireAnyPermission(request, [
-      "fpass.fill",
-      "fpass.manage",
-      "fpass.view_all",
+      "fpas.fill",
+      "fpas.manage",
+      "fpas.view_all",
     ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
     const { id } = await params;
 
-    const submission = await db.fpassSubmission.findUnique({
+    const submission = await db.fpasSubmission.findUnique({
       where: { id },
       include: {
         employee: {
@@ -49,11 +49,13 @@ export async function GET(
       );
     }
 
-    // Check access: owner, fpass.manage (all groups), or fpass.view_all
-    // when the owner is in the viewer's own group.
-    const canManage = user.isSystem || user.permissions.includes("fpass.manage");
-    if (submission.employeeId !== user.id && !canManage) {
-      const canViewGroup = user.permissions.includes("fpass.view_all");
+    // Check access: owner, institution viewers (system +
+    // fpas.view_institution), or fpas.view_all when the owner is in the
+    // viewer's own group. fpas.manage grants no viewing.
+    const canViewAll =
+      user.isSystem || user.permissions.includes("fpas.view_institution");
+    if (submission.employeeId !== user.id && !canViewAll) {
+      const canViewGroup = user.permissions.includes("fpas.view_all");
       const ownerGroupId = submission.employee?.group?.id ?? null;
       const sameGroup =
         !!ownerGroupId && !!user.groupId && ownerGroupId === user.groupId;
@@ -67,7 +69,7 @@ export async function GET(
 
     return NextResponse.json({ submission });
   } catch (error) {
-    console.error("[API /fpass/[id]] Error:", error);
+    console.error("[API /fpas/[id]] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -76,8 +78,8 @@ export async function GET(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PATCH /api/fpass/[id] — update a submission
-// Requires fpass.fill; owner or fpass.manage. Self-updates are
+// PATCH /api/fpas/[id] — update a submission
+// Requires fpas.fill; owner or fpas.manage. Self-updates are
 // additionally blocked when the owner's group is not in the
 // enabled list (managers bypass; empty list = all enabled).
 // ═══════════════════════════════════════════════════════════════
@@ -86,12 +88,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requirePermission(request, "fpass.fill");
+    const auth = await requirePermission(request, "fpas.fill");
     if (!auth.ok) return auth.response;
     const { user } = auth;
     const { id } = await params;
 
-    const existing = await db.fpassSubmission.findUnique({
+    const existing = await db.fpasSubmission.findUnique({
       where: { id },
       include: { employee: { select: { id: true, groupId: true } } },
     });
@@ -103,20 +105,22 @@ export async function PATCH(
       );
     }
 
-    // Check access: owner or fpass.manage
-    const canManage = user.isSystem || user.permissions.includes("fpass.manage");
-    if (existing.employeeId !== user.id && !canManage) {
+    // Nobody files for anyone else: owner only (managers included).
+    if (existing.employeeId !== user.id) {
       return NextResponse.json(
-        { error: "Forbidden" },
+        { error: "Forbidden - you may only update your own submission" },
         { status: 403 }
       );
     }
 
-    // Hard gate: FPASS must be enabled for the owner's department.
+    // Managers bypass the group gate below for their own fills.
+    const canManage = user.isSystem || user.permissions.includes("fpas.manage");
+
+    // Hard gate: FPAS must be enabled for the owner's department.
     // Managers bypass; an empty enabled list means all groups are enabled.
     if (!canManage) {
       const setting = await db.systemSetting.findUnique({
-        where: { key: "fpass_enabled_groups" },
+        where: { key: "fpas_enabled_groups" },
       });
       let enabledGroupIds: string[] = [];
       if (setting?.value) {
@@ -128,7 +132,7 @@ export async function PATCH(
         (!ownerGroupId || !enabledGroupIds.includes(ownerGroupId))
       ) {
         return NextResponse.json(
-          { error: "Forbidden - FPASS is not enabled for this department" },
+          { error: "Forbidden - FPAS is not enabled for this department" },
           { status: 403 }
         );
       }
@@ -140,7 +144,7 @@ export async function PATCH(
       totalPoints?: number;
     };
 
-    const submission = await db.fpassSubmission.update({
+    const submission = await db.fpasSubmission.update({
       where: { id },
       data: {
         ...(formData !== undefined ? { formData } : {}),
@@ -150,7 +154,7 @@ export async function PATCH(
 
     return NextResponse.json({ submission });
   } catch (error) {
-    console.error("[API /fpass/[id]] Error:", error);
+    console.error("[API /fpas/[id]] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

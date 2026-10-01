@@ -124,9 +124,10 @@ const PERMISSION_LABELS: Record<string, { label: string; description: string }> 
   "groups.edit": { label: "Edit Groups", description: "Edit group names, codes, and descriptions." },
   "groups.delete": { label: "Delete Groups", description: "Deactivate / remove groups." },
 
-  "fpass.fill": { label: "Fill FPASS Form", description: "Fill out the Faculty Performance Appraisal form." },
-  "fpass.manage": { label: "Manage FPASS", description: "View all FPASS submissions and manage group access." },
-  "fpass.view_all": { label: "View Group Submissions", description: "Open submitted FPASS forms of own-department members (read-only)." },
+  "fpas.fill": { label: "Fill FPAS Form", description: "Fill out the Faculty Performance Appraisal form." },
+  "fpas.manage": { label: "Manage FPAS", description: "Configure which departments can fill FPAS (group access settings)." },
+  "fpas.view_all": { label: "View Group Submissions", description: "Open submitted FPAS forms of own-department members (read-only)." },
+  "fpas.view_institution": { label: "View All Submissions", description: "Open any submitted FPAS form institution-wide (read-only)." },
 
   "biometric.enroll": { label: "Enroll Fingerprints", description: "Enroll and delete employee fingerprint templates." },
   "biometric.manage": { label: "View Biometric Status", description: "View any employee's biometric enrollment status." },
@@ -186,8 +187,8 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
     permissions: ["groups.view", "groups.create", "groups.edit", "groups.delete"],
   },
   {
-    label: "FPASS (Faculty Appraisal)",
-    permissions: ["fpass.fill", "fpass.manage", "fpass.view_all"],
+    label: "FPAS (Faculty Appraisal)",
+    permissions: ["fpas.fill", "fpas.manage", "fpas.view_all", "fpas.view_institution"],
   },
 ].map((m) => ({
   label: m.label,
@@ -525,7 +526,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
 
   // System configuration state (for config panel at bottom)
   const [cfgGroups, setCfgGroups] = useState<{ id: string; name: string; code: string }[]>([]);
-  const [cfgFpassIds, setCfgFpassIds] = useState<string[]>([]);
+  const [cfgFpasIds, setCfgFpasIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (mode !== "edit" || !roleId) return;
@@ -575,12 +576,12 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
   useEffect(() => {
     (async () => {
       try {
-        const [groupsData, fpassData] = await Promise.all([
+        const [groupsData, fpasData] = await Promise.all([
           apiFetch<{ groups: { id: string; name: string; code: string }[] }>("/api/groups"),
-          apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings"),
+          apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings"),
         ]);
         setCfgGroups(groupsData.groups ?? []);
-        setCfgFpassIds(fpassData.enabledGroupIds ?? []);
+        setCfgFpasIds(fpasData.enabledGroupIds ?? []);
       } catch {
         // non-fatal
       }
@@ -834,17 +835,17 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
           System Configuration
         </h2>
         <p className="text-xs text-rcc-text-muted -mt-2">
-          Current FPASS and profile edit settings across the system.
+          Current FPAS and profile edit settings across the system.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="border border-rcc-border rounded-lg p-4 space-y-2">
-            <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">FPASS Enabled Groups</h3>
-            {cfgFpassIds.length === 0 ? (
+            <h3 className="text-xs font-semibold text-rcc-text-secondary uppercase tracking-wide">FPAS Enabled Groups</h3>
+            {cfgFpasIds.length === 0 ? (
               <p className="text-xs text-rcc-text-muted">No groups enabled.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {cfgFpassIds.map(id => {
+                {cfgFpasIds.map(id => {
                   const g = cfgGroups.find(gr => gr.id === id);
                   return (
                     <span key={id} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-rcc-primary/10 text-rcc-primary border border-rcc-primary/20">
@@ -854,7 +855,7 @@ export function RoleFormPage({ mode, roleId }: { mode: "create" | "edit"; roleId
                 })}
               </div>
             )}
-            <p className="text-xs text-rcc-text-muted">Configure in Employee Records &rarr; FPASS Configuration.</p>
+            <p className="text-xs text-rcc-text-muted">Configure in Employee Records &rarr; FPAS Configuration.</p>
           </div>
 
           <div className="border border-rcc-border rounded-lg p-4 space-y-2">

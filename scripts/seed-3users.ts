@@ -12,7 +12,7 @@ const HR_PERMS = [
   "evaluation.view", "evaluation.submit", "evaluation.manage_forms", "evaluation.reset",
   "leave.request", "leave.approve_l2", "leave.view_all", "leave.manage_types",
   "reports.view", "reports.export",
-  "fpass.fill", "fpass.manage",
+  "fpas.fill", "fpas.manage",
   "groups.view", "groups.create", "groups.edit", "groups.delete", "roles.view",
 ];
 
@@ -22,7 +22,7 @@ const DEAN_PERMS = [
   "attendance.view", "attendance.clock_in",
   "evaluation.view", "evaluation.submit",
   "leave.approve_l1", "leave.request",
-  "reports.view", "fpass.fill", "groups.view",
+  "reports.view", "fpas.fill", "groups.view",
 ];
 
 const PROFESSOR_PERMS = [
@@ -30,7 +30,7 @@ const PROFESSOR_PERMS = [
   "attendance.clock_in", "attendance.view",
   "leave.request",
   "evaluation.view_results",
-  "fpass.fill",
+  "fpas.fill",
   "profile.selfEdit",
 ];
 

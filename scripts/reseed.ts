@@ -106,7 +106,7 @@ async function main() {
     "reports.view","reports.export",
     "roles.view","roles.create","roles.edit","roles.delete",
     "groups.view","groups.create","groups.edit","groups.delete",
-    "fpass.fill","fpass.manage",
+    "fpas.fill","fpas.manage",
   ]);
 
   const hrRole = await upsertRole("HR Personnel", "HR office - manages employees, leaves, evaluations config", {

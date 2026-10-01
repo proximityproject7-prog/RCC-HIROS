@@ -5,11 +5,12 @@ import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
   CheckCircle2,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, ApiError } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore } from "@/store/auth-store";
 import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { PermissionDenied } from "@/components/shared/permission-denied";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -31,7 +32,7 @@ interface EmployeeBrief {
   hireDate: string | null;
 }
 
-interface FpassSubmissionRecord {
+interface FpasSubmissionRecord {
   id: string;
   employeeId: string;
   schoolYear: string;
@@ -54,7 +55,7 @@ interface DynamicRow {
   [key: string]: string | number | boolean;
 }
 
-interface FpassFormData {
+interface FpasFormData {
   header: {
     name: string;
     department: string;
@@ -110,7 +111,7 @@ interface FpassFormData {
   };
 }
 
-const DEFAULT_FORM_DATA: FpassFormData = {
+const DEFAULT_FORM_DATA: FpasFormData = {
   header: { name: "", department: "", dateEnteredRcc: "", degreeInstitution: "", schoolYear: "" },
   criteria1: {
     studentEvaluation: 0, classroomPerformance: 0,
@@ -140,15 +141,15 @@ function makeRowId(): string {
 // Main Page
 // ═══════════════════════════════════════════════════════════════
 
-export function FpassPage({ employeeId, submissionId, showSettings: showSettingsProp }: { employeeId?: string; submissionId?: string; showSettings?: boolean }) {
+export function FpasPage({ employeeId, submissionId, showSettings: showSettingsProp }: { employeeId?: string; submissionId?: string; showSettings?: boolean }) {
   const { has } = usePermissions();
-  const canManage = has("fpass.manage");
+  const canManage = has("fpas.manage");
   const { setCurrentPage } = useAuthStore();
 
   const [showSettings, setShowSettings] = useState(showSettingsProp ?? false);
 
-  // No list view: Employee Records (FPASS filter + status column) is the
-  // hub. Bare `fpass` navigation redirects there.
+  // No list view: Employee Records (FPAS filter + status column) is the
+  // hub. Bare `fpas` navigation redirects there.
   const showList = !showSettings && !employeeId && !submissionId;
   useEffect(() => {
     if (showList) setCurrentPage("profiling");
@@ -156,13 +157,13 @@ export function FpassPage({ employeeId, submissionId, showSettings: showSettings
 
   // If admin clicks settings, show settings page
   if (showSettings && canManage) {
-    return <FpassSettingsPage onBack={() => setShowSettings(false)} />;
+    return <FpasSettingsPage onBack={() => setShowSettings(false)} />;
   }
 
   // If viewing a specific submission from the list
   if (submissionId) {
     return (
-      <FpassSubmissionViewPage
+      <FpasSubmissionViewPage
         submissionId={submissionId}
         onBack={() => setCurrentPage("profiling")}
         onSettings={() => setShowSettings(true)}
@@ -174,7 +175,7 @@ export function FpassPage({ employeeId, submissionId, showSettings: showSettings
   // If we have an employeeId, show the form for that employee
   if (employeeId) {
     return (
-      <FpassFormPage
+      <FpasFormPage
         employeeId={employeeId}
         readOnly={false}
         onBack={() => setCurrentPage("profiling", `view:${employeeId}`)}
@@ -189,10 +190,10 @@ export function FpassPage({ employeeId, submissionId, showSettings: showSettings
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FPASS Submission View Page (admin viewing a specific submission)
+// FPAS Submission View Page (admin viewing a specific submission)
 // ═══════════════════════════════════════════════════════════════
 
-function FpassSubmissionViewPage({
+function FpasSubmissionViewPage({
   submissionId,
   onBack,
   onSettings,
@@ -204,15 +205,18 @@ function FpassSubmissionViewPage({
   canManage: boolean;
 }) {
   const [loading, setLoading] = useState(true);
-  const [submission, setSubmission] = useState<FpassSubmissionRecord | null>(null);
+  const [submission, setSubmission] = useState<FpasSubmissionRecord | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
+    setAccessDenied(false);
     (async () => {
       try {
-        const data = await apiFetch<{ submission: FpassSubmissionRecord }>(`/api/fpass/${submissionId}`);
+        const data = await apiFetch<{ submission: FpasSubmissionRecord }>(`/api/fpas/${submissionId}`);
         setSubmission(data.submission);
-      } catch {
-        // non-fatal
+      } catch (err) {
+        // 403 = outside the viewer's scope: explain instead of a bare 404.
+        if (err instanceof ApiError && err.status === 403) setAccessDenied(true);
       } finally {
         setLoading(false);
       }
@@ -234,13 +238,17 @@ function FpassSubmissionViewPage({
         <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
-        <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">Submission not found.</div>
+        {accessDenied ? (
+          <PermissionDenied message="You are not allowed to view this submission." />
+        ) : (
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">Submission not found.</div>
+        )}
       </div>
     );
   }
 
   return (
-    <FpassFormPage
+    <FpasFormPage
       employeeId={submission.employeeId}
       readOnly={true}
       onBack={onBack}
@@ -252,10 +260,10 @@ function FpassSubmissionViewPage({
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FPASS Form Page
+// FPAS Form Page
 // ═══════════════════════════════════════════════════════════════
 
-function FpassFormPage({
+function FpasFormPage({
   employeeId,
   readOnly,
   onBack,
@@ -275,7 +283,7 @@ function FpassFormPage({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [employee, setEmployee] = useState<EmployeeBrief | null>(null);
-  const [formData, setFormData] = useState<FpassFormData>(DEFAULT_FORM_DATA);
+  const [formData, setFormData] = useState<FpasFormData>(DEFAULT_FORM_DATA);
   const [existingId, setExistingId] = useState<string | null>(submissionId ?? null);
   const [schoolYear, setSchoolYear] = useState(new Date().getFullYear() + "-" + (new Date().getFullYear() + 1));
 
@@ -319,8 +327,8 @@ function FpassFormPage({
     if (!submissionId) return;
     (async () => {
       try {
-        const data = await apiFetch<{ submission: FpassSubmissionRecord }>(`/api/fpass/${submissionId}`);
-        const parsed = JSON.parse(data.submission.formData) as FpassFormData;
+        const data = await apiFetch<{ submission: FpasSubmissionRecord }>(`/api/fpas/${submissionId}`);
+        const parsed = JSON.parse(data.submission.formData) as FpasFormData;
         setFormData(parsed);
         setSchoolYear(data.submission.schoolYear);
         setExistingId(data.submission.id);
@@ -375,18 +383,18 @@ function FpassFormPage({
       };
 
       if (existingId) {
-        await apiFetch(`/api/fpass/${existingId}`, {
+        await apiFetch(`/api/fpas/${existingId}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
       } else {
-        const result = await apiFetch<{ submission: { id: string } }>("/api/fpass", {
+        const result = await apiFetch<{ submission: { id: string } }>("/api/fpas", {
           method: "POST",
           body: JSON.stringify(payload),
         });
         setExistingId(result.submission.id);
       }
-      setSuccess("FPASS form saved successfully.");
+      setSuccess("FPAS form saved successfully.");
       snapshotRef.current = { formData: JSON.stringify(formData), schoolYear };
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
@@ -446,6 +454,7 @@ function FpassFormPage({
   };
 
   const totalPoints = useMemo(() => calculateTotal(formData), [formData]);
+  const criteriaTotals = useMemo(() => calculateCriteria(formData), [formData]);
 
   if (loading) {
     return (
@@ -471,7 +480,7 @@ function FpassFormPage({
       {/* Header */}
       <div>
         <button onClick={() => requestNavigation(() => onBack())} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
-          <ArrowLeft className="h-4 w-4" /> Back to FPASS
+          <ArrowLeft className="h-4 w-4" /> Back to FPAS
         </button>
         <div className="flex items-center justify-between">
           <div>
@@ -520,19 +529,32 @@ function FpassFormPage({
         </div>
       </div>
 
+      {/* Official FPAS instructions */}
+      <div className="bg-rcc-accent/5 border border-rcc-accent/20 rounded-lg p-4 text-sm text-rcc-text-secondary space-y-2">
+        <p>
+          <strong className="text-rcc-text-primary">Instruction:</strong> For Criteria I–II, kindly check
+          only those items that are true to you. For Criteria III–VI, kindly fill out and refer to the
+          FPAS scoring guide for the corresponding points.
+        </p>
+        <p className="italic">
+          The Dean/Principal and the faculty shall sit down to discuss the points marked for each
+          criterion and the final ratings.
+        </p>
+      </div>
+
       {/* Criteria I: Instruction */}
-      <CriteriaSection title="I. Instruction" points={25} maxPoints={25}>
+      <CriteriaSection title="I. Instruction" points={criteriaTotals.c1} maxPoints={25}>
         <RadioGroup
           label="Faculty Evaluation by Students"
           value={formData.criteria1.studentEvaluation}
           onChange={(v) => updateCriteria1("studentEvaluation", v)}
           options={[
             { value: 6, label: "5.00" },
-            { value: 5, label: "4.50-4.99" },
-            { value: 4, label: "3.50-4.49" },
-            { value: 3, label: "2.50-3.49" },
-            { value: 2, label: "1.50-2.49" },
-            { value: 1, label: "Below 1.49" },
+            { value: 5, label: "4.50-4.995" },
+            { value: 4, label: "3.50-4.494" },
+            { value: 3, label: "2.50-3.493" },
+            { value: 2, label: "1.50-2.492" },
+            { value: 1, label: "Below 1.491" },
           ]}
           readOnly={readOnly}
         />
@@ -542,11 +564,11 @@ function FpassFormPage({
           onChange={(v) => updateCriteria1("classroomPerformance", v)}
           options={[
             { value: 6, label: "5.00" },
-            { value: 5, label: "4.50-4.99" },
-            { value: 4, label: "3.50-4.49" },
-            { value: 3, label: "2.50-3.49" },
-            { value: 2, label: "1.50-2.49" },
-            { value: 1, label: "Below 1.49" },
+            { value: 5, label: "4.50-4.995" },
+            { value: 4, label: "3.50-4.494" },
+            { value: 3, label: "2.50-3.493" },
+            { value: 2, label: "1.50-2.492" },
+            { value: 1, label: "Below 1.491" },
           ]}
           readOnly={readOnly}
         />
@@ -651,7 +673,7 @@ function FpassFormPage({
       </CriteriaSection>
 
       {/* Criteria II: Faculty Attendance */}
-      <CriteriaSection title="II. Faculty Attendance" points={20} maxPoints={20}>
+      <CriteriaSection title="II. Faculty Attendance" points={criteriaTotals.c2} maxPoints={20}>
         <RadioGroup
           label="Record of Absences"
           value={formData.criteria2.absences}
@@ -701,7 +723,7 @@ function FpassFormPage({
           value={formData.criteria2.libraryVisits}
           onChange={(v) => updateCriteria2("libraryVisits", v)}
           options={[
-            { value: 3, label: "37 visits - above" },
+            { value: 3, label: "37 visits and above" },
             { value: 2, label: "26-36 visits" },
             { value: 1, label: "18-25 visits" },
           ]}
@@ -710,7 +732,7 @@ function FpassFormPage({
       </CriteriaSection>
 
       {/* Criteria III: Professional Growth */}
-      <CriteriaSection title="III. Professional Growth" points={20} maxPoints={20}>
+      <CriteriaSection title="III. Professional Growth" points={criteriaTotals.c3} maxPoints={20}>
         <DynamicTable
           title="Graduate Degree (max 9 pts)"
           rows={formData.criteria3.graduateDegree}
@@ -795,7 +817,7 @@ function FpassFormPage({
       </CriteriaSection>
 
       {/* Criteria IV: Researches & Publications */}
-      <CriteriaSection title="IV. Researches and Publications" points={16} maxPoints={16}>
+      <CriteriaSection title="IV. Researches and Publications" points={criteriaTotals.c4} maxPoints={16}>
         <DynamicTable
           title="Scientific Discoveries and Inventions (max 7 pts)"
           rows={formData.criteria4.discoveries}
@@ -851,13 +873,13 @@ function FpassFormPage({
       </CriteriaSection>
 
       {/* Criteria V: School Functions / Extracurricular */}
-      <CriteriaSection title="V. Involvement in School Functions / Student Extra-Curricular Activities" points={9} maxPoints={9}>
+      <CriteriaSection title="V. Involvement in School Functions / Student Extra-Curricular Activities" points={criteriaTotals.c5} maxPoints={9}>
         <DynamicTable
           title="Adviser of Student Organizations (max 3 pts)"
           rows={formData.criteria5.adviser}
           columns={[
-            { key: "title", label: "Title" },
-            { key: "nature", label: "Nature of Participation" },
+            { key: "title", label: "Name of Organization" },
+            { key: "nature", label: "Period" },
             { key: "points", label: "Points", type: "number" },
           ]}
           onAdd={() => addRow("criteria5", "adviser")}
@@ -894,7 +916,7 @@ function FpassFormPage({
       </CriteriaSection>
 
       {/* Criteria VI: Community Involvement */}
-      <CriteriaSection title="VI. Community Involvement" points={10} maxPoints={10}>
+      <CriteriaSection title="VI. Community Involvement" points={criteriaTotals.c6} maxPoints={10}>
         <DynamicTable
           title="Projects Initiated (max 4 pts)"
           rows={formData.criteria6.projectsInitiated}
@@ -941,10 +963,10 @@ function FpassFormPage({
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FPASS Settings Page
+// FPAS Settings Page
 // ═══════════════════════════════════════════════════════════════
 
-function FpassSettingsPage({ onBack }: { onBack: () => void }) {
+function FpasSettingsPage({ onBack }: { onBack: () => void }) {
   const [groups, setGroups] = useState<GroupBrief[]>([]);
   const [enabledIds, setEnabledIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -967,7 +989,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
       try {
         const [groupsData, settingsData] = await Promise.all([
           apiFetch<{ groups: GroupBrief[] }>("/api/groups"),
-          apiFetch<{ enabledGroupIds: string[] }>("/api/fpass/settings"),
+          apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings"),
         ]);
         setGroups(groupsData.groups ?? []);
         setEnabledIds(new Set(settingsData.enabledGroupIds ?? []));
@@ -1002,6 +1024,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
   };
 
   const enableSelected = () => {
+    setSuccess(null);
     setEnabledIds((prev) => {
       const next = new Set(prev);
       for (const id of selectedIds) next.add(id);
@@ -1011,6 +1034,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
   };
 
   const disableSelected = () => {
+    setSuccess(null);
     setEnabledIds((prev) => {
       const next = new Set(prev);
       for (const id of selectedIds) next.delete(id);
@@ -1024,7 +1048,7 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
     setError(null);
     setSuccess(null);
     try {
-      await apiFetch("/api/fpass/settings", {
+      await apiFetch("/api/fpas/settings", {
         method: "PATCH",
         body: JSON.stringify({ enabledGroupIds: Array.from(enabledIds) }),
       });
@@ -1063,8 +1087,8 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div>
-          <h1 className="text-xl font-bold text-rcc-text-primary">FPASS Configuration</h1>
-          <p className="text-sm text-rcc-text-muted mt-0.5">Select groups, then enable or disable FPASS access for them.</p>
+          <h1 className="text-xl font-bold text-rcc-text-primary">FPAS Configuration</h1>
+          <p className="text-sm text-rcc-text-muted mt-0.5">Select groups, then enable or disable FPAS access for them.</p>
         </div>
       </div>
 
@@ -1098,6 +1122,9 @@ function FpassSettingsPage({ onBack }: { onBack: () => void }) {
               <Save className="h-4 w-4" />
               {saving ? "Saving..." : "Save Changes"}
             </button>
+            {isDirty && !saving && (
+              <span className="text-xs font-medium text-amber-700">• Unsaved changes</span>
+            )}
           </div>
         </div>
         {/* Department dropdown picker */}
@@ -1377,7 +1404,7 @@ function DynamicTable({
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
-function calculateTotal(data: FpassFormData): number {
+function calculateCriteria(data: FpasFormData): { c1: number; c2: number; c3: number; c4: number; c5: number; c6: number } {
   // Criteria I: Instruction
   const c1 =
     data.criteria1.studentEvaluation +
@@ -1402,33 +1429,52 @@ function calculateTotal(data: FpassFormData): number {
     data.criteria2.facultyMeetings +
     data.criteria2.libraryVisits;
 
-  // Criteria III-VI: Sum of "points" columns in dynamic tables
+  // Criteria III-VI: Sum of "points" columns in dynamic tables.
+  // Per-table and per-criterion maxima follow the official FPAS form
+  // ("maximum of N pts"). Tables without an explicit maximum are uncapped
+  // individually but still bound by their criterion cap.
   const sumTable = (rows: DynamicRow[]) =>
     rows.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
+  const cappedTableSum = (rows: DynamicRow[], max?: number) =>
+    max === undefined ? sumTable(rows) : Math.min(sumTable(rows), max);
+  const cap = (value: number, max: number) => Math.min(value, max);
 
-  const c3 =
-    sumTable(data.criteria3.graduateDegree) +
-    sumTable(data.criteria3.facultyDevelopment) +
-    sumTable(data.criteria3.seminars) +
+  const c3 = cap(
+    cappedTableSum(data.criteria3.graduateDegree, 9) +
+    cappedTableSum(data.criteria3.facultyDevelopment, 4) +
+    cappedTableSum(data.criteria3.seminars, 3) +
     sumTable(data.criteria3.specialStudies) +
-    sumTable(data.criteria3.awards) +
-    sumTable(data.criteria3.professionalOrgs);
+    cappedTableSum(data.criteria3.awards, 4) +
+    cappedTableSum(data.criteria3.professionalOrgs, 3),
+    20
+  );
 
-  const c4 =
-    sumTable(data.criteria4.discoveries) +
+  const c4 = cap(
+    cappedTableSum(data.criteria4.discoveries, 7) +
     sumTable(data.criteria4.publications) +
-    sumTable(data.criteria4.researchStudies) +
-    sumTable(data.criteria4.researchArticles);
+    cappedTableSum(data.criteria4.researchStudies, 5) +
+    cappedTableSum(data.criteria4.researchArticles, 4),
+    16
+  );
 
-  const c5 =
-    sumTable(data.criteria5.adviser) +
-    sumTable(data.criteria5.coach) +
-    sumTable(data.criteria5.officialFunctions);
+  const c5 = cap(
+    cappedTableSum(data.criteria5.adviser, 3) +
+    cappedTableSum(data.criteria5.coach, 3) +
+    cappedTableSum(data.criteria5.officialFunctions, 3),
+    9
+  );
 
-  const c6 =
-    sumTable(data.criteria6.projectsInitiated) +
-    sumTable(data.criteria6.projectsParticipated) +
-    sumTable(data.criteria6.memberships);
+  const c6 = cap(
+    cappedTableSum(data.criteria6.projectsInitiated, 4) +
+    cappedTableSum(data.criteria6.projectsParticipated, 3) +
+    cappedTableSum(data.criteria6.memberships, 3),
+    10
+  );
 
-  return c1 + c2 + c3 + c4 + c5 + c6;
+  return { c1: cap(c1, 25), c2: cap(c2, 20), c3, c4, c5, c6 };
+}
+
+function calculateTotal(data: FpasFormData): number {
+  const t = calculateCriteria(data);
+  return Math.min(t.c1 + t.c2 + t.c3 + t.c4 + t.c5 + t.c6, 100);
 }

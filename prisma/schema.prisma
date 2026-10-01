@@ -123,7 +123,7 @@ model Employee {
   evaluationsMade Evaluation[]           @relation("EvaluationsMade")
   attendanceRecords Attendance[]
   attendanceEdits Attendance[]           @relation("AttendanceEdits")
-  fpassSubmissions FpassSubmission[]
+  fpasSubmissions FpasSubmission[]
   auditLogs      AuditLog[]
   biometricTemplates BiometricTemplate[]
   contractTypeRel    ContractType?  @relation(fields: [contractTypeId], references: [id])
@@ -363,10 +363,10 @@ model Attendance {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FPASS (FACULTY PERFORMANCE APPRAISAL)
+// FPAS (FACULTY PERFORMANCE APPRAISAL)
 // ═══════════════════════════════════════════════════════════════
 
-model FpassSubmission {
+model FpasSubmission {
   id          String   @id @default(cuid())
   employeeId  String
   employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)

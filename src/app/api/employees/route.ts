@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const contractType = searchParams.get("contractType") || undefined;
     const employmentType = searchParams.get("employmentType") || undefined;
     const activeParam = searchParams.get("active");
-    const fpassStatus = searchParams.get("fpassStatus") || undefined;
+    const fpasStatus = searchParams.get("fpasStatus") || undefined;
     const scope = searchParams.get("scope") || "profiling";
 
     // Group scoping: use the appropriate scope permission
@@ -76,13 +76,38 @@ export async function GET(request: NextRequest) {
       where.role = { ...(where.role as object || {}), isSystem: false };
     }
 
-    // FPASS status filter
+    // FPAS status filter — gated on FPAS visibility (else anyone with
+    // profiling.view could learn everyone's submission standing), and
+    // scoped to the viewer's department unless institution-wide.
+    const fpasPerms = auth.user.permissions;
+    const canSeeAllFpas =
+      auth.user.isSystem || fpasPerms.includes("fpas.view_institution");
+    const canSeeGroupFpas =
+      canSeeAllFpas ||
+      fpasPerms.includes("fpas.view_all") ||
+      fpasPerms.includes("fpas.fill");
+    if (fpasStatus === "submitted" || fpasStatus === "empty") {
+      if (!canSeeGroupFpas) {
+        return NextResponse.json(
+          { error: "Forbidden - FPAS visibility permission required" },
+          { status: 403 }
+        );
+      }
+      if (!canSeeAllFpas) {
+        if (auth.user.groupId) {
+          where.groupId = auth.user.groupId;
+        } else {
+          // Groupless without institution sight: only self is visible.
+          where.id = auth.user.id;
+        }
+      }
+    }
     const currentYear = new Date().getFullYear();
-    const fpassSchoolYear = `${currentYear}-${currentYear + 1}`;
-    if (fpassStatus === "submitted") {
-      where.fpassSubmissions = { some: { schoolYear: fpassSchoolYear } };
-    } else if (fpassStatus === "empty") {
-      where.fpassSubmissions = { none: { schoolYear: fpassSchoolYear } };
+    const fpasSchoolYear = `${currentYear}-${currentYear + 1}`;
+    if (fpasStatus === "submitted") {
+      where.fpasSubmissions = { some: { schoolYear: fpasSchoolYear } };
+    } else if (fpasStatus === "empty") {
+      where.fpasSubmissions = { none: { schoolYear: fpasSchoolYear } };
     }
 
     const employees = await db.employee.findMany({

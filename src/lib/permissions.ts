@@ -57,10 +57,11 @@ export const PERMISSIONS = [
   "reports.view",
   "reports.export",
 
-  // FPASS (Faculty Performance Appraisal)
-  "fpass.fill",
-  "fpass.manage",
-  "fpass.view_all",
+  // FPAS (Faculty Performance Appraisal)
+  "fpas.fill",
+  "fpas.manage",
+  "fpas.view_all",
+  "fpas.view_institution",
 
   // Roles
   "roles.view",
