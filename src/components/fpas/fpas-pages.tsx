@@ -1078,12 +1078,15 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
     setError(null);
     setSuccess(null);
     try {
-      await apiFetch("/api/fpas/settings", {
+      // Snapshot from the server echo (server truth), never from the
+      // click-time local copy — the two can differ if staging changed
+      // mid-flight (now prevented by disabling the picker while saving).
+      const result = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings", {
         method: "PATCH",
         body: JSON.stringify({ enabledGroupIds: Array.from(enabledIds) }),
       });
       setSuccess("Settings saved successfully.");
-      snapshotRef.current = JSON.stringify(Array.from(enabledIds).sort());
+      snapshotRef.current = JSON.stringify([...(result.enabledGroupIds ?? [])].sort());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
@@ -1132,14 +1135,14 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
           <div className="flex items-center gap-2">
             <button
               onClick={enableSelected}
-              disabled={!someSelected}
+              disabled={!someSelected || saving}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold border border-green-200 text-green-700 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Enable
             </button>
             <button
               onClick={disableSelected}
-              disabled={!someSelected}
+              disabled={!someSelected || saving}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Disable
@@ -1165,7 +1168,8 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
               onClick={() => setDropdownOpen((v) => !v)}
               aria-haspopup="listbox"
               aria-expanded={dropdownOpen}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40"
+              disabled={saving}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <span className={someSelected ? "" : "text-rcc-text-muted"}>
                 {someSelected
@@ -1183,7 +1187,8 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
                       type="checkbox"
                       checked={allSelected}
                       onChange={selectAll}
-                      className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
+                      disabled={saving}
+                      className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                     Select all
                   </label>
@@ -1196,7 +1201,8 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
                         type="checkbox"
                         checked={selectedIds.has(g.id)}
                         onChange={() => toggleSelect(g.id)}
-                        className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40"
+                        disabled={saving}
+                        className="h-4 w-4 rounded border-rcc-border text-rcc-accent focus:ring-rcc-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-rcc-text-primary">{g.name}</p>
