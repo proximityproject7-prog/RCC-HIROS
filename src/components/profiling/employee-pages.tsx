@@ -1012,8 +1012,13 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
   const [confirmState, setConfirmState] = useState<ConfirmDialogState | null>(null);
 
-  // FPAS enabled state
-  const [fpasEnabled, setFpasEnabled] = useState(false);
+  // FPAS enabled state for THIS profile's group.
+  //   true  = group is on the enabled list (or the list is empty = all)
+  //   false = group is switched off
+  //   null  = not resolved yet (still loading, request failed, or the
+  //           employee has no group) — treated as allowed, mirroring the
+  //           Records list. The form lock and submit API stay the enforcers.
+  const [fpasEnabled, setFpasEnabled] = useState<boolean | null>(null);
   // This profile's submission id (current school year) for the View button.
   // The status endpoint pre-scopes rows server-side, so presence here means
   // the viewer is authorized to see it.
@@ -1617,7 +1622,14 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
               </div>
             </div>
             <div className="flex items-center gap-2 pb-1">
-              {(((employeeId === user?.id && fpasEnabled && has("fpas.fill")))) && (
+              {/* Fill is offered only on the viewer's own profile. The group
+                  gate matches the Records list: unknown (loading / fetch
+                  failed / no group) is treated as allowed, and managers
+                  bypass for their own fills. The form lock and submit API
+                  remain the enforcers. */}
+              {employeeId === user?.id &&
+                has("fpas.fill") &&
+                (fpasEnabled !== false || has("fpas.manage")) && (
                 <button onClick={() => setCurrentPage("fpas", `emp:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-accent/30 text-rcc-accent hover:bg-rcc-accent/5 transition-colors">
                   <FileText className="h-3.5 w-3.5" /> Fill FPAS
                 </button>
