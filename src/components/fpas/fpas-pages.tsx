@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
   CheckCircle2,
@@ -293,11 +293,13 @@ function FpasFormPage({
   const [existingId, setExistingId] = useState<string | null>(submissionId ?? null);
   const [schoolYear, setSchoolYear] = useState(new Date().getFullYear() + "-" + (new Date().getFullYear() + 1));
 
-  // Dirty detection
-  const snapshotRef = useRef({ formData: JSON.stringify(DEFAULT_FORM_DATA), schoolYear: "" });
+  // Dirty detection. The snapshot is reactive state (not a ref) so the
+  // memoized isDirty always recomputes after load/save — a mutated ref
+  // would leave the flag stale-true and warn on every Back.
+  const [snapshot, setSnapshot] = useState({ formData: JSON.stringify(DEFAULT_FORM_DATA), schoolYear: "" });
   const isDirty = useMemo(() => {
-    return JSON.stringify(formData) !== snapshotRef.current.formData || schoolYear !== snapshotRef.current.schoolYear;
-  }, [formData, schoolYear]);
+    return JSON.stringify(formData) !== snapshot.formData || schoolYear !== snapshot.schoolYear;
+  }, [formData, schoolYear, snapshot]);
   useUnsavedChanges(isDirty && !readOnly);
   const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty && !readOnly);
 
@@ -317,7 +319,7 @@ function FpasFormPage({
             },
           };
           // Update snapshot after initial employee data load so auto-filled fields aren't "dirty"
-          snapshotRef.current = { formData: JSON.stringify(updated), schoolYear: snapshotRef.current.schoolYear };
+          setSnapshot((s) => ({ formData: JSON.stringify(updated), schoolYear: s.schoolYear }));
           return updated;
         });
       } catch {
@@ -356,7 +358,7 @@ function FpasFormPage({
         setFormData(parsed);
         setSchoolYear(data.submission.schoolYear);
         setExistingId(data.submission.id);
-        snapshotRef.current = { formData: JSON.stringify(parsed), schoolYear: data.submission.schoolYear };
+        setSnapshot({ formData: JSON.stringify(parsed), schoolYear: data.submission.schoolYear });
       } catch {
         // non-fatal
       }
@@ -419,7 +421,7 @@ function FpasFormPage({
         setExistingId(result.submission.id);
       }
       setSuccess("FPAS form saved successfully.");
-      snapshotRef.current = { formData: JSON.stringify(formData), schoolYear };
+      setSnapshot({ formData: JSON.stringify(formData), schoolYear });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
@@ -1007,10 +1009,15 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Dirty detection
-  const snapshotRef = useRef<string>("[]");
+  // The snapshot must be reactive state, not a ref: `isDirty` is memoized,
+  // and mutating a ref does not invalidate the memo. Keeping the snapshot in
+  // a ref made the flag stay stale-true after a successful save (the green
+  // banner and "Unsaved changes" showed at the same time) until `enabledIds`
+  // happened to change again.
+  const [snapshot, setSnapshot] = useState<string>("[]");
   const isDirty = useMemo(() => {
-    return JSON.stringify(Array.from(enabledIds).sort()) !== snapshotRef.current;
-  }, [enabledIds]);
+    return JSON.stringify(Array.from(enabledIds).sort()) !== snapshot;
+  }, [enabledIds, snapshot]);
   useUnsavedChanges(isDirty);
   const { requestNavigation, navDialogProps } = useNavigationGuard(isDirty);
 
@@ -1023,7 +1030,7 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
         ]);
         setGroups(groupsData.groups ?? []);
         setEnabledIds(new Set(settingsData.enabledGroupIds ?? []));
-        snapshotRef.current = JSON.stringify((settingsData.enabledGroupIds ?? []).sort());
+        setSnapshot(JSON.stringify((settingsData.enabledGroupIds ?? []).sort()));
       } catch {
         setError("Failed to load settings.");
       } finally {
@@ -1086,7 +1093,10 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ enabledGroupIds: Array.from(enabledIds) }),
       });
       setSuccess("Settings saved successfully.");
-      snapshotRef.current = JSON.stringify([...(result.enabledGroupIds ?? [])].sort());
+      // Pin the screen and the snapshot to the server echo so the list on
+      // screen, the banner, and the dirty check can never disagree.
+      setEnabledIds(new Set(result.enabledGroupIds ?? []));
+      setSnapshot(JSON.stringify([...(result.enabledGroupIds ?? [])].sort()));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
