@@ -77,29 +77,23 @@ export async function GET(request: NextRequest) {
     }
 
     // FPAS status filter — gated on FPAS visibility (else anyone with
-    // profiling.view could learn everyone's submission standing), and
-    // scoped to the viewer's department unless institution-wide.
+    // profiling.view could learn everyone's submission standing).
+    // Managers filter across all employees; everyone else is scoped to
+    // their own row.
     const fpasPerms = auth.user.permissions;
     const canSeeAllFpas =
-      auth.user.isSystem || fpasPerms.includes("fpas.view_institution");
-    const canSeeGroupFpas =
-      canSeeAllFpas ||
-      fpasPerms.includes("fpas.view_all") ||
-      fpasPerms.includes("fpas.fill");
+      auth.user.isSystem || fpasPerms.includes("fpas.manage");
+    const canSeeFpas =
+      canSeeAllFpas || fpasPerms.includes("fpas.fill");
     if (fpasStatus === "submitted" || fpasStatus === "empty") {
-      if (!canSeeGroupFpas) {
+      if (!canSeeFpas) {
         return NextResponse.json(
           { error: "Forbidden - FPAS visibility permission required" },
           { status: 403 }
         );
       }
       if (!canSeeAllFpas) {
-        if (auth.user.groupId) {
-          where.groupId = auth.user.groupId;
-        } else {
-          // Groupless without institution sight: only self is visible.
-          where.id = auth.user.id;
-        }
+        where.id = auth.user.id;
       }
     }
     const currentYear = new Date().getFullYear();

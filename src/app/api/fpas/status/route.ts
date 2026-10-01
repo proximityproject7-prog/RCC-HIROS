@@ -5,10 +5,9 @@ import { requireAnyPermission } from "@/lib/auth-token";
 const SETTING_KEY = "fpas_enabled_groups";
 
 // ═══════════════════════════════════════════════════════════════
-// GET /api/fpas/status — all employees with FPAS submission status
-// Entry: fpas.fill, fpas.manage, or fpas.view_all.
-// Scope: fpas.manage sees all groups; fpas.view_all sees own group
-// (+ self); everyone else sees only their own row. Only returns
+// GET /api/fpas/status — employees with FPAS submission status
+// Entry: fpas.fill or fpas.manage. Scope: fpas.manage sees all
+// employees; everyone else sees only their own row. Only returns
 // employees in FPAS-enabled groups (when any are configured).
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
@@ -16,15 +15,11 @@ export async function GET(request: NextRequest) {
     const auth = await requireAnyPermission(request, [
       "fpas.fill",
       "fpas.manage",
-      "fpas.view_all",
     ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
 
-    const canViewAll =
-      user.isSystem || user.permissions.includes("fpas.view_institution");
-    const canViewGroup =
-      canViewAll || user.permissions.includes("fpas.view_all");
+    const canManage = user.isSystem || user.permissions.includes("fpas.manage");
 
     // Get enabled group IDs from settings
     const setting = await db.systemSetting.findUnique({
@@ -50,15 +45,9 @@ export async function GET(request: NextRequest) {
       employeeWhere.groupId = { in: enabledGroupIds };
     }
 
-    // Institution viewers see all groups; group viewers see their own
-    // group (+ self even if groupless); everyone else sees only self.
-    // fpas.manage grants no viewing.
-    if (!canViewAll) {
-      if (canViewGroup && user.groupId) {
-        employeeWhere.OR = [{ groupId: user.groupId }, { id: user.id }];
-      } else {
-        employeeWhere.id = user.id;
-      }
+    // Managers see all employees; everyone else sees only self.
+    if (!canManage) {
+      employeeWhere.id = user.id;
     }
 
     // Fetch all eligible employees with their submissions for this school year

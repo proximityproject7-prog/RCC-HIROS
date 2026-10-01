@@ -134,7 +134,7 @@ export default function HomePage() {
           <FpasPage showSettings />
         </PermissionGuard>
       ) : (
-        <PermissionGuard any={["fpas.fill", "fpas.view_all", "fpas.view_institution"]} fallback={<PermissionDenied />}>
+        <PermissionGuard any={["fpas.fill", "fpas.manage"]} fallback={<PermissionDenied />}>
           <FpasPage
             employeeId={currentSubpage?.startsWith("emp:") ? currentSubpage.slice(4) : undefined}
             submissionId={currentSubpage?.startsWith("view:") ? currentSubpage.slice(5) : undefined}

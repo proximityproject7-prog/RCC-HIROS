@@ -4,8 +4,7 @@ import { requireAnyPermission, requirePermission } from "@/lib/auth-token";
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/fpas/[id] — get a single submission
-// Access: owner, fpas.manage (all), or fpas.view_all when the
-// owner is in the viewer's own group.
+// Access: owner or fpas.manage (all submissions).
 // ═══════════════════════════════════════════════════════════════
 export async function GET(
   request: NextRequest,
@@ -15,7 +14,6 @@ export async function GET(
     const auth = await requireAnyPermission(request, [
       "fpas.fill",
       "fpas.manage",
-      "fpas.view_all",
     ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
@@ -49,22 +47,13 @@ export async function GET(
       );
     }
 
-    // Check access: owner, institution viewers (system +
-    // fpas.view_institution), or fpas.view_all when the owner is in the
-    // viewer's own group. fpas.manage grants no viewing.
-    const canViewAll =
-      user.isSystem || user.permissions.includes("fpas.view_institution");
-    if (submission.employeeId !== user.id && !canViewAll) {
-      const canViewGroup = user.permissions.includes("fpas.view_all");
-      const ownerGroupId = submission.employee?.group?.id ?? null;
-      const sameGroup =
-        !!ownerGroupId && !!user.groupId && ownerGroupId === user.groupId;
-      if (!(canViewGroup && sameGroup)) {
-        return NextResponse.json(
-          { error: "Forbidden - outside your department scope" },
-          { status: 403 }
-        );
-      }
+    // Check access: owner or fpas.manage (all submissions).
+    const canManage = user.isSystem || user.permissions.includes("fpas.manage");
+    if (submission.employeeId !== user.id && !canManage) {
+      return NextResponse.json(
+        { error: "Forbidden - you are not allowed to view this submission" },
+        { status: 403 }
+      );
     }
 
     return NextResponse.json({ submission });

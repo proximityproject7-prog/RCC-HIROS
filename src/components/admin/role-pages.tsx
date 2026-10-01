@@ -126,8 +126,6 @@ const PERMISSION_LABELS: Record<string, { label: string; description: string }> 
 
   "fpas.fill": { label: "Fill FPAS Form", description: "Fill out the Faculty Performance Appraisal form." },
   "fpas.manage": { label: "Manage FPAS", description: "Configure which departments can fill FPAS (group access settings)." },
-  "fpas.view_all": { label: "View Group Submissions", description: "Open submitted FPAS forms of own-department members (read-only)." },
-  "fpas.view_institution": { label: "View All Submissions", description: "Open any submitted FPAS form institution-wide (read-only)." },
 
   "biometric.enroll": { label: "Enroll Fingerprints", description: "Enroll and delete employee fingerprint templates." },
   "biometric.manage": { label: "View Biometric Status", description: "View any employee's biometric enrollment status." },
@@ -188,7 +186,7 @@ const PERMISSIONS_BY_MODULE: PermissionModule[] = [
   },
   {
     label: "FPAS (Faculty Appraisal)",
-    permissions: ["fpas.fill", "fpas.manage", "fpas.view_all", "fpas.view_institution"],
+    permissions: ["fpas.fill", "fpas.manage"],
   },
 ].map((m) => ({
   label: m.label,

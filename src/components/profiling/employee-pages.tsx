@@ -192,12 +192,11 @@ export function EmployeeListPage() {
 
   const canViewInactive = has("profiling.view_inactive");
 
-  // FPAS submission status per employee (EMP-code → status) for the FPAS
-  // column. Shown to fill/group-view/institution-view holders; hidden if
-  // the fetch fails. fpas.manage grants no viewing. The endpoint
-  // pre-scopes rows server-side: an absent entry means out of the
-  // viewer's department scope (rendered as "—", no status leak).
-  const canViewFpas = hasAny(["fpas.fill", "fpas.view_all", "fpas.view_institution"]);
+  // FPAS submission status for the FPAS column (EMP-code → status).
+  // Shown to fill/manage holders; hidden if the fetch fails. Rows are
+  // pre-scoped server-side: managers see everyone, everyone else only
+  // self — an absent entry renders as "—".
+  const canViewFpas = hasAny(["fpas.fill", "fpas.manage"]);
   const [fpasMap, setFpasMap] = useState<Map<string, { hasSubmission: boolean; submissionId: string | null }> | null>(null);
   useEffect(() => {
     if (!canViewFpas) return;
@@ -1089,7 +1088,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   useEffect(() => {
     setProfileFpasSubId(null);
     if (!employee?.employeeId) return;
-    if (!hasAny(["fpas.fill", "fpas.view_all", "fpas.view_institution"])) return;
+    if (!hasAny(["fpas.fill", "fpas.manage"])) return;
     const code = employee.employeeId;
     (async () => {
       try {
@@ -1596,7 +1595,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
                   <FileText className="h-3.5 w-3.5" /> Fill FPAS
                 </button>
               )}
-              {profileFpasSubId && ((employeeId === user?.id) || has("fpas.view_institution") || has("fpas.view_all")) && (
+              {profileFpasSubId && ((employeeId === user?.id) || has("fpas.manage")) && (
                 <button onClick={() => setCurrentPage("fpas", `view:${profileFpasSubId}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
                   <Eye className="h-3.5 w-3.5" /> View FPAS
                 </button>

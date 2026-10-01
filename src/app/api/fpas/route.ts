@@ -6,17 +6,14 @@ import { requireAnyPermission, requirePermission } from "@/lib/auth-token";
 // GET /api/fpas — list submissions
 //   ?employeeId=X — filter by employee
 //   ?schoolYear=X — filter by school year
-// View scope: institution viewers (system + fpas.view_institution)
-// see all; fpas.view_all sees own group (+ self); everyone else sees
-// only their own submissions. fpas.manage grants no viewing.
+// View scope: fpas.manage sees all; everyone else sees only their
+// own submissions. fpas.manage grants no filling for others.
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAnyPermission(request, [
       "fpas.fill",
       "fpas.manage",
-      "fpas.view_all",
-      "fpas.view_institution",
     ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
@@ -25,39 +22,22 @@ export async function GET(request: NextRequest) {
     const employeeId = searchParams.get("employeeId") || undefined;
     const schoolYear = searchParams.get("schoolYear") || undefined;
 
-    const canViewAll =
-      user.isSystem || user.permissions.includes("fpas.view_institution");
-    const canViewGroup =
-      canViewAll || user.permissions.includes("fpas.view_all");
+    const canManage = user.isSystem || user.permissions.includes("fpas.manage");
 
     const where: Record<string, unknown> = {};
 
     if (employeeId) {
-      // Explicit filter must still respect scope: institution viewers may
-      // query anyone; others only themselves or (with view_all) own group.
-      if (!canViewAll && employeeId !== user.id) {
-        const target = await db.employee.findUnique({
-          where: { id: employeeId },
-          select: { groupId: true },
-        });
-        const sameGroup =
-          !!target?.groupId && !!user.groupId && target.groupId === user.groupId;
-        if (!(canViewGroup && sameGroup)) {
-          return NextResponse.json(
-            { error: "Forbidden - outside your department scope" },
-            { status: 403 }
-          );
-        }
+      // Non-managers may only query themselves.
+      if (!canManage && employeeId !== user.id) {
+        return NextResponse.json(
+          { error: "Forbidden - you may only view your own submissions" },
+          { status: 403 }
+        );
       }
       where.employeeId = employeeId;
-    } else if (!canViewAll) {
-      if (canViewGroup && user.groupId) {
-        // Group-scoped viewers see their own department's submissions.
-        where.employee = { groupId: user.groupId };
-      } else {
-        // Everyone else can only see their own submissions
-        where.employeeId = user.id;
-      }
+    } else if (!canManage) {
+      // Everyone else sees only their own submissions.
+      where.employeeId = user.id;
     }
 
     if (schoolYear) {
