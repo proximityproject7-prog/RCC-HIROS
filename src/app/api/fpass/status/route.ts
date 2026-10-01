@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requirePermission } from "@/lib/auth-token";
+import { requireAnyPermission } from "@/lib/auth-token";
 
 const SETTING_KEY = "fpass_enabled_groups";
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/fpass/status — all employees with FPASS submission status
-// Only returns employees in FPASS-enabled groups.
+// Entry: fpass.fill, fpass.manage, or fpass.view_all.
+// Scope: fpass.manage sees all groups; fpass.view_all sees own group
+// (+ self); everyone else sees only their own row. Only returns
+// employees in FPASS-enabled groups (when any are configured).
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requirePermission(request, "fpass.fill");
+    const auth = await requireAnyPermission(request, [
+      "fpass.fill",
+      "fpass.manage",
+      "fpass.view_all",
+    ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
 
     const canManage = user.isSystem || user.permissions.includes("fpass.manage");
+    const canViewGroup =
+      canManage || user.permissions.includes("fpass.view_all");
 
     // Get enabled group IDs from settings
     const setting = await db.systemSetting.findUnique({
@@ -40,9 +49,14 @@ export async function GET(request: NextRequest) {
       employeeWhere.groupId = { in: enabledGroupIds };
     }
 
-    // Non-managers can only see their own
+    // Non-managers are scoped: view_all holders see their own group
+    // (+ themselves even if groupless); everyone else sees only self.
     if (!canManage) {
-      employeeWhere.id = user.id;
+      if (canViewGroup && user.groupId) {
+        employeeWhere.OR = [{ groupId: user.groupId }, { id: user.id }];
+      } else {
+        employeeWhere.id = user.id;
+      }
     }
 
     // Fetch all eligible employees with their submissions for this school year

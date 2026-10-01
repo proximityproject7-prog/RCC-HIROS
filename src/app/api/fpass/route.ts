@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requirePermission } from "@/lib/auth-token";
+import { requireAnyPermission, requirePermission } from "@/lib/auth-token";
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/fpass — list submissions
 //   ?employeeId=X — filter by employee
 //   ?schoolYear=X — filter by school year
+// View scope: fpass.manage sees all; fpass.view_all sees own group
+// (+ self); everyone else sees only their own submissions.
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requirePermission(request, "fpass.fill");
+    const auth = await requireAnyPermission(request, [
+      "fpass.fill",
+      "fpass.manage",
+      "fpass.view_all",
+    ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
 
@@ -18,14 +24,37 @@ export async function GET(request: NextRequest) {
     const schoolYear = searchParams.get("schoolYear") || undefined;
 
     const canManage = user.isSystem || user.permissions.includes("fpass.manage");
+    const canViewGroup =
+      canManage || user.permissions.includes("fpass.view_all");
 
     const where: Record<string, unknown> = {};
 
     if (employeeId) {
+      // Explicit filter must still respect scope: non-managers may only
+      // query themselves, or (with view_all) their own group.
+      if (!canManage && employeeId !== user.id) {
+        const target = await db.employee.findUnique({
+          where: { id: employeeId },
+          select: { groupId: true },
+        });
+        const sameGroup =
+          !!target?.groupId && !!user.groupId && target.groupId === user.groupId;
+        if (!(canViewGroup && sameGroup)) {
+          return NextResponse.json(
+            { error: "Forbidden - outside your department scope" },
+            { status: 403 }
+          );
+        }
+      }
       where.employeeId = employeeId;
     } else if (!canManage) {
-      // Non-admins can only see their own submissions
-      where.employeeId = user.id;
+      if (canViewGroup && user.groupId) {
+        // Group-scoped viewers see their own department's submissions.
+        where.employee = { groupId: user.groupId };
+      } else {
+        // Everyone else can only see their own submissions
+        where.employeeId = user.id;
+      }
     }
 
     if (schoolYear) {

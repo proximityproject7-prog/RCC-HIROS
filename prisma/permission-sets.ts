@@ -64,6 +64,7 @@ export const ACCOUNTANT_PERMS = [
   "leave.view_all",
   "reports.view",
   "reports.export",
+  "fpass.view_all",
   "groups.view",
   "roles.view",
   "biometric.enroll",
@@ -117,6 +118,7 @@ export const DEAN_PERMS = [
   "leave.request",
   "reports.view",
   "fpass.fill",
+  "fpass.view_all",
   "groups.view",
 ];
 

@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requirePermission } from "@/lib/auth-token";
+import { requireAnyPermission, requirePermission } from "@/lib/auth-token";
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/fpass/[id] — get a single submission
+// Access: owner, fpass.manage (all), or fpass.view_all when the
+// owner is in the viewer's own group.
 // ═══════════════════════════════════════════════════════════════
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requirePermission(request, "fpass.fill");
+    const auth = await requireAnyPermission(request, [
+      "fpass.fill",
+      "fpass.manage",
+      "fpass.view_all",
+    ]);
     if (!auth.ok) return auth.response;
     const { user } = auth;
     const { id } = await params;
@@ -43,13 +49,20 @@ export async function GET(
       );
     }
 
-    // Check access: owner or fpass.manage
+    // Check access: owner, fpass.manage (all groups), or fpass.view_all
+    // when the owner is in the viewer's own group.
     const canManage = user.isSystem || user.permissions.includes("fpass.manage");
     if (submission.employeeId !== user.id && !canManage) {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403 }
-      );
+      const canViewGroup = user.permissions.includes("fpass.view_all");
+      const ownerGroupId = submission.employee?.group?.id ?? null;
+      const sameGroup =
+        !!ownerGroupId && !!user.groupId && ownerGroupId === user.groupId;
+      if (!(canViewGroup && sameGroup)) {
+        return NextResponse.json(
+          { error: "Forbidden - outside your department scope" },
+          { status: 403 }
+        );
+      }
     }
 
     return NextResponse.json({ submission });

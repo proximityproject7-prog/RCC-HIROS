@@ -193,8 +193,10 @@ export function EmployeeListPage() {
   const canViewInactive = has("profiling.view_inactive");
 
   // FPASS submission status per employee (EMP-code → status) for the FPASS
-  // column. Shown only to fill/manage holders; hidden if the fetch fails.
-  const canViewFpass = hasAny(["fpass.fill", "fpass.manage"]);
+  // column. Shown to fill/manage/view_all holders; hidden if the fetch
+  // fails. The endpoint pre-scopes rows server-side: an absent entry means
+  // out of the viewer's department scope (rendered as "—", no status leak).
+  const canViewFpass = hasAny(["fpass.fill", "fpass.manage", "fpass.view_all"]);
   const [fpassMap, setFpassMap] = useState<Map<string, { hasSubmission: boolean; submissionId: string | null }> | null>(null);
   useEffect(() => {
     if (!canViewFpass) return;
@@ -217,7 +219,6 @@ export function EmployeeListPage() {
     return () => controller.abort();
   }, [canViewFpass]);
   const showFpassCol = fpassMap !== null;
-  const canFillFor = (emp: Employee) => user?.id === emp.id || has("fpass.manage");
 
   return (
     <div className="space-y-4">
@@ -362,11 +363,7 @@ export function EmployeeListPage() {
                 currentData.map((emp) => {
                   const fpassEntry = fpassMap?.get(emp.employeeId);
                   const fpassSubmitted = !!fpassEntry?.hasSubmission && !!fpassEntry?.submissionId;
-                  const fpassTarget = fpassSubmitted
-                    ? `view:${fpassEntry!.submissionId}`
-                    : canFillFor(emp)
-                      ? `emp:${emp.id}`
-                      : null;
+                  const mayFillRow = (user?.id === emp.id && has("fpass.fill")) || has("fpass.manage");
                   const fpassBadge = fpassSubmitted ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> SUBMITTED
@@ -376,6 +373,15 @@ export function EmployeeListPage() {
                       <span className="w-1.5 h-1.5 rounded-full bg-rcc-text-muted" /> NOT STARTED
                     </span>
                   );
+                  // View target when a submission exists (presence in the
+                  // pre-scoped map already authorizes viewing it); otherwise
+                  // the fill form, but only for those who may fill.
+                  const fpassTarget = fpassSubmitted
+                    ? `view:${fpassEntry!.submissionId}`
+                    : mayFillRow
+                      ? `emp:${emp.id}`
+                      : null;
+                  const fpassTitle = fpassSubmitted ? "View FPASS submission" : "Fill FPASS form";
                   return (
                   <tr
                     key={emp.id}
@@ -431,11 +437,13 @@ export function EmployeeListPage() {
                     </td>
                     {showFpassCol && (
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        {fpassTarget ? (
+                        {!fpassEntry ? (
+                          <span className="text-rcc-text-muted">—</span>
+                        ) : fpassTarget ? (
                           <button
                             onClick={() => setCurrentPage("fpass", fpassTarget)}
                             className="cursor-pointer hover:opacity-80 transition-opacity"
-                            title={fpassSubmitted ? "View FPASS submission" : "Fill FPASS form"}
+                            title={fpassTitle}
                           >
                             {fpassBadge}
                           </button>
@@ -954,7 +962,7 @@ function ProfileSection({ sectionKey, label, rows, fields, editing, canEdit, onE
 
 export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const { setCurrentPage } = useAuthStore();
-  const { has, canChangePassword, canManageBiometrics } = usePermissions();
+  const { has, hasAny, canChangePassword, canManageBiometrics } = usePermissions();
   const { user } = useAuth();
 
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -976,6 +984,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 
   // FPASS enabled state
   const [fpassEnabled, setFpassEnabled] = useState(false);
+  // This profile's submission id (current school year) for the View button.
+  // The status endpoint pre-scopes rows server-side, so presence here means
+  // the viewer is authorized to see it.
+  const [profileFpassSubId, setProfileFpassSubId] = useState<string | null>(null);
 
   // Inline edit mode — unified for all fields
   const canSelfEdit = employeeId === user?.id && has("profile.selfEdit");
@@ -1064,6 +1076,27 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       }
     })();
   }, [employee?.groupId]);
+
+  // This profile's current-year submission (for the View FPASS button).
+  // Only fetched when the viewer may see FPASS at all; the endpoint
+  // pre-scopes rows, so a hit means authorized.
+  useEffect(() => {
+    setProfileFpassSubId(null);
+    if (!employee?.employeeId) return;
+    if (!hasAny(["fpass.fill", "fpass.manage", "fpass.view_all"])) return;
+    const code = employee.employeeId;
+    (async () => {
+      try {
+        const data = await apiFetch<{ employees: { employeeId: string; submission: { id: string } | null }[] }>(
+          "/api/fpass/status"
+        );
+        const row = (data.employees ?? []).find((e) => e.employeeId === code);
+        setProfileFpassSubId(row?.submission?.id ?? null);
+      } catch {
+        // non-fatal — View button stays hidden
+      }
+    })();
+  }, [employee?.employeeId, hasAny]);
 
   // Revoke blob URLs when viewer closes
   useEffect(() => {
@@ -1552,9 +1585,14 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
               </div>
             </div>
             <div className="flex items-center gap-2 pb-1">
-              {((employeeId === user?.id && fpassEnabled) || has("fpass.manage")) && (
+              {(((employeeId === user?.id && fpassEnabled && has("fpass.fill")) || has("fpass.manage"))) && (
                 <button onClick={() => setCurrentPage("fpass", `emp:${employee.id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-accent/30 text-rcc-accent hover:bg-rcc-accent/5 transition-colors">
-                  <FileText className="h-3.5 w-3.5" /> FPASS
+                  <FileText className="h-3.5 w-3.5" /> Fill FPASS
+                </button>
+              )}
+              {profileFpassSubId && ((employeeId === user?.id) || has("fpass.manage") || has("fpass.view_all")) && (
+                <button onClick={() => setCurrentPage("fpass", `view:${profileFpassSubId}`)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                  <Eye className="h-3.5 w-3.5" /> View FPASS
                 </button>
               )}
             </div>
