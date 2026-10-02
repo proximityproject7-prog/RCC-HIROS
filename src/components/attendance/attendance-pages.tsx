@@ -793,7 +793,7 @@ export function PremisesSettingsPage() {
           <div>
             <p className="text-sm font-semibold text-rcc-text-primary">Biometric Login</p>
             <p className="text-xs text-rcc-text-muted mt-0.5">
-              Show the fingerprint (Windows Hello) scan panel on the login page.
+              Show the fingerprint (ZK fingerprint scanner USB) panel on the login page.
             </p>
           </div>
           <Switch

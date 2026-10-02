@@ -2,19 +2,29 @@
 
 import { useState, FormEvent, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, LogIn, AlertCircle, Lock, Clock, Fingerprint, User, X } from "lucide-react";
+import { Eye, EyeOff, LogIn, AlertCircle, Lock, Clock, Fingerprint, User, X, Loader2, CheckCircle } from "lucide-react";
 import { useAuthContext } from "@/components/providers/auth-provider";
 import { readJsonResponse, ApiError } from "@/lib/api-client";
-import {
-  startAuthentication,
-  type AuthenticationResponseJSON,
-  type PublicKeyCredentialRequestOptionsJSON,
-} from "@simplewebauthn/browser";
 
-// ═══════════════════════════════════════════════════════════════
-// Login page with optional fingerprint panel (right side).
-// Uses WebAuthn API (Windows Hello) for kiosk fingerprint clock-in.
-// ═══════════════════════════════════════════════════════════════
+const KIOSK_SERVICE_URL =
+  process.env.NEXT_PUBLIC_KIOSK_SERVICE_URL || "http://127.0.0.1:8765";
+
+/**
+ * Parse a kiosk-service error body — FastAPI wraps messages as
+ * {"detail": "..."} — so the panel shows a readable message instead of raw JSON.
+ */
+async function readKioskError(res: Response): Promise<string> {
+  const text = await res.text().catch(() => "");
+  try {
+    const data = JSON.parse(text) as { detail?: string };
+    if (data && typeof data.detail === "string" && data.detail) {
+      return data.detail;
+    }
+  } catch {
+    // not JSON — fall through to raw text
+  }
+  return text || `Scanner request failed (HTTP ${res.status})`;
+}
 
 interface FPResult {
   action?: string;
@@ -33,7 +43,7 @@ interface FPResult {
   error?: string;
 }
 
-type PanelState = "idle" | "scanning" | "result" | "error";
+type PanelState = "idle" | "checking" | "scanning" | "result" | "error";
 
 export default function LoginPage() {
   const { login } = useAuthContext();
@@ -47,19 +57,35 @@ export default function LoginPage() {
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [panelState, setPanelState] = useState<PanelState>("idle");
   const [fpResult, setFpResult] = useState<FPResult | null>(null);
+  const [scannerReady, setScannerReady] = useState(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanCooldownRef = useRef(false);
   const abortScanRef = useRef<AbortController | null>(null);
+  const [liveImageB64, setLiveImageB64] = useState<string | null>(null);
 
-  // Check biometrics setting
+  // Check biometrics setting + scanner health
   useEffect(() => {
     async function checkBiometrics() {
+      let data: { enabled?: boolean } | undefined;
       try {
         const res = await fetch("/api/settings/biometrics");
-        const data = await readJsonResponse<{ enabled?: boolean }>(res);
+        data = await readJsonResponse<{ enabled?: boolean }>(res);
         setBiometricsEnabled(Boolean(data.enabled));
       } catch (e) {
         console.error("[Login] Biometrics check failed:", e);
+      }
+
+      if (data?.enabled) {
+        // Probe scanner
+        try {
+          const healthRes = await fetch(`${KIOSK_SERVICE_URL}/health`, {
+            signal: AbortSignal.timeout(3000),
+          });
+          const health = await healthRes.json();
+          setScannerReady(health.scanner === "connected");
+        } catch {
+          setScannerReady(false);
+        }
       }
     }
     checkBiometrics();
@@ -81,51 +107,62 @@ export default function LoginPage() {
     resetTimerRef.current = setTimeout(() => {
       setPanelState("idle");
       setFpResult(null);
+      setLiveImageB64(null);
       scanCooldownRef.current = false;
     }, 5000);
   }, []);
 
   const handleFingerprintScan = async () => {
-    if (scanCooldownRef.current) return;
+    if (scanCooldownRef.current || !scannerReady) return;
+
+    setPanelState("checking");
+    setFpResult(null);
+    setLiveImageB64(null);
+
+    // Verify scanner is still reachable
+    try {
+      const healthRes = await fetch(`${KIOSK_SERVICE_URL}/health`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      const health = await healthRes.json();
+      if (health.scanner !== "connected") {
+        handleFPResult({ error: "Scanner disconnected. Please check the ZK9500 connection." });
+        return;
+      }
+    } catch {
+      handleFPResult({ error: "Cannot reach scanner service. Is it running?" });
+      return;
+    }
 
     setPanelState("scanning");
-    setFpResult(null);
 
     const abortController = new AbortController();
     abortScanRef.current = abortController;
 
-    const SCAN_TIMEOUT_MS = 15000;
-
     try {
-      // Step 1: Get authentication options from server
-      const optionsRes = await fetch("/api/biometric/webauthn/authenticate/options", {
-        method: "POST",
-        signal: abortController.signal,
-      });
-
-      if (!optionsRes.ok) {
-        throw new Error("Failed to get authentication options");
-      }
-
-      const options = await readJsonResponse<PublicKeyCredentialRequestOptionsJSON>(optionsRes);
-
-      // Step 2: Trigger browser's WebAuthn API (Windows Hello) with 15s timeout
-      const authResponse = await Promise.race([
-        startAuthentication({ optionsJSON: options }),
-        new Promise<never>((_, reject) => {
-          const id = setTimeout(() => {
-            abortController.abort();
-            reject(new Error("Scan timed out. Please try again."));
-          }, SCAN_TIMEOUT_MS);
-          abortController.signal.addEventListener("abort", () => clearTimeout(id), { once: true });
-        }),
-      ]);
-
-      // Step 3: Verify authentication with server
-      const verifyRes = await fetch("/api/biometric/webauthn/authenticate/verify", {
+      // Step 1: Capture live swipe via local kiosk service
+      const captureRes = await fetch(`${KIOSK_SERVICE_URL}/capture`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ response: authResponse }),
+        body: JSON.stringify({ timeoutS: 15 }),
+        signal: AbortSignal.timeout(20000),
+      });
+
+      if (!captureRes.ok) {
+        throw new Error(await readKioskError(captureRes));
+      }
+
+      const { templateB64, imageB64 } = await captureRes.json();
+      setLiveImageB64(imageB64);
+
+      // Step 2: Verify against server (1:N match)
+      const verifyRes = await fetch("/api/biometric/zk/authenticate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          liveB64: templateB64,
+          deviceName: `${window.location.hostname}-kiosk`,
+        }),
         signal: abortController.signal,
       });
 
@@ -142,12 +179,12 @@ export default function LoginPage() {
         handleFPResult({ error: "Could not reach the authentication server. Please try again." });
       } else {
         const msg = err instanceof Error ? err.message : "Scan failed";
-        if (msg.includes("cancelled")) {
+        if (msg.includes("timeout") || msg.includes("timed out")) {
+          handleFPResult({ error: "Scan timed out - no finger detected" });
+        } else if (msg.includes("cancelled")) {
           handleFPResult({ error: "Scan cancelled" });
         } else if (msg.includes("not allowed")) {
           handleFPResult({ error: "Not allowed" });
-        } else if (msg.includes("timed out")) {
-          handleFPResult({ error: "Scan timed out after 15 seconds. Please try again." });
         } else {
           handleFPResult({ error: msg });
         }
@@ -162,6 +199,7 @@ export default function LoginPage() {
     abortScanRef.current = null;
     setPanelState("idle");
     setFpResult(null);
+    setLiveImageB64(null);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -184,7 +222,6 @@ export default function LoginPage() {
       } else if (msg.includes("inactive") || msg.includes("Inactive")) {
         setError("Your account is inactive. Please contact HR.");
       } else if (msg.includes("remaining")) {
-        // Pass through server message about remaining attempts
         setError(msg);
       } else if (
         (err instanceof ApiError && (err.status === 404 || err.status >= 500)) ||
@@ -192,7 +229,6 @@ export default function LoginPage() {
         msg.includes("NetworkError") ||
         msg.includes("Load failed")
       ) {
-        // Server unreachable — never blame the credentials for this.
         setError("Cannot reach the server. Please try again in a moment.");
       } else {
         setError("Invalid Employee ID/Email or password.");
@@ -208,7 +244,7 @@ export default function LoginPage() {
     return <AlertCircle className="h-4 w-4 shrink-0" />;
   };
 
-  const showFingerprintPanel = biometricsEnabled;
+  const showFingerprintPanel = biometricsEnabled && scannerReady;
 
   // Fingerprint panel content
   const renderFingerprintPanel = () => {
@@ -236,8 +272,8 @@ export default function LoginPage() {
             fpResult.action === "clock_in"
               ? "bg-green-100 text-green-700"
               : fpResult.action === "clock_out"
-                ? "bg-blue-100 text-blue-700"
-                : "bg-amber-100 text-amber-700"
+              ? "bg-blue-100 text-blue-700"
+              : "bg-amber-100 text-amber-700"
           }`}>
             {fpResult.message}
           </div>
@@ -246,43 +282,68 @@ export default function LoginPage() {
     }
 
     if (panelState === "error") {
+      const errText = fpResult?.error || "Please try again";
+      const errTitle =
+        errText === "Fingerprint not recognized"
+          ? "Fingerprint not recognized"
+          : /enrolled/i.test(errText)
+            ? "No fingerprints enrolled"
+            : "Fingerprint scan failed";
       return (
         <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
           <div className="w-28 h-28 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center">
             <AlertCircle className="h-14 w-14 text-red-400" />
           </div>
           <div className="text-center">
-            <p className="text-lg font-semibold text-rcc-text-primary">Fingerprint not recognized</p>
-            <p className="text-sm text-rcc-text-secondary mt-1">{fpResult?.error || "Please try again"}</p>
+            <p className="text-lg font-semibold text-rcc-text-primary">{errTitle}</p>
+            <p className="text-sm text-rcc-text-secondary mt-1">{errText}</p>
           </div>
         </div>
       );
     }
 
-    // Idle / scanning state
+    // Idle / checking / scanning state
     return (
       <div className="flex flex-col items-center gap-4">
         <button
           onClick={handleFingerprintScan}
-          disabled={panelState === "scanning"}
+          disabled={panelState !== "idle" || !scannerReady}
           className={`w-28 h-28 rounded-full border-2 flex items-center justify-center transition-colors cursor-pointer hover:scale-105 ${
             panelState === "scanning"
               ? "border-rcc-accent bg-rcc-accent/10 animate-pulse"
+              : panelState === "checking"
+              ? "border-blue-400 bg-blue-50"
               : "border-rcc-border bg-rcc-bg hover:border-rcc-accent"
           }`}
         >
-          <Fingerprint className={`h-14 w-14 transition-colors ${
-            panelState === "scanning" ? "text-rcc-accent" : "text-rcc-text-muted"
-          }`} />
+          {panelState === "checking" ? (
+            <Loader2 className="h-14 w-14 text-blue-500 animate-spin" />
+          ) : panelState === "scanning" ? (
+            <>
+              {liveImageB64 ? (
+                <img
+                  src={`data:image/png;base64,${liveImageB64}`}
+                  alt="Live scan"
+                  className="w-24 h-24 rounded object-cover border border-rcc-accent"
+                />
+              ) : (
+                <Fingerprint className="h-14 w-14 text-rcc-accent animate-pulse" />
+              )}
+            </>
+          ) : (
+            <Fingerprint className="h-14 w-14 text-rcc-text-muted" />
+          )}
         </button>
         <div className="text-center">
           <p className="text-lg font-semibold text-rcc-text-primary">
-            {panelState === "scanning" ? "Scanning..." : "Tap to scan"}
+            {panelState === "checking" ? "Checking scanner..." : panelState === "scanning" ? "Scanning..." : "Tap to scan"}
           </p>
           <p className="text-sm text-rcc-text-secondary mt-1">
             {panelState === "scanning"
-              ? "Follow Windows Hello prompts"
-              : "Place your finger on the reader"}
+              ? "Place your finger on the ZK9500 reader"
+              : panelState === "checking"
+              ? "Verifying scanner connection..."
+              : "Place your finger on the ZK9500 reader to clock in/out"}
           </p>
           {panelState === "scanning" && (
             <button
@@ -507,10 +568,7 @@ function LoginFormContent({
         >
           {isLoading ? (
             <>
-              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+              <Loader2 className="h-4 w-4 animate-spin" />
               Signing in...
             </>
           ) : (

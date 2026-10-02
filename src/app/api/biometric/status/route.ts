@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/auth-token";
+import { requireAuth } from "@/lib/auth-token";
 import { db } from "@/lib/db";
 
 // ═══════════════════════════════════════════════════════════════
@@ -16,14 +16,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing employeeId" }, { status: 400 });
     }
 
-    // Allow self or biometric.manage
-    const auth = await requirePermission(request, "biometric.manage");
-    const isSelf = auth.ok && auth.user.id === employeeId;
-    if (!auth.ok && !isSelf) return auth.response;
+    // Allow self or biometric.manage (or system admin)
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+    const isSelf = auth.user.id === employeeId;
+    const canView =
+      isSelf ||
+      auth.user.isSystem ||
+      auth.user.permissions.includes("biometric.manage");
+    if (!canView) {
+      return NextResponse.json(
+        { error: "Forbidden: insufficient permissions" },
+        { status: 403 }
+      );
+    }
 
     const templates = await db.biometricTemplate.findMany({
       where: { employeeId },
-      select: { id: true, fingerIndex: true, quality: true, createdAt: true },
+      select: { id: true, fingerIndex: true, engine: true, quality: true, createdAt: true },
       orderBy: { fingerIndex: "asc" },
     });
 
