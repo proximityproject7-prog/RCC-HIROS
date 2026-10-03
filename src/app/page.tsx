@@ -12,7 +12,7 @@ import { useEffect, useState, Component, type ReactNode } from "react";
 
 import { EmployeeListPage, EmployeeFormPage, EmployeeProfilePage } from "@/components/profiling/employee-pages";
 import { ContractTypeManagementPage } from "@/components/profiling/contract-type-pages";
-import { AttendanceListPage, PremisesSettingsPage } from "@/components/attendance/attendance-pages";
+import { AttendanceListPage, AttendanceConfigurationPage } from "@/components/attendance/attendance-pages";
 import { LeavePage } from "@/components/leave/leave-pages";
 import { EvaluationPage } from "@/components/evaluation/evaluation-pages";
 import { ReportsPage } from "@/components/reports/report-pages";
@@ -90,7 +90,7 @@ export default function HomePage() {
       ); break;
     case "attendance":
       content = currentSubpage === "premises" ? (
-        <PermissionGuard any={["attendance.edit", "roles.edit"]} fallback={<PermissionDenied />}><PremisesSettingsPage /></PermissionGuard>
+        <PermissionGuard any={["attendance.edit", "roles.edit"]} fallback={<PermissionDenied />}><AttendanceConfigurationPage /></PermissionGuard>
       ) : (
         <PermissionGuard require="attendance.view" fallback={<PermissionDenied />}><AttendanceListPage /></PermissionGuard>
       ); break;

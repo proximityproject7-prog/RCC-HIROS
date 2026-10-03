@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react
 import {
   ArrowLeft, Search, Pencil, MapPin, Settings, X, Save, AlertTriangle,
   Navigation, ExternalLink, Clock, Clock as ClockOut,
+  RefreshCw, Wifi, WifiOff, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
@@ -183,7 +184,7 @@ export function AttendanceListPage() {
             onClick={() => setCurrentPage("attendance", "premises")}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
           >
-            <Settings className="h-4 w-4" /> Premises Settings
+            <Settings className="h-4 w-4" /> Attendance Configuration
           </button>
         )}
       </div>
@@ -606,10 +607,10 @@ function EditAttendanceModal({
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PremisesSettingsPage
+// AttendanceConfigurationPage
 // ═══════════════════════════════════════════════════════════════
 
-export function PremisesSettingsPage() {
+export function AttendanceConfigurationPage() {
   const { setCurrentPage } = useAuthStore();
 
   const [lat, setLat] = useState("");
@@ -623,6 +624,8 @@ export function PremisesSettingsPage() {
   const [locating, setLocating] = useState(false);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [biometricsSaving, setBiometricsSaving] = useState(false);
+  const [kioskStatus, setKioskStatus] = useState<"checking" | "running" | "stopped" | "error" | null>(null);
+  const [kioskDetails, setKioskDetails] = useState<{ scanner: string; deviceCount: number; version: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -712,6 +715,25 @@ export function PremisesSettingsPage() {
     }
   };
 
+  const checkKioskStatus = async () => {
+    setError(null);
+    setKioskStatus("checking");
+    try {
+      const response = await fetch("http://127.0.0.1:8765/health", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) throw new Error("Failed to connect");
+      const data = await response.json();
+      setKioskDetails(data);
+      setKioskStatus(data.scanner === "connected" ? "running" : "stopped");
+    } catch {
+      setKioskStatus("error");
+      setKioskDetails(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -730,13 +752,13 @@ export function PremisesSettingsPage() {
           onClick={() => setCurrentPage("attendance")}
           className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to attendance
+          <ArrowLeft className="h-4 w-4" /> Back to attendance list
         </button>
       </div>
       <div>
-        <h1 className="text-xl font-bold text-rcc-text-primary">Premises Settings</h1>
+        <h1 className="text-xl font-bold text-rcc-text-primary">Attendance Configuration</h1>
         <p className="text-sm text-rcc-text-muted mt-0.5">
-          Configure the geofence center and radius used to evaluate clock-in / clock-out on-premise status.
+          Configure geofence settings and biometric login for attendance tracking.
         </p>
       </div>
 
@@ -745,7 +767,7 @@ export function PremisesSettingsPage() {
       )}
       {success && (
         <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-700">
-          Premises settings saved.
+          Attendance configuration saved.
         </div>
       )}
 
@@ -808,6 +830,65 @@ export function PremisesSettingsPage() {
         )}
       </div>
 
+      {/* Kiosk Service Status */}
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-rcc-text-primary">Kiosk Service (Fingerprint Scanner)</p>
+            <p className="text-xs text-rcc-text-muted mt-0.5">
+              Check the status of the local kiosk service that connects to the ZK fingerprint scanner.
+            </p>
+          </div>
+          <button
+            onClick={checkKioskStatus}
+            disabled={kioskStatus === "checking"}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+          >
+            {kioskStatus === "checking" && <RefreshCw className="h-4 w-4 animate-spin" />}
+            {!kioskStatus || kioskStatus === "checking" ? (
+              <span>Check Status</span>
+            ) : kioskStatus === "running" ? (
+              <span className="text-green-600">Running</span>
+            ) : kioskStatus === "stopped" ? (
+              <span className="text-amber-600">Stopped</span>
+            ) : (
+              <span className="text-red-600">Unreachable</span>
+            )}
+          </button>
+        </div>
+        {kioskStatus === "checking" && (
+          <p className="text-xs text-rcc-text-muted mt-2">Checking kiosk service status...</p>
+        )}
+        {kioskStatus === "running" && kioskDetails && (
+          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+            <div className="flex items-center gap-2 text-sm text-green-700">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Kiosk service is running</span>
+            </div>
+            <div className="mt-2 text-xs text-green-600 font-mono">
+              Scanner: {kioskDetails.scanner} · Devices: {kioskDetails.deviceCount} · Version: {kioskDetails.version}
+            </div>
+          </div>
+        )}
+        {kioskStatus === "stopped" && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-sm text-amber-700">Kiosk service is running but scanner is not connected.</p>
+            <p className="text-xs text-amber-600 mt-1">Ensure the ZK fingerprint scanner is plugged in and the kiosk service is running.</p>
+          </div>
+        )}
+        {kioskStatus === "error" && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-700">Could not connect to kiosk service.</p>
+            <p className="text-xs text-red-600 mt-1">Ensure the kiosk service is running on the kiosk PC: <code className="font-mono">python kiosk-service/main.py</code></p>
+          </div>
+        )}
+        {kioskStatus === null && (
+          <p className="text-xs text-rcc-text-muted mt-2">
+            Click "Check Status" to verify the kiosk service connection.
+          </p>
+        )}
+      </div>
+
       <div className="flex justify-end gap-2">
         <button
           onClick={() => setCurrentPage("attendance")}
@@ -822,7 +903,7 @@ export function PremisesSettingsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Settings"}
+          {saving ? "Saving..." : "Save Configuration"}
         </button>
       </div>
     </div>
