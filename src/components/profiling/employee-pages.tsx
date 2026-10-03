@@ -1923,22 +1923,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </div>
       </SectionCard>
 
-      {/* FPAS Configuration link (managed on the dedicated page) */}
-      {has("fpas.manage") && (
-        <SectionCard title="System Configuration" icon={Settings}>
-          <button
-            onClick={() => setCurrentPage("fpas", "settings")}
-            className="w-full flex items-center justify-between gap-2 p-3 rounded-md border border-rcc-border hover:bg-rcc-bg/40 transition-colors text-left"
-          >
-            <span>
-              <span className="block text-sm font-medium text-rcc-text-primary">FPAS Configuration</span>
-              <span className="block text-xs text-rcc-text-muted">Choose which departments can fill the appraisal form.</span>
-            </span>
-            <ArrowRight className="h-4 w-4 shrink-0 text-rcc-text-muted" />
-          </button>
-        </SectionCard>
-      )}
-
       {/* Fingerprint Biometrics */}
       {canManageBiometrics && (
         <BiometricsCard employeeId={employeeId} />
