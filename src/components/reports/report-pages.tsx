@@ -13,6 +13,7 @@ import {
 } from "@/components/shared/table-pagination-v2";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { AttendanceTrends } from "@/components/reports/attendance-trends";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -206,6 +207,9 @@ export function ReportsPage() {
   const [groups, setGroups] = useState<GroupBrief[]>([]);
   const [roles, setRoles] = useState<RoleBrief[]>([]);
   const [rows, setRows] = useState<UnifiedRow[]>([]);
+  // Attendance trend series (merged across selected groups + dates).
+  const [trendByDate, setTrendByDate] = useState<{ date: string; total: number; clockedIn: number; noClockIn: number }[]>([]);
+  const [trendByGroup, setTrendByGroup] = useState<{ groupCode: string; groupName: string; total: number; clockedIn: number; noClockIn: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -236,12 +240,16 @@ export function ReportsPage() {
   const fetchReport = useCallback(async () => {
     if (!allRequiredFilled) {
       setRows([]);
+      setTrendByDate([]);
+      setTrendByGroup([]);
       return;
     }
 
     if (dateFrom > dateTo) {
       setError("Start date must be before or equal to end date.");
       setRows([]);
+      setTrendByDate([]);
+      setTrendByGroup([]);
       return;
     }
 
@@ -250,6 +258,9 @@ export function ReportsPage() {
 
     try {
       const merged = new Map<string, UnifiedRow>();
+      // Trend accumulators (reset per fetch; merged across selected groups).
+      const dateAgg = new Map<string, { date: string; total: number; clockedIn: number; noClockIn: number }>();
+      const groupAgg = new Map<string, { groupCode: string; groupName: string; total: number; clockedIn: number; noClockIn: number }>();
 
       const fetchHeadcount = async (groupCode: string, rid?: string) => {
         const grp = groups.find((g) => g.code === groupCode);
@@ -315,9 +326,24 @@ export function ReportsPage() {
 
       const fetchAttendance = async (groupCode: string) => {
         const params = new URLSearchParams({ dateFrom, dateTo, groupCode });
-        const data = await apiFetch<{ byEmployee?: { employeeId: string; name: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[] }>(
+        const data = await apiFetch<{ byEmployee?: { employeeId: string; name: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[]; byDate?: { date: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[]; byGroup?: { groupId: string; groupName: string; groupCode: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[] }>(
           `/api/reports/attendance?${params.toString()}`
         );
+        // Accumulate trend series (per-day + per-department) across groups.
+        for (const d of data.byDate ?? []) {
+          const e = dateAgg.get(d.date) ?? { date: d.date, total: 0, clockedIn: 0, noClockIn: 0 };
+          e.total += d.total;
+          e.clockedIn += d.clockedIn;
+          e.noClockIn += d.noClockIn;
+          dateAgg.set(d.date, e);
+        }
+        for (const g of data.byGroup ?? []) {
+          const e = groupAgg.get(g.groupCode) ?? { groupCode: g.groupCode, groupName: g.groupName, total: 0, clockedIn: 0, noClockIn: 0 };
+          e.total += g.total;
+          e.clockedIn += g.clockedIn;
+          e.noClockIn += g.noClockIn;
+          groupAgg.set(g.groupCode, e);
+        }
         const grp = groups.find((g) => g.code === groupCode);
         for (const e of data.byEmployee ?? []) {
           const existing = merged.get(e.employeeId);
@@ -360,6 +386,8 @@ export function ReportsPage() {
       );
 
       setRows(Array.from(merged.values()));
+      setTrendByDate(Array.from(dateAgg.values()).sort((a, b) => a.date.localeCompare(b.date)));
+      setTrendByGroup(Array.from(groupAgg.values()).sort((a, b) => a.groupName.localeCompare(b.groupName)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load report.");
     } finally {
@@ -442,31 +470,7 @@ export function ReportsPage() {
     }
   };
 
-  // ─── CSV Export ───
-  const handleExportCSV = () => {
-    const headers: string[] = ["Employee ID", "Name", "Group", "Role"];
-    if (showHeadcount) headers.push("Gender", "Contract", "Hire Date", "Certificates");
-    if (showAttendance) headers.push("Total Records", "Clocked In", "Clocked Out", "No Clock-In", "Manual Edits");
-
-    const csvRows = [headers];
-    for (const r of filteredRows) {
-      const row: string[] = [r.employeeId, r.name, r.groupName, r.roleName];
-      if (showHeadcount) row.push(r.gender ?? "", r.contractType, r.hireDate ?? "", String(r.certificates));
-      if (showAttendance) row.push(String(r.totalRecords), String(r.clockedIn), String(r.clockedOut), String(r.noClockIn), String(r.manuallyEdited));
-      csvRows.push(row);
-    }
-
-    const csv = csvRows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `report-${reportType}-${dateFrom}-to-${dateTo}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // ─── CSV Export (single raw-records export) ───
 
   // ─── Summary cards ───
   const summary = useMemo(() => {
@@ -619,6 +623,11 @@ export function ReportsPage() {
             )}
           </div>
 
+          {/* Attendance trends (from the same series — no extra fetch) */}
+          {showAttendance && !loading && (
+            <AttendanceTrends byDate={trendByDate} byGroup={trendByGroup} />
+          )}
+
           {/* Table */}
           <div className="bg-rcc-surface rounded-lg border border-rcc-border overflow-hidden">
             <div className="px-4 py-3 border-b border-rcc-border flex items-center justify-between">
@@ -632,20 +641,11 @@ export function ReportsPage() {
                   {filteredRows.length} record(s)
                 </span>
                 {canExport && (
-                  <button
-                    onClick={handleExportCSV}
-                    disabled={filteredRows.length === 0}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Export CSV
-                  </button>
-                )}
-                {canExport && (
                   <div className="flex items-center gap-1.5">
                     <select
                       value={rawScope}
                       onChange={(e) => setRawScope(e.target.value as "filtered" | "all")}
-                      title="Raw export scope: current filters, or all groups"
+                      title="Export scope: current on-screen filters, or all groups for the selected dates"
                       className="px-2 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary bg-rcc-surface hover:bg-rcc-bg transition-colors"
                     >
                       <option value="filtered">Scope: current filters</option>
@@ -655,9 +655,9 @@ export function ReportsPage() {
                       onClick={handleExportRaw}
                       disabled={exportingRaw}
                       title="Download every clock in/out field + employee info for the selected dates (raw analytics CSV, no computed tardiness)"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-accent/40 text-rcc-accent hover:bg-rcc-accent/10 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
                     >
-                      <Download className="h-3.5 w-3.5" /> {exportingRaw ? "Exporting..." : "Export Raw CSV"}
+                      <Download className="h-3.5 w-3.5" /> {exportingRaw ? "Exporting..." : "Export CSV"}
                     </button>
                   </div>
                 )}
