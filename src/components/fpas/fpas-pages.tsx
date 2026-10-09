@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { canFillFpas } from "@/lib/fpas";
+import { FpasPrintDocument } from "@/components/fpas/fpas-print";
+import { FpasExportHub } from "@/components/fpas/fpas-export";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore } from "@/store/auth-store";
 import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
@@ -18,6 +20,8 @@ import { PermissionDenied } from "@/components/shared/permission-denied";
 // ═══════════════════════════════════════════════════════════════
 
 interface GroupBrief { id: string; name: string; code: string; }
+
+export type { GroupBrief };
 
 interface EmployeeBrief {
   id: string;
@@ -51,12 +55,12 @@ interface FpasSubmissionRecord {
   };
 }
 
-interface DynamicRow {
+export interface DynamicRow {
   id: string;
   [key: string]: string | number | boolean;
 }
 
-interface FpasFormData {
+export interface FpasFormData {
   header: {
     name: string;
     department: string;
@@ -502,7 +506,10 @@ function FpasFormPage({
   }
 
   return (
-    <div className="space-y-4">
+    <>
+    {/* Interactive form — screen only; the paper version is the
+        print-only FpasPrintDocument at the end of this return. */}
+    <div className="space-y-4 no-print">
       {navDialogProps && <ConfirmDialog {...navDialogProps} />}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-rcc-error">{error}</div>
@@ -524,10 +531,6 @@ function FpasFormPage({
         <button onClick={() => requestNavigation(() => onBack())} className="no-print inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
           <ArrowLeft className="h-4 w-4" /> Back to FPAS
         </button>
-        <div className="print-only mb-3">
-          <p className="text-sm font-bold text-rcc-text-primary">Republic Central Colleges — Faculty Performance Appraisal (printed {new Date().toLocaleDateString()})</p>
-          <p className="text-xs text-rcc-text-secondary">{employee?.employeeId} — {formData.header.name || ""} · {formData.header.department || ""} · S.Y. {schoolYear}</p>
-        </div>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-rcc-text-primary">Faculty Performance Appraisal Form</h1>
@@ -1012,6 +1015,11 @@ function FpasFormPage({
         />
       </CriteriaSection>
     </div>
+    {/* Template-faithful print document (screen-hidden, paper-only) */}
+    <div className="print-only">
+      <FpasPrintDocument formData={formData} schoolYear={schoolYear} />
+    </div>
+    </>
   );
 }
 
@@ -1028,6 +1036,9 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // True while the export hub shows its print preview — the config
+  // chrome above stays on screen but is hidden on paper.
+  const [exportPreviewOpen, setExportPreviewOpen] = useState(false);
 
   // Dirty detection
   // The snapshot must be reactive state, not a ref: `isDirty` is memoized,
@@ -1146,7 +1157,7 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      <div>
+      <div className={exportPreviewOpen ? "no-print" : ""}>
         <button onClick={() => requestNavigation(() => onBack())} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
@@ -1156,7 +1167,7 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
-      <div className="bg-rcc-surface rounded-lg border border-rcc-border">
+      <div className={`bg-rcc-surface rounded-lg border border-rcc-border ${exportPreviewOpen ? "no-print" : ""}`}>
         {/* Header with actions */}
         <div className="px-4 py-3 border-b border-rcc-border flex items-center justify-between gap-4">
           <span className="text-sm font-semibold text-rcc-text-primary">
@@ -1253,6 +1264,9 @@ function FpasSettingsPage({ onBack }: { onBack: () => void }) {
           </p>
         </div>
       </div>
+
+      {/* Submission exports (print-to-PDF per member) */}
+      <FpasExportHub groups={groups} onPreviewChange={setExportPreviewOpen} />
     </div>
   );
 }
@@ -1471,7 +1485,7 @@ function DynamicTable({
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
-function calculateCriteria(data: FpasFormData): { c1: number; c2: number; c3: number; c4: number; c5: number; c6: number } {
+export function calculateCriteria(data: FpasFormData): { c1: number; c2: number; c3: number; c4: number; c5: number; c6: number } {
   // Criteria I: Instruction
   const c1 =
     data.criteria1.studentEvaluation +
@@ -1541,7 +1555,7 @@ function calculateCriteria(data: FpasFormData): { c1: number; c2: number; c3: nu
   return { c1: cap(c1, 25), c2: cap(c2, 20), c3, c4, c5, c6 };
 }
 
-function calculateTotal(data: FpasFormData): number {
+export function calculateTotal(data: FpasFormData): number {
   const t = calculateCriteria(data);
   return Math.min(t.c1 + t.c2 + t.c3 + t.c4 + t.c5 + t.c6, 100);
 }

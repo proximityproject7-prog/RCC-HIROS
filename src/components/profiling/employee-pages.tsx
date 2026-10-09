@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { canFillFpas } from "@/lib/fpas";
+import { ProfilePrintDocument } from "@/components/profiling/profile-print";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -1571,7 +1572,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const photoUrl = employee.photo ? `/api/employees/${employeeId}/photo` : null;
 
   return (
-    <div className="space-y-5 max-w-5xl mx-auto">
+    <>
+    {/* Interactive profile — screen only; paper version is the
+        print-only ProfilePrintDocument at the end of this return. */}
+    <div className="space-y-5 max-w-5xl mx-auto no-print">
 
       {employeeId !== user?.id && (
         <div className="no-print flex items-center gap-3">
@@ -2039,6 +2043,38 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       {inlineNavDialog && <ConfirmDialog {...inlineNavDialog} />}
       {sectionNavDialog && <ConfirmDialog {...sectionNavDialog} />}
     </div>
+    {/* Template-faithful print document (screen-hidden, paper-only) */}
+    <div className="print-only">
+      <ProfilePrintDocument
+        employee={{
+          employeeId: employee.employeeId,
+          firstName: employee.firstName,
+          middleName: employee.middleName,
+          lastName: employee.lastName,
+          email: employee.email,
+          phone: employee.phone,
+          address: employee.address,
+          birthday: employee.birthday,
+          gender: employee.gender,
+          employmentType: employee.employmentType,
+          contractType: employee.contractTypeName ?? employee.contractType,
+          hireDate: employee.hireDate,
+          active: employee.active,
+          groupName: employee.groupName ?? employee.group?.name ?? null,
+          roleName: employee.roleName,
+          placeOfBirth: employee.placeOfBirth,
+          rank: employee.rank,
+          civilStatus: employee.civilStatus,
+          citizenship: employee.citizenship,
+          religion: employee.religion,
+          photo: employee.photo,
+        }}
+        profileData={profileData}
+        photoUrl={photoUrl}
+        schoolYear={`${new Date().getFullYear()}-${new Date().getFullYear() + 1}`}
+      />
+    </div>
+    </>
   );
 }
 
