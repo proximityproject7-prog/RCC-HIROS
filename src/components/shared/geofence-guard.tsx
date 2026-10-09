@@ -119,7 +119,7 @@ export function GeofenceGuard({ children }: GeofenceGuardProps) {
 
       {/* Off-premise floating widget (collapsed pill by default) */}
       {offPremise && (
-        <div className="fixed bottom-4 right-4 z-[100]">
+        <div className="no-print fixed bottom-4 right-4 z-[100]">
           {expanded ? (
             <div className="w-64 bg-rcc-surface border border-amber-300 rounded-lg shadow-xl overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border-b border-amber-200">
@@ -157,7 +157,7 @@ export function GeofenceGuard({ children }: GeofenceGuardProps) {
 
       {/* Subtle indicator when on-premise */}
       {distance !== null && !offPremise && (
-        <div className="fixed bottom-3 right-3 z-[90]" title={`On premises (${distance}m from center)`}>
+        <div className="no-print fixed bottom-3 right-3 z-[90]" title={`On premises (${distance}m from center)`}>
           <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded-full text-[10px] text-green-700 font-medium">
             <MapPin className="h-3 w-3" />
             On Premises
