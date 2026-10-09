@@ -208,8 +208,8 @@ export function ReportsPage() {
   const [roles, setRoles] = useState<RoleBrief[]>([]);
   const [rows, setRows] = useState<UnifiedRow[]>([]);
   // Attendance trend series (merged across selected groups + dates).
-  const [trendByDate, setTrendByDate] = useState<{ date: string; total: number; clockedIn: number; noClockIn: number }[]>([]);
-  const [trendByGroup, setTrendByGroup] = useState<{ groupCode: string; groupName: string; total: number; clockedIn: number; noClockIn: number }[]>([]);
+  const [trendByDate, setTrendByDate] = useState<{ date: string; total: number; clockedIn: number; absent: number; expected: number }[]>([]);
+  const [trendByGroup, setTrendByGroup] = useState<{ groupCode: string; groupName: string; total: number; clockedIn: number; absent: number; expected: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -259,8 +259,8 @@ export function ReportsPage() {
     try {
       const merged = new Map<string, UnifiedRow>();
       // Trend accumulators (reset per fetch; merged across selected groups).
-      const dateAgg = new Map<string, { date: string; total: number; clockedIn: number; noClockIn: number }>();
-      const groupAgg = new Map<string, { groupCode: string; groupName: string; total: number; clockedIn: number; noClockIn: number }>();
+      const dateAgg = new Map<string, { date: string; total: number; clockedIn: number; absent: number; expected: number }>();
+      const groupAgg = new Map<string, { groupCode: string; groupName: string; total: number; clockedIn: number; absent: number; expected: number }>();
 
       const fetchHeadcount = async (groupCode: string, rid?: string) => {
         const grp = groups.find((g) => g.code === groupCode);
@@ -326,22 +326,24 @@ export function ReportsPage() {
 
       const fetchAttendance = async (groupCode: string) => {
         const params = new URLSearchParams({ dateFrom, dateTo, groupCode });
-        const data = await apiFetch<{ byEmployee?: { employeeId: string; name: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[]; byDate?: { date: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[]; byGroup?: { groupId: string; groupName: string; groupCode: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[] }>(
+        const data = await apiFetch<{ byEmployee?: { employeeId: string; name: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number }[]; byDate?: { date: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number; absent: number; expected: number }[]; byGroup?: { groupId: string; groupName: string; groupCode: string; total: number; clockedIn: number; clockedOut: number; noClockIn: number; manuallyEdited: number; absent: number; expected: number }[] }>(
           `/api/reports/attendance?${params.toString()}`
         );
         // Accumulate trend series (per-day + per-department) across groups.
         for (const d of data.byDate ?? []) {
-          const e = dateAgg.get(d.date) ?? { date: d.date, total: 0, clockedIn: 0, noClockIn: 0 };
+          const e = dateAgg.get(d.date) ?? { date: d.date, total: 0, clockedIn: 0, absent: 0, expected: 0 };
           e.total += d.total;
           e.clockedIn += d.clockedIn;
-          e.noClockIn += d.noClockIn;
+          e.absent += d.absent ?? 0;
+          e.expected += d.expected ?? 0;
           dateAgg.set(d.date, e);
         }
         for (const g of data.byGroup ?? []) {
-          const e = groupAgg.get(g.groupCode) ?? { groupCode: g.groupCode, groupName: g.groupName, total: 0, clockedIn: 0, noClockIn: 0 };
+          const e = groupAgg.get(g.groupCode) ?? { groupCode: g.groupCode, groupName: g.groupName, total: 0, clockedIn: 0, absent: 0, expected: 0 };
           e.total += g.total;
           e.clockedIn += g.clockedIn;
-          e.noClockIn += g.noClockIn;
+          e.absent += g.absent ?? 0;
+          e.expected += g.expected ?? 0;
           groupAgg.set(g.groupCode, e);
         }
         const grp = groups.find((g) => g.code === groupCode);

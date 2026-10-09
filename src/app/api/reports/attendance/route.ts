@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
         firstName: true,
         lastName: true,
         groupId: true,
+        hireDate: true,
         group: { select: { id: true, name: true, code: true } },
       },
     });
@@ -128,6 +129,11 @@ export async function GET(request: NextRequest) {
     // byGroup:   { groupId, groupName, groupCode, total, clockedIn, ... }
     // byDate:    { date, total, clockedIn, ... }
     // byEmployee (when groupFilter): { employeeId, name, total, clockedIn, ... }
+    //
+    // Absence semantics (session-38 fix): a missing row means absent. The
+    // roster expected per day (hire-aware) minus distinct employees with a
+    // row that day yields `absent`/`expected`, so present-rate reflects
+    // reality instead of hovering at 100%.
 
     type Agg = {
       total: number;
@@ -135,6 +141,8 @@ export async function GET(request: NextRequest) {
       clockedOut: number;
       noClockIn: number;
       manuallyEdited: number;
+      absent: number;
+      expected: number;
     };
 
     const byGroupMap = new Map<string, Agg & {
@@ -166,8 +174,14 @@ export async function GET(request: NextRequest) {
         clockedOut: 0,
         noClockIn: 0,
         manuallyEdited: 0,
+        absent: 0,
+        expected: 0,
       });
     }
+
+    // Distinct employees with a row per (day) and per (day, group).
+    const recordedByDay = new Map<string, Set<string>>();
+    const recordedByDayGroup = new Map<string, Set<string>>();
 
     // Iterate records
     for (const r of records) {
@@ -175,6 +189,14 @@ export async function GET(request: NextRequest) {
 
       const dateKey = startOfDay(r.date).toISOString().slice(0, 10);
       const gid = r.employee.groupId || "unassigned";
+
+      let daySet = recordedByDay.get(dateKey);
+      if (!daySet) { daySet = new Set(); recordedByDay.set(dateKey, daySet); }
+      daySet.add(r.employeeId);
+      const dgKey = `${dateKey}|${gid}`;
+      let dgSet = recordedByDayGroup.get(dgKey);
+      if (!dgSet) { dgSet = new Set(); recordedByDayGroup.set(dgKey, dgSet); }
+      dgSet.add(r.employeeId);
 
       // Update byDate
       if (!byDateMap.has(dateKey)) {
@@ -185,6 +207,8 @@ export async function GET(request: NextRequest) {
           clockedOut: 0,
           noClockIn: 0,
           manuallyEdited: 0,
+          absent: 0,
+          expected: 0,
         });
       }
       const dAgg = byDateMap.get(dateKey)!;
@@ -217,6 +241,8 @@ export async function GET(request: NextRequest) {
             clockedOut: 0,
             noClockIn: 0,
             manuallyEdited: 0,
+            absent: 0,
+            expected: 0,
           });
         }
         const eAgg = byEmployeeMap.get(empId)!;
@@ -226,6 +252,48 @@ export async function GET(request: NextRequest) {
         if (!r.clockInAt) eAgg.noClockIn += 1;
         if (r.manuallyEdited) eAgg.manuallyEdited += 1;
       }
+    }
+
+    // Roster-expected absence pass: for EVERY day in range (not just days
+    // with rows), expected = in-scope employees hired on/before that day;
+    // absent = expected − distinct recorded. Group-level likewise.
+    const dayCursor = startOfDay(from);
+    const lastDay = startOfDay(to);
+    let expectedTotal = 0;
+    let clockedInTotal = 0;
+    while (dayCursor <= lastDay) {
+      const dateKey = dayCursor.toISOString().slice(0, 10);
+      const hired = employees.filter((e) => !e.hireDate || startOfDay(new Date(e.hireDate)) <= dayCursor);
+      const recorded = recordedByDay.get(dateKey);
+
+      let dAgg = byDateMap.get(dateKey);
+      if (!dAgg) {
+        dAgg = { date: dateKey, total: 0, clockedIn: 0, clockedOut: 0, noClockIn: 0, manuallyEdited: 0, absent: 0, expected: 0 };
+        byDateMap.set(dateKey, dAgg);
+      }
+      dAgg.expected = hired.length;
+      dAgg.absent = Math.max(0, hired.length - (recorded?.size ?? 0));
+      expectedTotal += hired.length;
+      clockedInTotal += dAgg.clockedIn;
+
+      // Per-group for this day
+      const byGid = new Map<string, { total: number; recorded: Set<string> }>();
+      for (const e of hired) {
+        const gid = e.groupId || "unassigned";
+        let g = byGid.get(gid);
+        if (!g) { g = { total: 0, recorded: new Set() }; byGid.set(gid, g); }
+        g.total += 1;
+        if (recorded?.has(e.id)) g.recorded.add(e.id);
+      }
+      for (const [gid, g] of byGid) {
+        const gAgg = byGroupMap.get(gid);
+        if (gAgg) {
+          gAgg.expected += g.total;
+          gAgg.absent += Math.max(0, g.total - g.recorded.size);
+        }
+      }
+
+      dayCursor.setDate(dayCursor.getDate() + 1);
     }
 
     // Sort byDate ascending
@@ -245,14 +313,12 @@ export async function GET(request: NextRequest) {
         )
       : undefined;
 
-    // Summary totals
+    // Summary totals (present rate over roster-expected, not over rows)
     const summary = {
       totalEmployees: employees.length,
       totalRecords: records.length,
       avgPresentRate:
-        employees.length > 0
-          ? (records.filter((r) => r.clockInAt).length / Math.max(1, records.length)) * 100
-          : 0,
+        expectedTotal > 0 ? (clockedInTotal / expectedTotal) * 100 : 0,
       totalManualEdits: records.filter((r) => r.manuallyEdited).length,
     };
 

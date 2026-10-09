@@ -26,7 +26,8 @@ export interface TrendDay {
   date: string;
   total: number;
   clockedIn: number;
-  noClockIn: number;
+  absent: number;
+  expected: number;
 }
 
 export interface TrendGroup {
@@ -34,7 +35,8 @@ export interface TrendGroup {
   groupName: string;
   total: number;
   clockedIn: number;
-  noClockIn: number;
+  absent: number;
+  expected: number;
 }
 
 const BROWN = "#6B4A30";
@@ -54,7 +56,7 @@ export function AttendanceTrends({
       byDate.map((d) => ({
         ...d,
         short: d.date.slice(5),
-        presentRate: d.total > 0 ? Math.round((d.clockedIn / d.total) * 100) : 0,
+        presentRate: d.expected > 0 ? Math.round((d.clockedIn / d.expected) * 100) : 0,
       })),
     [byDate]
   );
@@ -68,7 +70,7 @@ export function AttendanceTrends({
           Attendance Trends
         </h2>
         <span className="text-xs text-rcc-text-muted">
-          Selected groups + dates (table-only role/search filters excluded)
+          Selected groups + dates, hire-aware roster denominator (table-only role/search filters excluded)
         </span>
       </div>
 
@@ -76,7 +78,7 @@ export function AttendanceTrends({
         {/* Daily present rate + volumes */}
         <div>
           <p className="text-xs font-semibold text-rcc-text-secondary mb-2">
-            Daily presence — clocked-in vs no-clock-in (bars) and present rate % (line)
+            Daily presence — clocked-in vs absent incl. no record (bars) and present rate % of expected roster (line)
           </p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -92,7 +94,7 @@ export function AttendanceTrends({
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar yAxisId="count" dataKey="clockedIn" name="Clocked in" fill={SAGE} radius={[2, 2, 0, 0]} />
-                <Bar yAxisId="count" dataKey="noClockIn" name="No clock-in" fill={CLAY} radius={[2, 2, 0, 0]} />
+                <Bar yAxisId="count" dataKey="absent" name="Absent" fill={CLAY} radius={[2, 2, 0, 0]} />
                 <Line yAxisId="rate" type="monotone" dataKey="presentRate" name="Present rate" stroke={BROWN} strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -102,7 +104,7 @@ export function AttendanceTrends({
         {/* Per-department comparison */}
         <div>
           <p className="text-xs font-semibold text-rcc-text-secondary mb-2">
-            By department — clocked-in vs no-clock-in records
+            By department — clocked-in vs absent records
           </p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -113,7 +115,7 @@ export function AttendanceTrends({
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="clockedIn" name="Clocked in" fill={BROWN} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="noClockIn" name="No clock-in" fill={GOLD} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="absent" name="Absent" fill={GOLD} radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
