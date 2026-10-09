@@ -24,6 +24,35 @@ export function usePagination<T>(data: T[], opts: { defaultPageSize?: number } =
   };
 }
 
+// ───────────────────────────────────────────────────────────────
+// useServerPagination — same controls shape, but the page lives on
+// the server: the caller fetches `page`/`pageSize` and passes the
+// server-reported `total`. `resetKey` returns to page 1 (filters).
+// ───────────────────────────────────────────────────────────────
+
+export function useServerPagination(
+  total: number,
+  opts: { defaultPageSize?: number; resetKey?: string } = {}
+) {
+  const [pageSize, setPageSize] = useState(opts.defaultPageSize ?? 15);
+  const [currentPage, setCurrentPage] = useState(1);
+  const resetKey = opts.resetKey ?? "";
+  useEffect(() => { setCurrentPage(1); }, [resetKey, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, total);
+  return {
+    page: safePage,
+    pageSize,
+    controls: {
+      currentPage: safePage, totalPages, pageSize, setPageSize, setCurrentPage,
+      totalItems: total, startIndex: total === 0 ? 0 : startIndex + 1, endIndex,
+      canPrev: safePage > 1, canNext: safePage < totalPages,
+    },
+  };
+}
+
 export function PaginationControls(props: {
   currentPage: number; totalPages: number; pageSize: number;
   setPageSize: (n: number) => void; setCurrentPage: (n: number) => void;

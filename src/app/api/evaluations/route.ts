@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth-token";
+import { parsePagination, pageMeta } from "@/lib/pagination";
 
 // ═══════════════════════════════════════════════════════════════
 // /api/evaluations
@@ -97,6 +98,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get("scope") || "submitted_by_me";
     const periodId = searchParams.get("periodId") || undefined;
+    const groupIdParam = searchParams.get("groupId") || undefined;
+    const pagination = parsePagination(searchParams);
 
     const where: Record<string, unknown> = {};
     if (periodId) where.periodId = periodId;
@@ -132,14 +135,24 @@ export async function GET(request: NextRequest) {
       where.employee = { ...(where.employee as object || {}), role: { isSystem: false } };
     }
 
-    const evaluations = await db.evaluation.findMany({
-      where,
-       
-      include: EVALUATION_INCLUDE as any,
-      orderBy: { updatedAt: "desc" },
-    });
+    // Server-side group filter (pushed down so pages stay small).
+    if (groupIdParam) {
+      where.employee = { ...(where.employee as object || {}), groupId: groupIdParam };
+    }
+
+    const [evaluations, total] = await Promise.all([
+      db.evaluation.findMany({
+        where,
+        include: EVALUATION_INCLUDE as any,
+        orderBy: { updatedAt: "desc" },
+        take: pagination.take,
+        skip: pagination.skip,
+      }),
+      db.evaluation.count({ where }),
+    ]);
 
     return NextResponse.json({
+      ...pageMeta(total, pagination),
       evaluations: evaluations.map((e) => serializeEvaluation(e)),
     });
   } catch (error) {

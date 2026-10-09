@@ -4,6 +4,7 @@ import {
   requireAuth,
   requirePermission,
 } from "@/lib/auth-token";
+import { parsePagination, pageMeta } from "@/lib/pagination";
 import {
   evaluateGeofence,
   getPremisesConfig,
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
     const employeeId = searchParams.get("employeeId") || undefined;
     const scope = searchParams.get("scope") || "mine";
     const search = searchParams.get("search") || undefined;
+    const pagination = parsePagination(searchParams);
 
     // Determine effective scope: "all" requires attendance.view_all or scopeAllAttendance
     let effectiveScope: "mine" | "all" = "mine";
@@ -168,7 +170,12 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { date: "desc" },
+      take: status === "no_clock_in" ? undefined : pagination.take,
+      skip: status === "no_clock_in" ? undefined : pagination.skip,
     });
+    // Total for the main path (counted up-front; synthetic path below).
+    let total: number | null =
+      status === "no_clock_in" ? null : await db.attendance.count({ where });
 
     // Edge case: status=no_clock_in — fetch active employees and diff
     if (status === "no_clock_in") {
@@ -230,8 +237,9 @@ export async function GET(request: NextRequest) {
       });
       const hasRecord = new Set(existingForDay.map((r) => r.employeeId));
 
-      // Build synthetic "no_clock_in" records
-      records = employees
+      // Build synthetic "no_clock_in" records (paged in memory — one day
+      // of roster at a time, bounded by group).
+      const allSynthetic = employees
         .filter((e) => !hasRecord.has(e.id))
         .map((e) => ({
           id: `synthetic-${e.id}-${dayStart.toISOString()}`,
@@ -256,9 +264,12 @@ export async function GET(request: NextRequest) {
           createdAt: dayStart,
           updatedAt: dayStart,
         })) as unknown as typeof records;
+      total = allSynthetic.length;
+      records = allSynthetic.slice(pagination.skip, pagination.skip + pagination.take) as unknown as typeof records;
     }
 
     return NextResponse.json({
+      ...pageMeta(total ?? 0, pagination),
       attendance: records.map((r) => ({
         id: r.id,
         employeeId: r.employeeId,

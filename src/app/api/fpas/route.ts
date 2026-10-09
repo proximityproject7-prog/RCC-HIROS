@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAnyPermission, requirePermission } from "@/lib/auth-token";
 import { canFillFpas } from "@/lib/fpas";
+import { parsePagination, pageMeta } from "@/lib/pagination";
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/fpas — list submissions
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId") || undefined;
     const schoolYear = searchParams.get("schoolYear") || undefined;
+    const pagination = parsePagination(searchParams);
 
     const canManage = user.isSystem || user.permissions.includes("fpas.manage");
 
@@ -45,28 +47,45 @@ export async function GET(request: NextRequest) {
       where.schoolYear = schoolYear;
     }
 
-    const submissions = await db.fpasSubmission.findMany({
-      where,
-      include: {
-        employee: {
-          select: {
-            id: true,
-            employeeId: true,
-            firstName: true,
-            lastName: true,
-            middleName: true,
-            group: { select: { id: true, name: true, code: true } },
-            role: { select: { id: true, name: true, isSystem: true } },
-          },
+    // List shape trims the large formData blob (detail comes from
+    // GET /api/fpas/[id]); full rows stay available to the export hub
+    // via per-submission fetches.
+    const listSelect = {
+      id: true,
+      employeeId: true,
+      schoolYear: true,
+      totalPoints: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      employee: {
+        select: {
+          id: true,
+          employeeId: true,
+          firstName: true,
+          lastName: true,
+          middleName: true,
+          group: { select: { id: true, name: true, code: true } },
+          role: { select: { id: true, name: true, isSystem: true } },
         },
       },
-      orderBy: { updatedAt: "desc" },
-    });
+    };
+
+    const [submissions, total] = await Promise.all([
+      db.fpasSubmission.findMany({
+        where,
+        select: listSelect,
+        orderBy: { updatedAt: "desc" },
+        take: pagination.take,
+        skip: pagination.skip,
+      }),
+      db.fpasSubmission.count({ where }),
+    ]);
 
     // Filter out system admin submissions for non-system-admin users
     const filteredSubmissions = user.isSystem ? submissions : submissions.filter(s => !s.employee?.role?.isSystem);
 
-    return NextResponse.json({ submissions: filteredSubmissions });
+    return NextResponse.json({ ...pageMeta(total, pagination), submissions: filteredSubmissions });
   } catch (error) {
     console.error("[API /fpas] Error:", error);
     return NextResponse.json(

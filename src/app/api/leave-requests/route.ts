@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth-token";
+import { parsePagination, pageMeta } from "@/lib/pagination";
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
@@ -183,6 +184,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get("scope") || "mine";
+    const pagination = parsePagination(searchParams);
+    const search = searchParams.get("search")?.trim() || "";
+    const statusFilter = searchParams.get("status") || "";
     const { user } = auth;
 
     const where: Record<string, unknown> = {};
@@ -280,14 +284,33 @@ export async function GET(request: NextRequest) {
       where.employee = { ...(where.employee as object || {}), role: { isSystem: false } };
     }
 
-    const requests = await db.leaveRequest.findMany({
-      where,
-       
-      include: REQUEST_INCLUDE as any,
-      orderBy: { createdAt: "desc" },
-    });
+    // Server-side search + status (pushed down so pages stay small).
+    const and: Record<string, unknown>[] = [];
+    if (statusFilter) and.push({ status: statusFilter });
+    if (search) {
+      and.push({
+        OR: [
+          { requestNo: { contains: search } },
+          { employee: { firstName: { contains: search } } },
+          { employee: { lastName: { contains: search } } },
+        ],
+      });
+    }
+    if (and.length > 0) where.AND = and;
+
+    const [requests, total] = await Promise.all([
+      db.leaveRequest.findMany({
+        where,
+        include: REQUEST_INCLUDE as any,
+        orderBy: { createdAt: "desc" },
+        take: pagination.take,
+        skip: pagination.skip,
+      }),
+      db.leaveRequest.count({ where }),
+    ]);
 
     return NextResponse.json({
+      ...pageMeta(total, pagination),
       requests: requests.map((r) => serializeRequest(r as unknown as LeaveRequestFull)),
     });
   } catch (error) {

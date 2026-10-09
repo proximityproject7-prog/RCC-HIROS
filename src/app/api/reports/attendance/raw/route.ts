@@ -95,45 +95,6 @@ export async function GET(request: NextRequest) {
       groupIds = [user.groupId];
     }
 
-    const records = await db.attendance.findMany({
-      where: {
-        date: { gte: startOfDay(from), lte: endOfDay(to) },
-        ...(groupIds ? { employee: { groupId: { in: groupIds } } } : {}),
-        ...(roleId ? { employee: { roleId } } : {}),
-        ...(!user.isSystem
-          ? { employee: { role: { isSystem: false } } }
-          : {}),
-      },
-      include: {
-        employee: {
-          select: {
-            employeeId: true,
-            firstName: true,
-            middleName: true,
-            lastName: true,
-            email: true,
-            gender: true,
-            employmentType: true,
-            contractType: true,
-            hireDate: true,
-            active: true,
-            group: { select: { code: true, name: true } },
-            role: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: [{ date: "asc" }, { employeeId: "asc" }],
-    });
-
-    const filtered =
-      q.length > 0
-        ? records.filter((r) => {
-            const full =
-              `${r.employee.firstName} ${r.employee.middleName ?? ""} ${r.employee.lastName} ${r.employee.employeeId}`.toLowerCase();
-            return full.includes(q);
-          })
-        : records;
-
     const headers = [
       "Employee ID",
       "Last Name",
@@ -165,54 +126,106 @@ export async function GET(request: NextRequest) {
     ];
 
     const lines = [headers.map(csvCell).join(",")];
-    for (const r of filtered) {
-      const e = r.employee;
-      lines.push(
-        [
-          e.employeeId,
-          e.lastName,
-          e.firstName,
-          e.middleName ?? "",
-          e.email,
-          e.gender ?? "",
-          e.employmentType,
-          e.contractType,
-          e.hireDate ? e.hireDate.toISOString().slice(0, 10) : "",
-          e.active ? "TRUE" : "FALSE",
-          e.group?.code ?? "",
-          e.group?.name ?? "",
-          e.role?.name ?? "",
-          r.date.toISOString().slice(0, 10),
-          r.clockInAt ? r.clockInAt.toISOString() : "",
-          r.clockOutAt ? r.clockOutAt.toISOString() : "",
-          r.clockInLat ?? "",
-          r.clockInLng ?? "",
-          r.clockInOnPremise === null || r.clockInOnPremise === undefined
-            ? ""
-            : r.clockInOnPremise
-              ? "TRUE"
-              : "FALSE",
-          r.clockInDistance ?? "",
-          r.clockOutLat ?? "",
-          r.clockOutLng ?? "",
-          r.clockOutOnPremise === null || r.clockOutOnPremise === undefined
-            ? ""
-            : r.clockOutOnPremise
-              ? "TRUE"
-              : "FALSE",
-          r.clockOutDistance ?? "",
-          r.biometricVerified ? "TRUE" : "FALSE",
-          r.manuallyEdited ? "TRUE" : "FALSE",
-          r.editRemarks ?? "",
-        ]
-          .map(csvCell)
-          .join(",")
-      );
-    }
 
-    const csv = lines.join("\n");
     const fname = `report-raw-${dateFromParam}-to-${dateToParam}.csv`;
-    return new NextResponse(csv, {
+    // Stream in date-batched chunks so year-long exports don't
+    // materialize the whole CSV string in memory (scale hardening).
+    const encoder = new TextEncoder();
+    const BATCH_DAYS = 31;
+    const stream = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(encoder.encode(lines.join("\n") + "\n"));
+        const cursor = new Date(from);
+        const end = new Date(to);
+        while (cursor <= end) {
+          const chunkEnd = new Date(cursor);
+          chunkEnd.setDate(chunkEnd.getDate() + BATCH_DAYS - 1);
+          if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+          const chunk = await db.attendance.findMany({
+            where: {
+              date: { gte: startOfDay(cursor), lte: endOfDay(chunkEnd) },
+              ...(groupIds ? { employee: { groupId: { in: groupIds } } } : {}),
+              ...(roleId ? { employee: { roleId } } : {}),
+              ...(!user.isSystem
+                ? { employee: { role: { isSystem: false } } }
+                : {}),
+            },
+            include: {
+              employee: {
+                select: {
+                  employeeId: true,
+                  firstName: true,
+                  middleName: true,
+                  lastName: true,
+                  email: true,
+                  gender: true,
+                  employmentType: true,
+                  contractType: true,
+                  hireDate: true,
+                  active: true,
+                  group: { select: { code: true, name: true } },
+                  role: { select: { name: true } },
+                },
+              },
+            },
+            orderBy: [{ date: "asc" }, { employeeId: "asc" }],
+          });
+          const rows = q.length > 0
+            ? chunk.filter((r) => {
+                const full =
+                  `${r.employee.firstName} ${r.employee.middleName ?? ""} ${r.employee.lastName} ${r.employee.employeeId}`.toLowerCase();
+                return full.includes(q);
+              })
+            : chunk;
+          for (const r of rows) {
+            const e = r.employee;
+            controller.enqueue(
+              encoder.encode(
+                [
+                  e.employeeId,
+                  e.lastName,
+                  e.firstName,
+                  e.middleName ?? "",
+                  e.email,
+                  e.gender ?? "",
+                  e.employmentType,
+                  e.contractType,
+                  e.hireDate ? e.hireDate.toISOString().slice(0, 10) : "",
+                  e.active ? "TRUE" : "FALSE",
+                  e.group?.code ?? "",
+                  e.group?.name ?? "",
+                  e.role?.name ?? "",
+                  r.date.toISOString().slice(0, 10),
+                  r.clockInAt ? r.clockInAt.toISOString() : "",
+                  r.clockOutAt ? r.clockOutAt.toISOString() : "",
+                  r.clockInLat ?? "",
+                  r.clockInLng ?? "",
+                  r.clockInOnPremise === null || r.clockInOnPremise === undefined
+                    ? ""
+                    : r.clockInOnPremise ? "TRUE" : "FALSE",
+                  r.clockInDistance ?? "",
+                  r.clockOutLat ?? "",
+                  r.clockOutLng ?? "",
+                  r.clockOutOnPremise === null || r.clockOutOnPremise === undefined
+                    ? ""
+                    : r.clockOutOnPremise ? "TRUE" : "FALSE",
+                  r.clockOutDistance ?? "",
+                  r.biometricVerified ? "TRUE" : "FALSE",
+                  r.manuallyEdited ? "TRUE" : "FALSE",
+                  r.editRemarks ?? "",
+                ]
+                  .map(csvCell)
+                  .join(",") + "\n"
+              )
+            );
+          }
+          cursor.setDate(cursor.getDate() + BATCH_DAYS);
+        }
+        controller.close();
+      },
+    });
+
+    return new NextResponse(stream, {
       status: 200,
       headers: {
         "Content-Type": "text/csv;charset=utf-8",

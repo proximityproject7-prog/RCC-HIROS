@@ -9,7 +9,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  usePagination,
+  useServerPagination,
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -807,7 +807,7 @@ export function SubmitEvaluationPage() {
       try {
         const [p, e, f] = await Promise.all([
           apiFetch<{ periods: EvalPeriod[] }>("/api/evaluation-periods"),
-          apiFetch<{ employees: EmployeeBrief[] }>("/api/employees?active=true&scope=evaluation"),
+          apiFetch<{ employees: EmployeeBrief[] }>("/api/employees?active=true&scope=evaluation&pageSize=100"),
           apiFetch<{ forms: EvalForm[] }>("/api/evaluation-forms"),
         ]);
         const openPeriods = (p.periods ?? []).filter((x) => x.status === "open");
@@ -1294,24 +1294,35 @@ export function EvaluationResultsPage() {
 
 function ResultsTable({ scope }: { scope: string }) {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Evaluation | null>(null);
   const [groupId, setGroupId] = useState("");
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
 
+  // Server-driven paging + server group filter.
+  const serverPager = useServerPagination(total, { defaultPageSize: 15, resetKey: `${scope}|${groupId}` });
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ evaluations: Evaluation[] }>(`/api/evaluations?scope=${scope}`);
+      const params = new URLSearchParams({ scope });
+      if (groupId) params.set("groupId", groupId);
+      params.set("page", String(serverPager.page));
+      params.set("pageSize", String(serverPager.pageSize));
+      const data = await apiFetch<{ evaluations: Evaluation[]; total?: number }>(
+        `/api/evaluations?${params.toString()}`
+      );
       setEvaluations(data.evaluations ?? []);
+      setTotal(typeof data.total === "number" ? data.total : (data.evaluations ?? []).length);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load evaluations.");
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, groupId, serverPager.page, serverPager.pageSize]);
 
   useEffect(() => {
     load();
@@ -1329,15 +1340,9 @@ function ResultsTable({ scope }: { scope: string }) {
   const showEvaluator = scope === "for_me" || scope === "all";
   const showEmployee = scope === "submitted_by_me" || scope === "all";
 
-  // Filter evaluations by group
-  const filtered = useMemo(() => {
-    if (!groupId) return evaluations;
-    return evaluations.filter((ev) => ev.employee?.groupId === groupId);
-  }, [evaluations, groupId]);
-
   // Pagination must be called unconditionally at the top of the component —
   // but we need to call it before any early return. The hook above is already unconditional.
-  const { currentData, controls } = usePagination(filtered, { defaultPageSize: 15 });
+  const { currentData, controls } = { currentData: evaluations, controls: serverPager.controls };
 
   return (
     <div className="space-y-4">

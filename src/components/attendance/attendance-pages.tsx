@@ -10,7 +10,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  usePagination,
+  useServerPagination,
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
 import { Switch } from "@/components/ui/switch";
@@ -104,6 +104,7 @@ export function AttendanceListPage() {
   const { has, scopeAllAttendance, scopeGroupAttendance, isSystemAdmin } = usePermissions();
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [total, setTotal] = useState(0);
   const [groups, setGroups] = useState<GroupBrief[]>([]);
   const [roles, setRoles] = useState<RoleBrief[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +138,10 @@ export function AttendanceListPage() {
     })();
   }, []);
 
+  // Server-driven paging (one page per fetch; filter changes reset to p1).
+  const filterKey = [canSeeOthers, date, groupId, roleId, status, search].join("|");
+  const serverPager = useServerPagination(total, { defaultPageSize: 15, resetKey: filterKey });
+
   const loadRecords = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
@@ -148,15 +153,18 @@ export function AttendanceListPage() {
       if (roleId) params.set("roleId", roleId);
       if (status !== "all") params.set("status", status);
       if (search.trim()) params.set("search", search.trim());
-      const data = await apiFetch<{ attendance: AttendanceRecord[] }>(`/api/attendance?${params.toString()}`, { signal });
+      params.set("page", String(serverPager.page));
+      params.set("pageSize", String(serverPager.pageSize));
+      const data = await apiFetch<{ attendance: AttendanceRecord[]; total?: number }>(`/api/attendance?${params.toString()}`, { signal });
       setRecords(data.attendance ?? []);
+      setTotal(typeof data.total === "number" ? data.total : (data.attendance ?? []).length);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load attendance.");
     } finally {
       setLoading(false);
     }
-  }, [canSeeOthers, date, groupId, roleId, status, search]);
+  }, [canSeeOthers, date, groupId, roleId, status, search, serverPager.page, serverPager.pageSize]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -164,7 +172,7 @@ export function AttendanceListPage() {
     return () => controller.abort();
   }, [loadRecords]);
 
-  const { currentData, controls } = usePagination(records, { defaultPageSize: 15 });
+  const { currentData, controls } = { currentData: records, controls: serverPager.controls };
 
   const canEditTime = isSystemAdmin || has("attendance.edit");
   const canEditOnPremise = isSystemAdmin || has("attendance.edit_on_premise");

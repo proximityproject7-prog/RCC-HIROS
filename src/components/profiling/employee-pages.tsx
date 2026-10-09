@@ -15,7 +15,7 @@ import { ProfilePrintDocument } from "@/components/profiling/profile-print";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  usePagination,
+  useServerPagination,
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -119,6 +119,7 @@ export function EmployeeListPage() {
   const { user } = useAuth();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeTotal, setEmployeeTotal] = useState(0);
   const [groups, setGroups] = useState<GroupBrief[]>([]);
   const [roles, setRoles] = useState<RoleBrief[]>([]);
   const [contractTypes, setContractTypes] = useState<ContractTypeBrief[]>([]);
@@ -158,6 +159,10 @@ export function EmployeeListPage() {
     })();
   }, []);
 
+  // Server-driven paging: the list endpoint returns one page + total.
+  const filterKey = [debouncedSearch, groupId, roleId, contractType, employmentType, activeFilter, fpasFilter].join("|");
+  const serverPager = useServerPagination(employeeTotal, { defaultPageSize: 15, resetKey: filterKey });
+
   const loadEmployees = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
@@ -170,19 +175,22 @@ export function EmployeeListPage() {
       if (employmentType) params.set("employmentType", employmentType);
       if (activeFilter) params.set("active", activeFilter);
       if (fpasFilter) params.set("fpasStatus", fpasFilter);
+      params.set("page", String(serverPager.page));
+      params.set("pageSize", String(serverPager.pageSize));
       const qs = params.toString();
-      const data = await apiFetch<{ employees: Employee[] }>(
+      const data = await apiFetch<{ employees: Employee[]; total?: number }>(
         `/api/employees${qs ? `?${qs}` : ""}`,
         { signal }
       );
       setEmployees(data.employees ?? []);
+      setEmployeeTotal(typeof data.total === "number" ? data.total : (data.employees ?? []).length);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load employees.");
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, groupId, roleId, contractType, activeFilter, fpasFilter]);
+  }, [debouncedSearch, groupId, roleId, contractType, activeFilter, fpasFilter, serverPager.page, serverPager.pageSize]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -190,7 +198,7 @@ export function EmployeeListPage() {
     return () => controller.abort();
   }, [loadEmployees]);
 
-  const { currentData, controls } = usePagination(employees, { defaultPageSize: 15 });
+  const { currentData, controls } = { currentData: employees, controls: serverPager.controls };
 
   const canViewInactive = has("profiling.view_inactive");
 

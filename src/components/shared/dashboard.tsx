@@ -32,17 +32,27 @@ export function DynamicDashboard() {
     };
 
     (async () => {
+      // Count widgets read server `total` with pageSize=1 (one-row
+      // transfer, exact count at any scale).
+      const countOf = async <T extends string>(path: string, key: T): Promise<number> => {
+        const sep = path.includes("?") ? "&" : "?";
+        const data = await apiFetch<Record<T, unknown[]> & { total?: number }>(`${path}${sep}pageSize=1`);
+        if (typeof data.total === "number") return data.total;
+        const arr = data[key];
+        return Array.isArray(arr) ? arr.length : 0;
+      };
       const results = await Promise.allSettled([
         fetchIf(has("roles.view"), async () => (await apiFetch<{ roles: unknown[] }>("/api/roles")).roles.length),
         fetchIf(has("groups.view"), async () => (await apiFetch<{ groups: unknown[] }>("/api/groups")).groups.length),
-        fetchIf(has("profiling.view"), async () => (await apiFetch<{ employees: unknown[] }>("/api/employees")).employees.length),
-        fetchIf(has("leave.approve_l1"), async () => (await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=pending_l1")).requests.length),
-        fetchIf(has("leave.approve_l2"), async () => (await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=pending_l2")).requests.length),
-        fetchIf(has("leave.request"), async () => (await apiFetch<{ requests: unknown[] }>("/api/leave-requests?scope=mine")).requests.length),
-        fetchIf(has("evaluation.view_results"), async () => (await apiFetch<{ evaluations: unknown[] }>("/api/evaluations?scope=for_me")).evaluations.length),
-        fetchIf(has("evaluation.submit"), async () => (await apiFetch<{ evaluations: unknown[] }>("/api/evaluations?scope=submitted_by_me")).evaluations.length),
+        fetchIf(has("profiling.view"), async () => countOf("/api/employees", "employees")),
+        fetchIf(has("leave.approve_l1"), async () => countOf("/api/leave-requests?scope=pending_l1", "requests")),
+        fetchIf(has("leave.approve_l2"), async () => countOf("/api/leave-requests?scope=pending_l2", "requests")),
+        fetchIf(has("leave.request"), async () => countOf("/api/leave-requests?scope=mine", "requests")),
+        fetchIf(has("evaluation.view_results"), async () => countOf("/api/evaluations?scope=for_me", "evaluations")),
+        fetchIf(has("evaluation.submit"), async () => countOf("/api/evaluations?scope=submitted_by_me", "evaluations")),
         fetchIf(has("attendance.view"), async () => {
-          const att = await apiFetch<{ attendance?: unknown[]; records?: unknown[] }>(`/api/attendance?scope=all&date=${todayStr}`);
+          const att = await apiFetch<{ attendance?: unknown[]; records?: unknown[]; total?: number }>(`/api/attendance?scope=all&date=${todayStr}&pageSize=1`);
+          if (typeof att.total === "number") return att.total;
           return (att.attendance ?? att.records ?? []).length;
         }),
       ]);

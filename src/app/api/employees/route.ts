@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth-token";
+import { parsePagination, pageMeta } from "@/lib/pagination";
 
 // ═══════════════════════════════════════════════════════════════
 // GET    /api/employees   profiling.view
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
     const activeParam = searchParams.get("active");
     const fpasStatus = searchParams.get("fpasStatus") || undefined;
     const scope = searchParams.get("scope") || "profiling";
+    const pagination = parsePagination(searchParams);
 
     // Group scoping: use the appropriate scope permission
     const scopeAll = scope === "evaluation" ? auth.user.scopeAllEvaluation : auth.user.scopeAllProfiling;
@@ -104,18 +106,45 @@ export async function GET(request: NextRequest) {
       where.fpasSubmissions = { none: { schoolYear: fpasSchoolYear } };
     }
 
-    const employees = await db.employee.findMany({
-      where,
-      include: {
-        group: true,
-        role: { select: { id: true, name: true, isSystem: true } },
-        contractTypeRel: { select: { id: true, name: true, code: true } },
-        _count: { select: { certificates: true } },
-      },
-      orderBy: [{ employeeId: "asc" }],
-    });
+    const [employees, total] = await Promise.all([
+      db.employee.findMany({
+        where,
+        // List shape: only the columns the table needs (detail comes
+        // from GET /api/employees/[id]).
+        select: {
+          id: true,
+          employeeId: true,
+          firstName: true,
+          middleName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          address: true,
+          birthday: true,
+          gender: true,
+          contractType: true,
+          contractTypeId: true,
+          contractTypeRel: { select: { id: true, name: true, code: true } },
+          employmentType: true,
+          hireDate: true,
+          salary: true,
+          active: true,
+          groupId: true,
+          group: { select: { id: true, name: true, code: true } },
+          roleId: true,
+          role: { select: { id: true, name: true, isSystem: true } },
+          _count: { select: { certificates: true } },
+          createdAt: true,
+        },
+        orderBy: [{ employeeId: "asc" }],
+        take: pagination.take,
+        skip: pagination.skip,
+      }),
+      db.employee.count({ where }),
+    ]);
 
     return NextResponse.json({
+      ...pageMeta(total, pagination),
       employees: employees.map((e) => ({
         id: e.id,
         employeeId: e.employeeId,

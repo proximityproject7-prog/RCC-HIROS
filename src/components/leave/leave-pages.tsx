@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   Plus, Search, Pencil, Trash2, Save, AlertTriangle,
   FileText, Eye, X, Upload,
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   usePagination,
+  useServerPagination,
   PaginationControls,
 } from "@/components/shared/table-pagination-v2";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -141,7 +142,7 @@ export function MyLeavePage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=mine", { signal });
+      const data = await apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=mine&pageSize=100", { signal });
       setRequests(data.requests ?? []);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -515,20 +516,20 @@ export function LeaveApprovalPage() {
       const tasks: Promise<void>[] = [];
       if (canL1) {
         tasks.push(
-          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l1", { signal })
+          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l1&pageSize=100", { signal })
             .then((d) => { if (!signal?.aborted) setL1Reqs(d.requests ?? []); })
             .catch(() => { if (!signal?.aborted) setL1Reqs([]); })
         );
         // Recallable: pending L2 requests carrying my approved L1 row
         tasks.push(
-          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=recallable", { signal })
+          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=recallable&pageSize=100", { signal })
             .then((d) => { if (!signal?.aborted) setRecallReqs(d.requests ?? []); })
             .catch(() => { if (!signal?.aborted) setRecallReqs([]); })
         );
       }
       if (canL2) {
         tasks.push(
-          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l2", { signal })
+          apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=pending_l2&pageSize=100", { signal })
             .then((d) => { if (!signal?.aborted) setL2Reqs(d.requests ?? []); })
             .catch(() => { if (!signal?.aborted) setL2Reqs([]); })
         );
@@ -1113,44 +1114,48 @@ export function LeaveTypeManagementPage() {
 
 export function AllLeavePage() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Server-driven paging + server search/status (one page per fetch).
+  const filterKey = `${debouncedSearch}|${statusFilter}`;
+  const serverPager = useServerPagination(total, { defaultPageSize: 15, resetKey: filterKey });
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ requests: LeaveRequest[] }>("/api/leave-requests?scope=all");
+      const params = new URLSearchParams({ scope: "all" });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (statusFilter) params.set("status", statusFilter);
+      params.set("page", String(serverPager.page));
+      params.set("pageSize", String(serverPager.pageSize));
+      const data = await apiFetch<{ requests: LeaveRequest[]; total?: number }>(
+        `/api/leave-requests?${params.toString()}`
+      );
       setRequests(data.requests ?? []);
+      setTotal(typeof data.total === "number" ? data.total : (data.requests ?? []).length);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load leave requests.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [debouncedSearch, statusFilter, serverPager.page, serverPager.pageSize]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return requests.filter((r) => {
-      if (statusFilter && r.status !== statusFilter) return false;
-      if (!q) return true;
-      const emp = r.employee;
-      const empName = emp ? `${emp.firstName} ${emp.lastName}`.toLowerCase() : "";
-      return (
-        r.requestNo.toLowerCase().includes(q) ||
-        empName.includes(q) ||
-        (r.leaveType?.name ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [requests, search, statusFilter]);
-
-  const { currentData, controls } = usePagination(filtered, { defaultPageSize: 15 });
+  const { currentData, controls } = { currentData: requests, controls: serverPager.controls };
 
   return (
     <div className="space-y-4">
