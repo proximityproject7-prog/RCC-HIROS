@@ -13,7 +13,8 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "tsx scripts/seed-demo-content.ts",
-    "db:seed:personnel": "tsx prisma/seed-personnel.ts"
+    "db:seed:personnel": "tsx prisma/seed-personnel.ts",
+    "db:seed:showcase": "tsx prisma/seed-showcase.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
