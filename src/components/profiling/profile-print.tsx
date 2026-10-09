@@ -14,8 +14,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 const cellClass = "border border-black px-2 py-1 text-[11px] text-black align-top";
-const headCellClass = "border border-black px-2 py-1 text-[11px] font-bold text-black align-top bg-white";
-const labelCellClass = "border border-black px-2 py-1 text-[11px] font-semibold text-black align-top";
+const headCellClass = "border border-black px-2 py-1 text-[11px] font-bold text-black align-top bg-[#FAF7F2]";
+const labelCellClass = "border border-black px-2 py-1 text-[11px] font-semibold text-black align-top bg-[#FAF7F2]";
+const bandClass = "bg-[#6B4A30] text-[#FEF9C3]";
 
 export interface PrintableEmployee {
   employeeId: string;
@@ -62,7 +63,7 @@ function SectionTable({
   const blanks = Math.max(0, minBlankRows - rows.length);
   return (
     <div className="mb-3 print-keep">
-      <p className="text-[12px] font-bold text-black mb-1">{title}</p>
+      <p className="text-[12px] font-bold text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5 mb-1">{title}</p>
       <table className="w-full border-collapse border border-black">
         <thead>
           <tr>
@@ -110,9 +111,11 @@ export function ProfilePrintDocument({
 
   return (
     <div className="text-black bg-white">
-      {/* Header (template header lines) */}
-      <p className="text-center text-[13px] font-bold">Republic Central Colleges</p>
-      <p className="text-center text-[11px]">HUMAN RESOURCE DEPARTMENT</p>
+      {/* Header (template header lines) — brown band */}
+      <div className={`${bandClass} rounded-sm px-3 py-2 mb-2 print:rounded-none`}>
+        <p className="text-center text-[13px] font-bold">Republic Central Colleges</p>
+        <p className="text-center text-[11px]">HUMAN RESOURCE DEPARTMENT</p>
+      </div>
 
       {/* 2x2 photo box, floated right like the template text box */}
       <div className="flex justify-end mb-1">
@@ -128,11 +131,11 @@ export function ProfilePrintDocument({
         </div>
       </div>
 
-      <p className="text-center text-[14px] font-bold">PERSONNEL PROFILE</p>
-      <p className="text-center text-[11px] mb-3">Academic Year {schoolYear}</p>
+      <p className={`${bandClass} rounded-sm text-center text-[14px] font-bold py-1 print:rounded-none`}>PERSONNEL PROFILE</p>
+      <p className="text-center text-[11px] mb-3 mt-1">Academic Year {schoolYear}</p>
 
       {/* I. Personal Profile (template Table 0) */}
-      <p className="text-[12px] font-bold text-black mb-1">I. PERSONAL PROFILE</p>
+      <p className="text-[12px] font-bold text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5 mb-1">I. PERSONAL PROFILE</p>
       <table className="w-full border-collapse border border-black mb-3">
         <tbody>
           <tr>

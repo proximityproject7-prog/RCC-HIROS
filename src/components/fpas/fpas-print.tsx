@@ -163,12 +163,14 @@ function c2Items(c: FpasFormData["criteria2"]): CheckItem[] {
 // ─── Small render helpers (plain black grid, template style) ───
 
 const cellClass = "border border-black px-2 py-1 text-[11px] text-black align-top";
-const headCellClass = "border border-black px-2 py-1 text-[11px] font-bold text-black align-top bg-white";
+const headCellClass = "border border-black px-2 py-1 text-[11px] font-bold text-black align-top bg-[#FAF7F2]";
+const bandClass = "bg-[#6B4A30] text-[#FEF9C3]";
+const subtotalClass = "bg-[#FAF7F2]";
 
 function CheckBlock({ item }: { item: CheckItem }) {
   return (
     <div className="mb-1.5">
-      <p className="text-[11px] font-semibold text-black">{item.label} <span className="font-normal">Points</span></p>
+      <p className="text-[11px] font-semibold text-[#6B4A30]">{item.label} <span className="font-normal">Points</span></p>
       {item.options.map((o) => (
         <p key={o.value} className="text-[11px] text-black ml-3">
           ({item.selected === o.value ? "✓" : " "}) {o.label}{" "}
@@ -193,7 +195,7 @@ function PrintTable({
   const total = rows.reduce((a, r) => a + (Number(r[r.length - 1]) || 0), 0);
   return (
     <div className="mb-2 print-keep">
-      <p className="text-[11px] font-semibold text-black mb-0.5">
+      <p className="text-[11px] font-semibold text-[#6B4A30] mb-0.5">
         {title}
         {max !== undefined ? ` (maximum of ${max} pts)` : ""}
       </p>
@@ -223,8 +225,8 @@ function PrintTable({
           )}
         </tbody>
       </table>
-      <p className="text-[11px] text-black text-right mt-0.5">
-        Subtotal: <span className="font-bold">{max !== undefined ? Math.min(total, max).toFixed(1) : total.toFixed(1)}</span>
+      <p className={`text-[11px] text-black text-right mt-0.5 px-1 ${subtotalClass}`}>
+        Subtotal: <span className="font-bold text-[#6B4A30]">{max !== undefined ? Math.min(total, max).toFixed(1) : total.toFixed(1)}</span>
         {max !== undefined ? ` / ${max}` : ""}
       </p>
     </div>
@@ -255,10 +257,12 @@ export function FpasPrintDocument({
 
   return (
     <div className="text-black bg-white">
-      {/* Org header (template paras 1–4) */}
-      <p className="text-center text-[13px] font-bold">Republic Central Colleges</p>
-      <p className="text-center text-[11px]">Angeles City</p>
-      <p className="text-center text-[14px] font-bold mt-2 mb-3">FACULTY PERFORMANCE APPRAISAL FORM</p>
+      {/* Org header (template paras 1–4) — brown band */}
+      <div className={`${bandClass} rounded-sm px-3 py-2 mb-3 print:rounded-none`}>
+        <p className="text-center text-[13px] font-bold">Republic Central Colleges</p>
+        <p className="text-center text-[11px]">Angeles City</p>
+        <p className="text-center text-[14px] font-bold mt-1">FACULTY PERFORMANCE APPRAISAL FORM</p>
+      </div>
 
       {/* Fill-in fields (template paras 6–12) */}
       <div className="text-[11px] space-y-1 mb-2">
@@ -283,7 +287,7 @@ export function FpasPrintDocument({
       </p>
 
       {/* I. Instruction (25) */}
-      <p className="text-[12px] font-bold mt-3 mb-1">INSTRUCTION ({t.c1.toFixed(1)} / 25 points)</p>
+      <p className="text-[12px] font-bold mt-3 mb-1 text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5">INSTRUCTION ({t.c1.toFixed(1)} / 25 points)</p>
       {c1Items(formData.criteria1).map((item) => (
         <CheckBlock key={item.label} item={item} />
       ))}
@@ -294,13 +298,13 @@ export function FpasPrintDocument({
       </div>
 
       {/* II. Faculty Attendance (20) */}
-      <p className="text-[12px] font-bold mt-3 mb-1">FACULTY ATTENDANCE ({t.c2.toFixed(1)} / 20 points)</p>
+      <p className="text-[12px] font-bold mt-3 mb-1 text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5">FACULTY ATTENDANCE ({t.c2.toFixed(1)} / 20 points)</p>
       {c2Items(formData.criteria2).map((item) => (
         <CheckBlock key={item.label} item={item} />
       ))}
 
       {/* III. Professional Growth (20) */}
-      <p className="text-[12px] font-bold mt-3 mb-1">PROFESSIONAL GROWTH ({t.c3.toFixed(1)} / 20 points)</p>
+      <p className="text-[12px] font-bold mt-3 mb-1 text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5">PROFESSIONAL GROWTH ({t.c3.toFixed(1)} / 20 points)</p>
       <PrintTable
         title="Graduate Degree"
         headers={["Title", "Name of Institution", "Date Graduated or Units Earned", "Points"]}
@@ -338,7 +342,7 @@ export function FpasPrintDocument({
       />
 
       {/* IV. Researches and Publications (16) */}
-      <p className="text-[12px] font-bold mt-3 mb-1">RESEARCHES AND PUBLICATIONS ({t.c4.toFixed(1)} / 16 points)</p>
+      <p className="text-[12px] font-bold mt-3 mb-1 text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5">RESEARCHES AND PUBLICATIONS ({t.c4.toFixed(1)} / 16 points)</p>
       <p className="text-[11px] mb-1">Within the last three (3) years</p>
       <PrintTable
         title="Scientific Discoveries and Inventions performed with official certification"
@@ -365,7 +369,7 @@ export function FpasPrintDocument({
       />
 
       {/* V. Involvement (9) */}
-      <p className="text-[12px] font-bold mt-3 mb-1">
+      <p className="text-[12px] font-bold mt-3 mb-1 text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5">
         INVOLVEMENT IN SCHOOL FUNCTIONS / STUDENT EXTRA-CURRICULAR ACTIVITIES ({t.c5.toFixed(1)} / 9 points)
       </p>
       <p className="text-[11px] mb-1">Within the last three (3) years</p>
@@ -389,7 +393,7 @@ export function FpasPrintDocument({
       />
 
       {/* VI. Community (10) */}
-      <p className="text-[12px] font-bold mt-3 mb-1">COMMUNITY INVOLVEMENT ({t.c6.toFixed(1)} / 10 points)</p>
+      <p className="text-[12px] font-bold mt-3 mb-1 text-[#6B4A30] border-b border-[#E8D5B0] pb-0.5">COMMUNITY INVOLVEMENT ({t.c6.toFixed(1)} / 10 points)</p>
       <p className="text-[11px] mb-1">Within the last three (3) years</p>
       <PrintTable
         title="Projects Initiated"
@@ -411,7 +415,7 @@ export function FpasPrintDocument({
       />
 
       {/* Grand total + signature (template Table 15) */}
-      <p className="text-[13px] font-bold mt-3 mb-2">GRAND TOTAL: {grand.toFixed(1)} / 100</p>
+      <p className={`${bandClass} rounded-sm px-3 py-1.5 text-[13px] font-bold mt-3 mb-2 print:rounded-none`}>GRAND TOTAL: {grand.toFixed(1)} / 100</p>
       <div className="text-[11px] mt-4 space-y-4">
         <p>Evaluated by: ________________________________________</p>
         <p>
