@@ -110,9 +110,8 @@ model Employee {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  // Scale indexes (B4): group/role/active list filters
-  @@index([groupId])
-  @@index([roleId])
+  // Scale index (B4): active-only list filters.
+  // (groupId/roleId already indexed via their FK constraints.)
   @@index([active])
 
   // Relations
@@ -326,9 +325,9 @@ model Evaluation {
   responses EvaluationResponse[]
 
   @@unique([periodId, evaluatorId, employeeId])
-  // Scale indexes (B4): period + per-employee lookups
+  // Scale index (B4): period + per-employee lookups.
+  // (employeeId alone is already indexed via its FK constraint.)
   @@index([periodId, employeeId])
-  @@index([employeeId])
 }
 
 model EvaluationResponse {
