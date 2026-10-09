@@ -1074,6 +1074,9 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     useNavigationGuard(isSectionDirty);
   const [sectionSaving, setSectionSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  // Bumped after every upload/delete so the mutable /photo URL is never
+  // served stale from the browser cache (session-35).
+  const [photoVersion, setPhotoVersion] = useState(0);
 
   // Parse profileData JSON
   useEffect(() => {
@@ -1459,6 +1462,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
       const fd = new FormData();
       fd.append("photo", file);
       await apiFetch(`/api/employees/${employeeId}/photo`, { method: "POST", body: fd, skipJsonHeader: true });
+      setPhotoVersion((v) => v + 1);
       loadEmployee();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Photo upload failed.");
@@ -1471,6 +1475,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const handlePhotoDelete = async () => {
     try {
       await apiFetch(`/api/employees/${employeeId}/photo`, { method: "DELETE" });
+      setPhotoVersion((v) => v + 1);
       loadEmployee();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove photo.");
@@ -1569,7 +1574,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const canEditProfile = canFillProfile || has("profiling.edit") || has("profile.editAll");
   const initials = (employee.firstName.charAt(0) + employee.lastName.charAt(0)).toUpperCase();
   const fullName = `${employee.firstName} ${employee.middleName ? employee.middleName + " " : ""}${employee.lastName}`;
-  const photoUrl = employee.photo ? `/api/employees/${employeeId}/photo` : null;
+  const photoUrl = employee.photo ? `/api/employees/${employeeId}/photo?v=${photoVersion}` : null;
 
   return (
     <>

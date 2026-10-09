@@ -52,7 +52,9 @@ export async function GET(
       return new NextResponse(buffer, {
         headers: {
           "Content-Type": mimeMap[ext] || "image/jpeg",
-          "Cache-Control": "public, max-age=31536000, immutable",
+          // Mutable avatar URL — must never be long-cached, otherwise a
+          // re-uploaded photo keeps showing the stale image (session-35).
+          "Cache-Control": "no-store",
         },
       });
     } catch {
