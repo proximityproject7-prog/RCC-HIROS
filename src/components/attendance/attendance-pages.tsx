@@ -60,6 +60,7 @@ interface PremisesConfig {
   lng: number;
   radiusMeters: number;
   label: string;
+  requireOnPremise?: boolean;
 }
 
 const inputClass =
@@ -624,6 +625,7 @@ export function AttendanceConfigurationPage() {
   const [locating, setLocating] = useState(false);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [biometricsSaving, setBiometricsSaving] = useState(false);
+  const [requireOnPremise, setRequireOnPremise] = useState(true);
   const [kioskStatus, setKioskStatus] = useState<"checking" | "running" | "stopped" | "error" | null>(null);
   const [kioskDetails, setKioskDetails] = useState<{ scanner: string; deviceCount: number; version: string } | null>(null);
 
@@ -636,6 +638,7 @@ export function AttendanceConfigurationPage() {
         setLng(String(p.lng));
         setRadius(String(p.radiusMeters));
         setLabel(p.label);
+        setRequireOnPremise(p.requireOnPremise !== false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load premises config.");
       } finally {
@@ -689,7 +692,7 @@ export function AttendanceConfigurationPage() {
     try {
       await apiFetch("/api/settings/premises", {
         method: "POST",
-        body: JSON.stringify({ lat: latNum, lng: lngNum, radiusMeters: radiusNum, label: label.trim() }),
+        body: JSON.stringify({ lat: latNum, lng: lngNum, radiusMeters: radiusNum, label: label.trim(), requireOnPremise }),
       });
       setSuccess(true);
     } catch (err) {
@@ -807,6 +810,23 @@ export function AttendanceConfigurationPage() {
               <ExternalLink className="h-3 w-3" /> View on OpenStreetMap
             </a>
           )}
+        </div>
+      </div>
+
+      <div className="bg-rcc-surface rounded-lg border border-rcc-border p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-rcc-text-primary">On-Site-Only Enforcement</p>
+            <p className="text-xs text-rcc-text-muted mt-0.5">
+              When on, clock in/out outside the geofence is rejected (403). When off, location is still recorded but off-premise clocks are allowed.
+            </p>
+          </div>
+          <Switch
+            checked={requireOnPremise}
+            onCheckedChange={setRequireOnPremise}
+            disabled={saving}
+            aria-label="On-site-only enforcement"
+          />
         </div>
       </div>
 

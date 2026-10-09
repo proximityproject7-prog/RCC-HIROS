@@ -139,3 +139,46 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #8B5E3C;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   RCC-HIROS — Browser print (Save as PDF) support
+   Any element with .no-print is hidden on paper; .print-only is
+   hidden on screen and shown only on paper. Colors are preserved
+   so FPAS prints carry the official form styling.
+   ═══════════════════════════════════════════════════════════════ */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  html, body {
+    overflow: visible !important;
+    height: auto !important;
+    background: #ffffff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* Let the content column use the full page width */
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  /* Avoid splitting cards/tables across pages where possible */
+  .print-keep {
+    break-inside: avoid;
+  }
+  table {
+    break-inside: auto;
+  }
+  tr {
+    break-inside: avoid;
+  }
+}

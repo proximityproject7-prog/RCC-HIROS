@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth-token";
 import { Prisma } from "@/generated/prisma/client";
+import {
+  parseScope,
+  periodScopesOverlap,
+} from "@/lib/evaluation-periods";
 
 // ═══════════════════════════════════════════════════════════════
 // /api/evaluation-periods/[id]
@@ -101,10 +105,37 @@ export async function PATCH(
       data.status = status;
 
       if (status === "open") {
-        await db.evaluationPeriod.updateMany({
+        // A1 fix: close only other open periods whose scope overlaps
+        // the final scope of this period (groupIds/targetRoleIds after
+        // applying this PATCH), so unrelated departments are unaffected.
+        const finalGroups =
+          typeof data.groupIds === "string"
+            ? parseScope(data.groupIds)
+            : parseScope(period.groupIds);
+        const finalRoles =
+          typeof data.targetRoleIds === "string"
+            ? parseScope(data.targetRoleIds)
+            : parseScope(period.targetRoleIds);
+        const openOthers = await db.evaluationPeriod.findMany({
           where: { id: { not: id }, status: "open" },
-          data: { status: "closed", closedAt: new Date() },
+          select: { id: true, groupIds: true, targetRoleIds: true },
         });
+        const overlappingIds = openOthers
+          .filter((p) =>
+            periodScopesOverlap(
+              finalGroups,
+              finalRoles,
+              parseScope(p.groupIds),
+              parseScope(p.targetRoleIds)
+            )
+          )
+          .map((p) => p.id);
+        if (overlappingIds.length > 0) {
+          await db.evaluationPeriod.updateMany({
+            where: { id: { in: overlappingIds } },
+            data: { status: "closed", closedAt: new Date() },
+          });
+        }
         data.openedAt = new Date();
         data.closedAt = null;
       } else {

@@ -374,10 +374,12 @@ export async function POST(request: NextRequest) {
 
       if (!onPremise) {
         const cfg = await getPremisesConfig();
-        return NextResponse.json(
-          { error: `You are ${formatDistance(distance ?? 0)} from ${cfg.label}. Clock-in is only allowed on premises.` },
-          { status: 403 }
-        );
+        if (cfg.requireOnPremise) {
+          return NextResponse.json(
+            { error: `You are ${formatDistance(distance ?? 0)} from ${cfg.label}. Clock-in is only allowed on premises.` },
+            { status: 403 }
+          );
+        }
       }
 
       // Use the @@unique([employeeId, date]) compound key for upsert
@@ -445,10 +447,12 @@ export async function POST(request: NextRequest) {
 
     if (!onPremise) {
       const cfg = await getPremisesConfig();
-      return NextResponse.json(
-        { error: `You are ${formatDistance(distance ?? 0)} from ${cfg.label}. Clock-out is only allowed on premises.` },
-        { status: 403 }
-      );
+      if (cfg.requireOnPremise) {
+        return NextResponse.json(
+          { error: `You are ${formatDistance(distance ?? 0)} from ${cfg.label}. Clock-out is only allowed on premises.` },
+          { status: 403 }
+        );
+      }
     }
 
     const record = await db.attendance.update({

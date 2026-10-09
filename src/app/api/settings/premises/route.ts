@@ -10,7 +10,8 @@ import { getPremisesConfig } from "@/lib/geolocation";
 // /api/settings/premises
 // GET  auth                                                — read config
 // POST attendance.edit OR roles.edit                       — update config
-//   Body: { lat, lng, radiusMeters, label }
+//   Body: { lat, lng, radiusMeters, label, requireOnPremise? }
+// requireOnPremise defaults to true and is preserved when omitted.
 // ═══════════════════════════════════════════════════════════════
 
 const SETTING_KEY = "premises_config";
@@ -40,11 +41,12 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return auth.response;
 
     const body = await request.json();
-    const { lat, lng, radiusMeters, label } = body as {
+    const { lat, lng, radiusMeters, label, requireOnPremise } = body as {
       lat?: number;
       lng?: number;
       radiusMeters?: number;
       label?: string;
+      requireOnPremise?: boolean;
     };
 
     // Validate inputs
@@ -82,11 +84,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (requireOnPremise !== undefined && typeof requireOnPremise !== "boolean") {
+      return NextResponse.json(
+        { error: "requireOnPremise must be a boolean" },
+        { status: 400 }
+      );
+    }
+
+    // Preserve the existing toggle when the client omits it.
+    let nextRequireOnPremise = true;
+    {
+      const existing = await db.systemSetting.findUnique({
+        where: { key: SETTING_KEY },
+      });
+      if (existing?.value) {
+        try {
+          const parsed = JSON.parse(existing.value) as { requireOnPremise?: unknown };
+          if (typeof parsed.requireOnPremise === "boolean") {
+            nextRequireOnPremise = parsed.requireOnPremise;
+          }
+        } catch {
+          // fall through to default
+        }
+      }
+      if (typeof requireOnPremise === "boolean") {
+        nextRequireOnPremise = requireOnPremise;
+      }
+    }
+
     const value = JSON.stringify({
       lat,
       lng,
       radiusMeters: Math.round(radiusMeters),
       label: label.trim(),
+      requireOnPremise: nextRequireOnPremise,
     });
 
     // Upsert the SystemSetting row
@@ -115,7 +146,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      premises: { lat, lng, radiusMeters: Math.round(radiusMeters), label: label.trim() },
+      premises: { lat, lng, radiusMeters: Math.round(radiusMeters), label: label.trim(), requireOnPremise: nextRequireOnPremise },
     });
   } catch (error) {
     console.error("[API /settings/premises POST] Error:", error);

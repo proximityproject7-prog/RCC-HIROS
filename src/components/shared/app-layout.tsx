@@ -24,10 +24,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <GeofenceGuard>
-      <div className="flex h-screen bg-rcc-bg overflow-hidden">
-        <DynamicSidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="h-16 bg-rcc-surface border-b border-rcc-border flex items-center justify-between px-6 shrink-0">
+      <div className="flex h-screen bg-rcc-bg overflow-hidden print:block print:h-auto print:overflow-visible">
+        <div className="no-print contents">
+          <DynamicSidebar />
+        </div>
+        <div className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
+          <header className="no-print h-16 bg-rcc-surface border-b border-rcc-border flex items-center justify-between px-6 shrink-0">
             <h1 className="text-base font-semibold text-rcc-text-primary">{user?.roleName ?? "User"}</h1>
             <div className="flex items-center gap-3">
               <div ref={userMenuRef} className="relative">

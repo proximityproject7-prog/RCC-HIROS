@@ -7,9 +7,10 @@ import {
   Plus, Search, Pencil, ArrowLeft, ArrowRight, Save, Users as UsersIcon, Upload,
   FileText, Download, Trash2, Eye, X, Lock, Mail, Phone, MapPin, Calendar,
   IdCard, Briefcase, Award, Image as ImageIcon, AlertTriangle, Building2, Settings,
-  Hash, User, DollarSign, Shield, Fingerprint,
+  Hash, User, DollarSign, Shield, Fingerprint, Printer,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { canFillFpas } from "@/lib/fpas";
 import { useAuthStore } from "@/store/auth-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -383,16 +384,14 @@ export function EmployeeListPage() {
                   // Nobody files for anyone else: fill form only for the
                   // viewer's own row when they hold Fill.
                   // Fill badge only for the viewer's own row when they hold
-                  // Fill and the row's group is enabled (managers bypass
-                  // the group gate for their own fills). Otherwise the
+                  // Fill gate (rule: @/lib/fpas canFillFpas — unknown/empty
+                  // enabled list = allowed; managers bypass). Otherwise the
                   // form-level lock + submit API explain and enforce.
-                  const rowGroupOk =
-                    !fpasEnabledIds ||
-                    fpasEnabledIds.size === 0 ||
-                    !emp.groupId ||
-                    fpasEnabledIds.has(emp.groupId) ||
-                    has("fpas.manage");
-                  const mayFillRow = user?.id === emp.id && has("fpas.fill") && rowGroupOk;
+                  const mayFillRow = user?.id === emp.id && has("fpas.fill") && canFillFpas({
+                    groupId: emp.groupId,
+                    enabledGroupIds: fpasEnabledIds ? [...fpasEnabledIds] : null,
+                    bypass: has("fpas.manage"),
+                  });
                   const fpasBadge = fpasSubmitted ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> SUBMITTED
@@ -1099,15 +1098,17 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     loadEmployee();
   }, [loadEmployee]);
 
-  // Check FPAS enabled for employee's group. An empty enabled list
-  // means ALL groups are enabled (matches the submit-API semantics).
+  // Check FPAS enabled for employee's group (rule: @/lib/fpas
+  // canFillFpas — unknown/empty list = allowed).
   useEffect(() => {
     if (!employee?.groupId) return;
     (async () => {
       try {
         const data = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings");
-        const ids = data.enabledGroupIds ?? [];
-        setFpasEnabled(ids.length === 0 || ids.includes(employee.groupId!));
+        setFpasEnabled(canFillFpas({
+          groupId: employee.groupId,
+          enabledGroupIds: data.enabledGroupIds ?? [],
+        }));
       } catch {
         // non-fatal
       }
@@ -1573,7 +1574,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     <div className="space-y-5 max-w-5xl mx-auto">
 
       {employeeId !== user?.id && (
-        <div className="flex items-center gap-3">
+        <div className="no-print flex items-center gap-3">
           <button onClick={() => setCurrentPage("profiling")} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors">
             <ArrowLeft className="h-4 w-4" /> Back to employees
           </button>
@@ -1621,7 +1622,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
                 <span className="inline-flex items-center gap-1"><IdCard className="h-3.5 w-3.5" /> <span className="font-mono">{employee.employeeId}</span></span>
               </div>
             </div>
-            <div className="flex items-center gap-2 pb-1">
+            <div className="no-print flex items-center gap-2 pb-1">
+              <button onClick={() => window.print()} title="Print this profile (Save as PDF for a printable copy)" className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
+                <Printer className="h-3.5 w-3.5" /> Print
+              </button>
               {/* Fill is offered only on the viewer's own profile. The group
                   gate matches the Records list: unknown (loading / fetch
                   failed / no group) is treated as allowed, and managers

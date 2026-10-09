@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAnyPermission, requirePermission } from "@/lib/auth-token";
+import { canFillFpas } from "@/lib/fpas";
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/fpas — list submissions
@@ -132,7 +133,8 @@ export async function POST(request: NextRequest) {
 
     // Hard gate: FPAS must be enabled for the target's department.
     // Managers bypass; an empty enabled list means all groups are enabled.
-    if (!canManage) {
+    // (Rule lives in @/lib/fpas — canFillFpas.)
+    {
       const setting = await db.systemSetting.findUnique({
         where: { key: "fpas_enabled_groups" },
       });
@@ -141,8 +143,11 @@ export async function POST(request: NextRequest) {
         try { enabledGroupIds = JSON.parse(setting.value); } catch { enabledGroupIds = []; }
       }
       if (
-        enabledGroupIds.length > 0 &&
-        (!targetEmployee.groupId || !enabledGroupIds.includes(targetEmployee.groupId))
+        !canFillFpas({
+          groupId: targetEmployee.groupId,
+          enabledGroupIds,
+          bypass: canManage,
+        })
       ) {
         return NextResponse.json(
           { error: "Forbidden - FPAS is not enabled for this department" },

@@ -15,6 +15,12 @@ export interface PremisesConfig {
   radiusMeters: number;
   /** Human-readable label shown to users. */
   label: string;
+  /**
+   * On-site-only enforcement toggle (B4). true = off-premise clock
+   * attempts are rejected with 403; false = location is recorded but
+   * off-premise clocks are allowed. Defaults to true.
+   */
+  requireOnPremise: boolean;
 }
 
 const DEFAULT_PREMISES: PremisesConfig = {
@@ -22,6 +28,7 @@ const DEFAULT_PREMISES: PremisesConfig = {
   lng: 120.5886,
   radiusMeters: 200,
   label: "Republic Central Colleges - Angeles",
+  requireOnPremise: true,
 };
 
 const SETTING_KEY = "premises_config";
@@ -45,6 +52,10 @@ export async function getPremisesConfig(): Promise<PremisesConfig> {
           ? parsed.radiusMeters
           : DEFAULT_PREMISES.radiusMeters,
       label: typeof parsed.label === "string" ? parsed.label : DEFAULT_PREMISES.label,
+      requireOnPremise:
+        typeof parsed.requireOnPremise === "boolean"
+          ? parsed.requireOnPremise
+          : DEFAULT_PREMISES.requireOnPremise,
     };
   } catch {
     return DEFAULT_PREMISES;

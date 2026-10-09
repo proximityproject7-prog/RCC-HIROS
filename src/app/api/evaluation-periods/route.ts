@@ -4,6 +4,10 @@ import {
   requireAuth,
   requirePermission,
 } from "@/lib/auth-token";
+import {
+  parseScope,
+  periodScopesOverlap,
+} from "@/lib/evaluation-periods";
 
 // ═══════════════════════════════════════════════════════════════
 // GET   /api/evaluation-periods  auth                    — list periods
@@ -170,12 +174,32 @@ export async function POST(request: NextRequest) {
         ? JSON.stringify(targetRoleIds)
         : JSON.stringify([]);
 
-    // If opening, close any currently open period
+    // If opening, close only currently-open periods whose scope
+    // overlaps this one (A1 fix) — non-overlapping departments keep
+    // running their own periods simultaneously.
     if (status === "open") {
-      await db.evaluationPeriod.updateMany({
+      const newGroups = parseScope(groupIdsJson);
+      const newRoles = parseScope(targetRoleIdsJson);
+      const openOthers = await db.evaluationPeriod.findMany({
         where: { status: "open" },
-        data: { status: "closed", closedAt: new Date() },
+        select: { id: true, groupIds: true, targetRoleIds: true },
       });
+      const overlappingIds = openOthers
+        .filter((p) =>
+          periodScopesOverlap(
+            newGroups,
+            newRoles,
+            parseScope(p.groupIds),
+            parseScope(p.targetRoleIds)
+          )
+        )
+        .map((p) => p.id);
+      if (overlappingIds.length > 0) {
+        await db.evaluationPeriod.updateMany({
+          where: { id: { in: overlappingIds } },
+          data: { status: "closed", closedAt: new Date() },
+        });
+      }
     }
 
     const period = await db.evaluationPeriod.create({

@@ -5,7 +5,7 @@ import {
   Search, Download, Users, Building2, TrendingUp, Calendar,
   Clock, ChevronDown, ChevronRight, Check, X, Filter, Mail, Briefcase,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, getToken } from "@/lib/api-client";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   usePagination,
@@ -398,6 +398,50 @@ export function ReportsPage() {
   const showAttendance = reportType === "all" || reportType === "attendance";
   const showHeadcount = reportType === "all" || reportType === "headcount";
 
+  // ─── Raw analytics export (server CSV, same filters as screen) ───
+  const [rawScope, setRawScope] = useState<"filtered" | "all">("filtered");
+  const [exportingRaw, setExportingRaw] = useState(false);
+
+  const handleExportRaw = async () => {
+    setExportingRaw(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ dateFrom, dateTo });
+      if (rawScope === "all") {
+        params.set("groupCodes", "ALL");
+      } else {
+        params.set("groupCodes", selectedGroups.join(","));
+      }
+      if (selectedRole) params.set("roleId", selectedRole);
+      if (searchName.trim()) params.set("q", searchName.trim());
+      const token = getToken();
+      const res = await fetch(`/api/reports/attendance/raw?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          (data && typeof data === "object" && "error" in data
+            ? String((data as { error: unknown }).error)
+            : null) ?? `Raw export failed (HTTP ${res.status})`
+        );
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `report-raw-${dateFrom}-to-${dateTo}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Raw export failed.");
+    } finally {
+      setExportingRaw(false);
+    }
+  };
+
   // ─── CSV Export ───
   const handleExportCSV = () => {
     const headers: string[] = ["Employee ID", "Name", "Group", "Role"];
@@ -595,6 +639,27 @@ export function ReportsPage() {
                   >
                     <Download className="h-3.5 w-3.5" /> Export CSV
                   </button>
+                )}
+                {canExport && (
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={rawScope}
+                      onChange={(e) => setRawScope(e.target.value as "filtered" | "all")}
+                      title="Raw export scope: current filters, or all groups"
+                      className="px-2 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary bg-rcc-surface hover:bg-rcc-bg transition-colors"
+                    >
+                      <option value="filtered">Scope: current filters</option>
+                      <option value="all">Scope: all groups</option>
+                    </select>
+                    <button
+                      onClick={handleExportRaw}
+                      disabled={exportingRaw}
+                      title="Download every clock in/out field + employee info for the selected dates (raw analytics CSV, no computed tardiness)"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-accent/40 text-rcc-accent hover:bg-rcc-accent/10 transition-colors disabled:opacity-50"
+                    >
+                      <Download className="h-3.5 w-3.5" /> {exportingRaw ? "Exporting..." : "Export Raw CSV"}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

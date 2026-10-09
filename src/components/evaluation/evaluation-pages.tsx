@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import {
   Plus, ArrowLeft, AlertTriangle, Pencil,
-  CheckCircle2, FileText, Info, Trash2, X,
+  CheckCircle2, FileText, Info, Trash2, X, Eye, Printer,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
@@ -133,6 +133,19 @@ export function EvaluationFormsPage() {
   const [editAllGroups, setEditAllGroups] = useState(true);
   const [editAllRoles, setEditAllRoles] = useState(true);
   const [exportingId, setExportingId] = useState<string | null>(null);
+  // A2: on-screen archive viewer (reuses the archive endpoint payload)
+  const [viewingArchive, setViewingArchive] = useState<{
+    period: EvalPeriod;
+    evaluations: Array<{
+      employee?: { name: string; employeeId: string; groupName: string | null; roleName: string | null } | null;
+      evaluator?: { name: string; employeeId: string } | null;
+      totalScore: number | null;
+      remarks: string | null;
+      submittedAt: string | null;
+      responses: Array<{ category: string; description: string; score: number; maxScore: number; comments: string | null }>;
+    }>;
+  } | null>(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -274,6 +287,26 @@ export function EvaluationFormsPage() {
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save access settings.");
+    }
+  };
+
+  const handleViewArchive = async (period: EvalPeriod) => {
+    setLoadingArchive(true);
+    setError(null);
+    try {
+      const data = await apiFetch<{ evaluations: Array<{
+        employee?: { name: string; employeeId: string; groupName: string | null; roleName: string | null } | null;
+        evaluator?: { name: string; employeeId: string } | null;
+        totalScore: number | null;
+        remarks: string | null;
+        submittedAt: string | null;
+        responses: Array<{ category: string; description: string; score: number; maxScore: number; comments: string | null }>;
+      }> }>(`/api/evaluation-periods/${period.id}/archive`);
+      setViewingArchive({ period, evaluations: data.evaluations ?? [] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load archive.");
+    } finally {
+      setLoadingArchive(false);
     }
   };
 
@@ -606,9 +639,14 @@ export function EvaluationFormsPage() {
                       <>
                         <span className="text-xs text-rcc-text-muted">{p.evaluationsCount} evaluation(s) submitted</span>
                         {has("evaluation.manage_forms") && (
-                          <button onClick={() => handleExportArchive(p)} disabled={exportingId === p.id} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium disabled:opacity-50">
-                            <FileText className="h-3 w-3" /> {exportingId === p.id ? "Exporting..." : "Export CSV"}
-                          </button>
+                          <>
+                            <button onClick={() => handleViewArchive(p)} disabled={loadingArchive} className="inline-flex items-center gap-1 text-xs text-rcc-primary hover:underline font-medium disabled:opacity-50">
+                              <Eye className="h-3 w-3" /> {loadingArchive ? "Loading..." : "View"}
+                            </button>
+                            <button onClick={() => handleExportArchive(p)} disabled={exportingId === p.id} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium disabled:opacity-50">
+                              <FileText className="h-3 w-3" /> {exportingId === p.id ? "Exporting..." : "Export CSV"}
+                            </button>
+                          </>
                         )}
                         {has("evaluation.reset") && (
                           <button onClick={() => handleResetPeriod(p.id, p.name)} disabled={resettingPeriodId === p.id} className="text-xs text-red-600 hover:underline disabled:opacity-50">
@@ -649,6 +687,79 @@ export function EvaluationFormsPage() {
             </button>
           </div>
           {cleanupResult && <p className="text-xs text-green-700 font-medium">{cleanupResult}</p>}
+        </div>
+      )}
+
+      {/* A2: Archive viewer dialog (read-only past-period browsing + print) */}
+      {viewingArchive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-rcc-surface rounded-lg border border-rcc-border w-full max-w-4xl max-h-[85vh] flex flex-col">
+            <div className="no-print flex items-center justify-between px-5 py-3 border-b border-rcc-border">
+              <div>
+                <h3 className="text-sm font-bold text-rcc-text-primary">Archive — {viewingArchive.period.name}</h3>
+                <p className="text-xs text-rcc-text-muted">{viewingArchive.evaluations.length} submitted evaluation(s)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  title="Print this archive (Save as PDF for per-faculty printable files)"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Print
+                </button>
+                <button onClick={() => setViewingArchive(null)} className="p-1.5 rounded-md hover:bg-rcc-bg text-rcc-text-secondary" aria-label="Close archive viewer">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="print-only px-5 pt-4">
+              <p className="text-sm font-bold text-rcc-text-primary">Republic Central Colleges — Evaluation Archive (printed {new Date().toLocaleDateString()})</p>
+              <p className="text-xs text-rcc-text-secondary">{viewingArchive.period.name} · {viewingArchive.evaluations.length} submitted evaluation(s)</p>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 space-y-3">
+              {viewingArchive.evaluations.length === 0 && (
+                <p className="text-sm text-rcc-text-muted">No submitted evaluations in this period.</p>
+              )}
+              {viewingArchive.evaluations.map((ev, i) => (
+                <div key={i} className="print-keep rounded-md border border-rcc-border p-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-rcc-text-primary">
+                      {ev.employee?.name ?? "Unknown"} <span className="font-mono text-xs text-rcc-text-muted">{ev.employee?.employeeId ?? ""}</span>
+                    </p>
+                    <span className="text-xs font-semibold text-rcc-accent tabular-nums">
+                      {ev.totalScore !== null && ev.totalScore !== undefined ? ev.totalScore.toFixed(2) : "—"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-rcc-text-muted mt-0.5">
+                    {[ev.employee?.groupName, ev.employee?.roleName].filter(Boolean).join(" · ")}
+                    {ev.evaluator ? ` · Evaluator: ${ev.evaluator.name}` : ""}
+                    {ev.submittedAt ? ` · ${new Date(ev.submittedAt).toLocaleDateString()}` : ""}
+                  </p>
+                  {ev.remarks && <p className="text-xs text-rcc-text-secondary mt-1 italic">“{ev.remarks}”</p>}
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-rcc-text-muted border-b border-rcc-border">
+                          <th className="py-1 pr-2 font-semibold">Category</th>
+                          <th className="py-1 pr-2 font-semibold">Criterion</th>
+                          <th className="py-1 font-semibold text-right">Score</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-rcc-border">
+                        {ev.responses.map((r, j) => (
+                          <tr key={j}>
+                            <td className="py-1 pr-2 text-rcc-text-secondary">{r.category}</td>
+                            <td className="py-1 pr-2 text-rcc-text-primary">{r.description}</td>
+                            <td className="py-1 text-right tabular-nums">{r.score}/{r.maxScore}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

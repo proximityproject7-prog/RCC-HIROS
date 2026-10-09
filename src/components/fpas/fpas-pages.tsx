@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
-  CheckCircle2,
+  CheckCircle2, Printer,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api-client";
+import { canFillFpas } from "@/lib/fpas";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuthStore } from "@/store/auth-store";
 import { useUnsavedChanges, useNavigationGuard } from "@/hooks/use-unsaved-changes";
@@ -339,16 +340,16 @@ function FpasFormPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, employee]);
 
-  // Group gate: a switched-off group locks the form (Save hidden).
-  // Empty enabled list = all enabled; managers bypass for their own fills.
+  // Group gate (rule: @/lib/fpas canFillFpas): a switched-off group
+  // locks the form (Save hidden). Empty enabled list = all enabled;
+  // managers bypass for their own fills.
   useEffect(() => {
     setGroupBlocked(false);
     if (canManage || !employee?.groupId) return;
     (async () => {
       try {
         const data = await apiFetch<{ enabledGroupIds: string[] }>("/api/fpas/settings");
-        const ids = data.enabledGroupIds ?? [];
-        if (ids.length > 0 && !ids.includes(employee.groupId!)) {
+        if (!canFillFpas({ groupId: employee.groupId, enabledGroupIds: data.enabledGroupIds ?? [] })) {
           setGroupBlocked(true);
         }
       } catch {
@@ -520,9 +521,13 @@ function FpasFormPage({
 
       {/* Header */}
       <div>
-        <button onClick={() => requestNavigation(() => onBack())} className="inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
+        <button onClick={() => requestNavigation(() => onBack())} className="no-print inline-flex items-center gap-1 text-sm text-rcc-text-secondary hover:text-rcc-primary transition-colors mb-3">
           <ArrowLeft className="h-4 w-4" /> Back to FPAS
         </button>
+        <div className="print-only mb-3">
+          <p className="text-sm font-bold text-rcc-text-primary">Republic Central Colleges — Faculty Performance Appraisal (printed {new Date().toLocaleDateString()})</p>
+          <p className="text-xs text-rcc-text-secondary">{employee?.employeeId} — {formData.header.name || ""} · {formData.header.department || ""} · S.Y. {schoolYear}</p>
+        </div>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-rcc-text-primary">Faculty Performance Appraisal Form</h1>
@@ -534,11 +539,18 @@ function FpasFormPage({
             <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-rcc-accent/10 text-rcc-accent text-sm font-semibold tabular-nums">
               {totalPoints.toFixed(1)} pts
             </span>
+            <button
+              onClick={() => window.print()}
+              title="Print this FPAS form (Save as PDF for a per-faculty printable file)"
+              className="no-print inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
+            >
+              <Printer className="h-4 w-4" /> Print
+            </button>
             {!readOnly && (
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
+                className="no-print inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 {saving ? "Saving..." : "Save"}

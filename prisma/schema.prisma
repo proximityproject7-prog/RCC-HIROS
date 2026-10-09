@@ -110,6 +110,11 @@ model Employee {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  // Scale indexes (B4): group/role/active list filters
+  @@index([groupId])
+  @@index([roleId])
+  @@index([active])
+
   // Relations
   group          Group?    @relation(fields: [groupId], references: [id])
   role           Role?     @relation(fields: [roleId], references: [id])
@@ -225,6 +230,10 @@ model LeaveRequest {
   employee  Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   leaveType LeaveType        @relation(fields: [leaveTypeId], references: [id])
   approvals LeaveApproval[]
+
+  // Scale indexes (B4): hot list/scope filters
+  @@index([employeeId, status])
+  @@index([status])
 }
 
 model LeaveApproval {
@@ -317,6 +326,9 @@ model Evaluation {
   responses EvaluationResponse[]
 
   @@unique([periodId, evaluatorId, employeeId])
+  // Scale indexes (B4): period + per-employee lookups
+  @@index([periodId, employeeId])
+  @@index([employeeId])
 }
 
 model EvaluationResponse {
@@ -360,6 +372,8 @@ model Attendance {
   editedBy Employee? @relation("AttendanceEdits", fields: [editedById], references: [id])
 
   @@unique([employeeId, date])
+  // Scale index (B4): date-range scans across the roster
+  @@index([date])
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
