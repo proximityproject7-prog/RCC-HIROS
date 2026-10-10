@@ -10,6 +10,7 @@ import {
   Hash, User, DollarSign, Shield, Fingerprint, Printer,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { downloadFile } from "@/lib/download";
 import { canFillFpas } from "@/lib/fpas";
 import { ProfilePrintDocument } from "@/components/profiling/profile-print";
 import { useAuthStore } from "@/store/auth-store";
@@ -1082,6 +1083,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     useNavigationGuard(isSectionDirty);
   const [sectionSaving, setSectionSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   // Bumped after every upload/delete so the mutable /photo URL is never
   // served stale from the browser cache (session-35).
   const [photoVersion, setPhotoVersion] = useState(0);
@@ -1642,6 +1644,26 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <div className="no-print flex items-center gap-2 pb-1">
               <button onClick={() => window.print()} title="Print this profile (Save as PDF for a printable copy)" className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
                 <Printer className="h-3.5 w-3.5" /> Print
+              </button>
+              <button
+                onClick={async () => {
+                  setDownloadingPdf(true);
+                  try {
+                    await downloadFile(
+                      `/api/employees/${employeeId}/pdf`,
+                      `PROFILE-${employee.employeeId}-${employee.firstName}-${employee.lastName}.pdf`
+                    );
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "PDF download failed.");
+                  } finally {
+                    setDownloadingPdf(false);
+                  }
+                }}
+                disabled={downloadingPdf}
+                title="Download this profile as a PDF file"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" /> {downloadingPdf ? "Saving…" : "Download PDF"}
               </button>
               {/* Fill is offered only on the viewer's own profile. The group
                   gate matches the Records list: unknown (loading / fetch

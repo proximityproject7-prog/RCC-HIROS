@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
-  CheckCircle2, Printer,
+  CheckCircle2, Printer, Download,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api-client";
+import { downloadFile } from "@/lib/download";
 import { canFillFpas } from "@/lib/fpas";
 import { FpasPrintDocument } from "@/components/fpas/fpas-print";
 import { FpasExportHub } from "@/components/fpas/fpas-export";
@@ -60,80 +61,19 @@ export interface DynamicRow {
   [key: string]: string | number | boolean;
 }
 
-export interface FpasFormData {
-  header: {
-    name: string;
-    department: string;
-    dateEnteredRcc: string;
-    degreeInstitution: string;
-    schoolYear: string;
-  };
-  criteria1: {
-    studentEvaluation: number;
-    classroomPerformance: number;
-    gradeSubmission: number;
-    gradeAccuracy: number;
-    classRecordSubmission: number;
-    gradingSheetSubmission: number;
-    syllabiSubmission: number;
-    syllabiFormat: boolean;
-    syllabiObjectives: boolean;
-    syllabiReferences: boolean;
-    testPaperSubmission: number;
-    testItemQuality: number;
-    testAdministration: number;
-  };
-  criteria2: {
-    absences: number;
-    tardiness: number;
-    schoolActivities: number;
-    facultyMeetings: number;
-    libraryVisits: number;
-  };
-  criteria3: {
-    graduateDegree: DynamicRow[];
-    facultyDevelopment: DynamicRow[];
-    seminars: DynamicRow[];
-    specialStudies: DynamicRow[];
-    awards: DynamicRow[];
-    professionalOrgs: DynamicRow[];
-  };
-  criteria4: {
-    discoveries: DynamicRow[];
-    publications: DynamicRow[];
-    researchStudies: DynamicRow[];
-    researchArticles: DynamicRow[];
-  };
-  criteria5: {
-    adviser: DynamicRow[];
-    coach: DynamicRow[];
-    officialFunctions: DynamicRow[];
-  };
-  criteria6: {
-    projectsInitiated: DynamicRow[];
-    projectsParticipated: DynamicRow[];
-    memberships: DynamicRow[];
-  };
-}
+// Canonical model + scoring live in @/lib/fpas-form (shared with the
+// print/PDF documents and server routes). Re-exported here so existing
+// imports keep working.
+export type { FpasFormData } from "@/lib/fpas-form";
+import type { FpasFormData } from "@/lib/fpas-form";
+import {
+  blankFpasForm,
+  calculateCriteria,
+  calculateTotal,
+} from "@/lib/fpas-form";
+export { blankFpasForm, calculateCriteria, calculateTotal };
 
-const DEFAULT_FORM_DATA: FpasFormData = {
-  header: { name: "", department: "", dateEnteredRcc: "", degreeInstitution: "", schoolYear: "" },
-  criteria1: {
-    studentEvaluation: 0, classroomPerformance: 0,
-    gradeSubmission: 0, gradeAccuracy: 0, classRecordSubmission: 0,
-    gradingSheetSubmission: 0, syllabiSubmission: 0,
-    syllabiFormat: false, syllabiObjectives: false, syllabiReferences: false,
-    testPaperSubmission: 0, testItemQuality: 0, testAdministration: 0,
-  },
-  criteria2: { absences: 0, tardiness: 0, schoolActivities: 0, facultyMeetings: 0, libraryVisits: 0 },
-  criteria3: {
-    graduateDegree: [], facultyDevelopment: [], seminars: [],
-    specialStudies: [], awards: [], professionalOrgs: [],
-  },
-  criteria4: { discoveries: [], publications: [], researchStudies: [], researchArticles: [] },
-  criteria5: { adviser: [], coach: [], officialFunctions: [] },
-  criteria6: { projectsInitiated: [], projectsParticipated: [], memberships: [] },
-};
+const DEFAULT_FORM_DATA: FpasFormData = blankFpasForm("");
 
 const inputClass =
   "w-full px-3 py-2 bg-rcc-bg border border-rcc-border rounded-md text-sm text-rcc-text-primary focus:outline-none focus:ring-2 focus:ring-rcc-accent/40";
@@ -285,6 +225,7 @@ function FpasFormPage({
 }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [employee, setEmployee] = useState<EmployeeBrief | null>(null);
@@ -548,6 +489,28 @@ function FpasFormPage({
               className="no-print inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
             >
               <Printer className="h-4 w-4" /> Print
+            </button>
+            <button
+              onClick={async () => {
+                if (!existingId) return;
+                setDownloadingPdf(true);
+                setError(null);
+                try {
+                  await downloadFile(
+                    `/api/fpas/${existingId}/pdf`,
+                    `FPAS-${employee?.employeeId ?? "form"}-${schoolYear}.pdf`
+                  );
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "PDF download failed.");
+                } finally {
+                  setDownloadingPdf(false);
+                }
+              }}
+              disabled={!existingId || downloadingPdf}
+              title={existingId ? "Download this FPAS form as a PDF file" : "Save the form first, then download the PDF"}
+              className="no-print inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> {downloadingPdf ? "Saving…" : "Download PDF"}
             </button>
             {!readOnly && (
               <button
@@ -1485,77 +1448,3 @@ function DynamicTable({
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
-export function calculateCriteria(data: FpasFormData): { c1: number; c2: number; c3: number; c4: number; c5: number; c6: number } {
-  // Criteria I: Instruction
-  const c1 =
-    data.criteria1.studentEvaluation +
-    data.criteria1.classroomPerformance +
-    data.criteria1.gradeSubmission +
-    data.criteria1.gradeAccuracy +
-    data.criteria1.classRecordSubmission +
-    data.criteria1.gradingSheetSubmission +
-    data.criteria1.syllabiSubmission +
-    (data.criteria1.syllabiFormat ? 0.5 : 0) +
-    (data.criteria1.syllabiObjectives ? 1 : 0) +
-    (data.criteria1.syllabiReferences ? 0.5 : 0) +
-    data.criteria1.testPaperSubmission +
-    data.criteria1.testItemQuality +
-    data.criteria1.testAdministration;
-
-  // Criteria II: Attendance
-  const c2 =
-    data.criteria2.absences +
-    data.criteria2.tardiness +
-    data.criteria2.schoolActivities +
-    data.criteria2.facultyMeetings +
-    data.criteria2.libraryVisits;
-
-  // Criteria III-VI: Sum of "points" columns in dynamic tables.
-  // Per-table and per-criterion maxima follow the official FPAS form
-  // ("maximum of N pts"). Tables without an explicit maximum are uncapped
-  // individually but still bound by their criterion cap.
-  const sumTable = (rows: DynamicRow[]) =>
-    rows.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
-  const cappedTableSum = (rows: DynamicRow[], max?: number) =>
-    max === undefined ? sumTable(rows) : Math.min(sumTable(rows), max);
-  const cap = (value: number, max: number) => Math.min(value, max);
-
-  const c3 = cap(
-    cappedTableSum(data.criteria3.graduateDegree, 9) +
-    cappedTableSum(data.criteria3.facultyDevelopment, 4) +
-    cappedTableSum(data.criteria3.seminars, 3) +
-    sumTable(data.criteria3.specialStudies) +
-    cappedTableSum(data.criteria3.awards, 4) +
-    cappedTableSum(data.criteria3.professionalOrgs, 3),
-    20
-  );
-
-  const c4 = cap(
-    cappedTableSum(data.criteria4.discoveries, 7) +
-    sumTable(data.criteria4.publications) +
-    cappedTableSum(data.criteria4.researchStudies, 5) +
-    cappedTableSum(data.criteria4.researchArticles, 4),
-    16
-  );
-
-  const c5 = cap(
-    cappedTableSum(data.criteria5.adviser, 3) +
-    cappedTableSum(data.criteria5.coach, 3) +
-    cappedTableSum(data.criteria5.officialFunctions, 3),
-    9
-  );
-
-  const c6 = cap(
-    cappedTableSum(data.criteria6.projectsInitiated, 4) +
-    cappedTableSum(data.criteria6.projectsParticipated, 3) +
-    cappedTableSum(data.criteria6.memberships, 3),
-    10
-  );
-
-  return { c1: cap(c1, 25), c2: cap(c2, 20), c3, c4, c5, c6 };
-}
-
-export function calculateTotal(data: FpasFormData): number {
-  const t = calculateCriteria(data);
-  return Math.min(t.c1 + t.c2 + t.c3 + t.c4 + t.c5 + t.c6, 100);
-}

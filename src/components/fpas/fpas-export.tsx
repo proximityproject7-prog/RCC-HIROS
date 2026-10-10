@@ -12,6 +12,7 @@ import {
   ArrowLeft, CheckSquare, Download, Printer, Search, Square,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { downloadFile } from "@/lib/download";
 import { FpasPrintDocument } from "@/components/fpas/fpas-print";
 import type { FpasFormData, GroupBrief } from "@/components/fpas/fpas-pages";
 
@@ -50,6 +51,44 @@ export function FpasExportHub({ groups, onPreviewChange }: { groups: GroupBrief[
   const [error, setError] = useState<string | null>(null);
   const [docs, setDocs] = useState<ExportDoc[] | null>(null);
   const [skipped, setSkipped] = useState(0);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [bundleBusy, setBundleBusy] = useState<"" | "pdf" | "zip">("");
+
+  const deptCode = useMemo(() => {
+    if (deptId === "ALL") return "ALL";
+    return groups.find((g) => g.id === deptId)?.code ?? "ALL";
+  }, [deptId, groups]);
+
+  const downloadOne = async (doc: ExportDoc) => {
+    setDownloading(doc.key);
+    setError(null);
+    try {
+      await downloadFile(
+        `/api/fpas/${doc.key}/pdf`,
+        `FPAS-${doc.employeeCode}-${doc.name}-${schoolYear}.pdf`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "PDF download failed.");
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const downloadBundle = async (format: "pdf" | "zip") => {
+    setBundleBusy(format);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ schoolYear, groupCode: deptCode, format });
+      await downloadFile(
+        `/api/fpas/export-pdf?${params.toString()}`,
+        `fpas-${schoolYear}-${deptCode}.${format}`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bundle download failed.");
+    } finally {
+      setBundleBusy("");
+    }
+  };
 
   // Load per-employee submission status for the chosen school year.
   useEffect(() => {
@@ -177,6 +216,22 @@ export function FpasExportHub({ groups, onPreviewChange }: { groups: GroupBrief[
               {scope === "submitted" ? " · tip: use your browser's Save-as-PDF once per member for per-member files" : ""}
             </span>
             <button
+              onClick={() => downloadBundle("pdf")}
+              disabled={bundleBusy !== ""}
+              title="Download the whole scope as one merged PDF file"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> {bundleBusy === "pdf" ? "Saving…" : "Download merged PDF"}
+            </button>
+            <button
+              onClick={() => downloadBundle("zip")}
+              disabled={bundleBusy !== ""}
+              title="Download one PDF file per member (.zip)"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> {bundleBusy === "zip" ? "Saving…" : "Download .zip"}
+            </button>
+            <button
               onClick={() => window.print()}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors"
             >
@@ -184,12 +239,26 @@ export function FpasExportHub({ groups, onPreviewChange }: { groups: GroupBrief[
             </button>
           </div>
         </div>
+        {error && (
+          <div className="no-print bg-red-50 border border-red-200 rounded-md p-2.5 text-xs text-rcc-error">{error}</div>
+        )}
         {docs.map((d, i) => (
           <div
             key={d.key}
             className="bg-white rounded-lg border border-rcc-border p-6 print:border-0 print:rounded-none print:p-0"
             style={i < docs.length - 1 ? { breakAfter: "page" } : undefined}
           >
+            <div className="no-print flex items-center justify-between gap-2 mb-3">
+              <p className="text-xs text-rcc-text-muted font-mono">{d.employeeCode} — {d.name}</p>
+              <button
+                onClick={() => downloadOne(d)}
+                disabled={downloading !== null}
+                title="Download this member's form as a PDF file"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" /> {downloading === d.key ? "Saving…" : "Download PDF"}
+              </button>
+            </div>
             <FpasPrintDocument formData={d.formData} schoolYear={schoolYear} />
           </div>
         ))}

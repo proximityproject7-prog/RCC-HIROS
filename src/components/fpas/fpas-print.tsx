@@ -17,7 +17,7 @@ import {
   calculateTotal,
   type DynamicRow,
   type FpasFormData,
-} from "@/components/fpas/fpas-pages";
+} from "@/lib/fpas-form";
 
 // ─── Check-scale definitions (mirror the fill form options) ───
 
