@@ -67,6 +67,9 @@ function SectionTable({
   minBlankRows?: number;
 }) {
   const w = widths ?? headers.map(() => 1);
+  const sum = w.reduce((a, b) => a + b, 0);
+  // Percentage widths (content-immune) — same proportions as weights.
+  const pct = (i: number) => `${((w[i] ?? 1) / sum) * 100}%`;
   const blanks = Math.max(0, minBlankRows - rows.length);
   return (
     <View>
@@ -74,20 +77,20 @@ function SectionTable({
       <View style={s.table}>
         <View style={s.headRow}>
           {headers.map((h, i) => (
-            <Text key={h} style={[s.headCell, i === headers.length - 1 ? stylesNoRight : undefined, { flex: w[i] ?? 1 }]}>{h}</Text>
+            <Text key={h} style={[s.headCell, i === headers.length - 1 ? stylesNoRight : undefined, { width: pct(i) }]}>{h}</Text>
           ))}
         </View>
         {rows.map((r, i) => (
           <View key={i} style={s.row} wrap={false}>
             {r.map((c, j) => (
-              <Text key={j} style={[s.cell, j === r.length - 1 ? stylesNoRight : undefined, { flex: w[j] ?? 1 }]}>{c || " "}</Text>
+              <Text key={j} style={[s.cell, j === r.length - 1 ? stylesNoRight : undefined, { width: pct(j) }]}>{c || " "}</Text>
             ))}
           </View>
         ))}
         {Array.from({ length: blanks }).map((_, i) => (
           <View key={`b${i}`} style={s.row}>
             {headers.map((h, j) => (
-              <Text key={j} style={[s.cell, j === headers.length - 1 ? stylesNoRight : undefined, { flex: w[j] ?? 1 }]}> </Text>
+              <Text key={j} style={[s.cell, j === headers.length - 1 ? stylesNoRight : undefined, { width: pct(j) }]}> </Text>
             ))}
           </View>
         ))}
@@ -97,25 +100,26 @@ function SectionTable({
 }
 
 function FieldRow({ pairs }: { pairs: [string, string][] }) {
-  // Fixed 12-unit grid shared by EVERY row (mirrors the template's
-  // 6-column table): label 3 / colon 1 / value 8 for a lone pair, or
-  // two pairs of label 3 / colon 1 / value 2. Colons always land on
-  // the same x-positions; the table edge supplies the last border.
+  // Fixed PERCENTAGE widths shared by EVERY row (mirrors the template's
+  // fixed 6-column table). Percentages — unlike flex shares — ignore
+  // content minimums, so long values wrap inside their cell instead of
+  // re-splitting the columns. Lone pair: 25 / 8.33 / 66.67; two pairs:
+  // 25 / 8.33 / 16.67 twice. The table edge supplies the last border.
   const cells: ReactNode[] = [];
   if (pairs.length === 1) {
     const [label, value] = pairs[0];
     cells.push(
-      <Text key="l0" style={[s.labelCell, { flex: 3 }]}>{label}</Text>,
-      <Text key="c0" style={[s.cell, { flex: 1 }]}>:</Text>,
-      <Text key="v0" style={[s.cell, stylesNoRight, { flex: 8 }]}>{value || " "}</Text>
+      <Text key="l0" style={[s.labelCell, { width: "25%" }]}>{label}</Text>,
+      <Text key="c0" style={[s.cell, { width: "8.33%" }]}>:</Text>,
+      <Text key="v0" style={[s.cell, stylesNoRight, { width: "66.67%" }]}>{value || " "}</Text>
     );
   } else {
     pairs.forEach(([label, value], i) => {
       const last = i === pairs.length - 1;
       cells.push(
-        <Text key={`l${i}`} style={[s.labelCell, { flex: 3 }]}>{label}</Text>,
-        <Text key={`c${i}`} style={[s.cell, { flex: 1 }]}>:</Text>,
-        <Text key={`v${i}`} style={[s.cell, last ? stylesNoRight : undefined, { flex: 2 }]}>{value || " "}</Text>
+        <Text key={`l${i}`} style={[s.labelCell, { width: "25%" }]}>{label}</Text>,
+        <Text key={`c${i}`} style={[s.cell, { width: "8.33%" }]}>:</Text>,
+        <Text key={`v${i}`} style={[s.cell, last ? stylesNoRight : undefined, { width: "16.67%" }]}>{value || " "}</Text>
       );
     });
   }

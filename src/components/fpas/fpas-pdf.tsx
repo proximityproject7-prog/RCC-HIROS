@@ -229,6 +229,9 @@ function PrintTable({
 }) {
   const total = rows.reduce((a, r) => a + (Number(r[r.length - 1]) || 0), 0);
   const w = widths ?? headers.map(() => 1);
+  const sum = w.reduce((a, b) => a + b, 0);
+  // Percentage widths (content-immune) — same proportions as weights.
+  const pct = (i: number) => `${((w[i] ?? 1) / sum) * 100}%`;
   return (
     <View>
       <Text style={s.tblTitle}>
@@ -238,7 +241,7 @@ function PrintTable({
       <View style={s.table}>
         <View style={s.headRow}>
           {headers.map((h, i) => (
-            <Text key={h} style={[s.headCell, i === headers.length - 1 ? s.noRight : undefined, { flex: w[i] ?? 1 }]}>
+            <Text key={h} style={[s.headCell, i === headers.length - 1 ? s.noRight : undefined, { width: pct(i) }]}>
               {h}
             </Text>
           ))}
@@ -246,7 +249,7 @@ function PrintTable({
         {(rows.length === 0 ? [headers.map(() => "")] : rows).map((r, i) => (
           <View key={i} style={s.row} wrap={false}>
             {r.map((c, j) => (
-              <Text key={j} style={[s.cell, j === r.length - 1 ? s.noRight : undefined, { flex: w[j] ?? 1 }]}>
+              <Text key={j} style={[s.cell, j === r.length - 1 ? s.noRight : undefined, { width: pct(j) }]}>
                 {c || " "}
               </Text>
             ))}
