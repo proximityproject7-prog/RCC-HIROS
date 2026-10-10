@@ -167,9 +167,14 @@ export function ProfilePdfDocument({
         <Text style={s.sub}>Academic Year {schoolYear}</Text>
 
         <Text style={s.h2}>I. PERSONAL PROFILE</Text>
+        {/* Table A — full-width lone pairs (one uniform row geometry) */}
         <View style={s.table}>
           <FieldRow pairs={[["Full Name", fullName]]} />
           <FieldRow pairs={[["Present Address", employee.address ?? ""]]} />
+        </View>
+        {/* Table B — paired rows (one uniform row geometry). Split from
+            Table A so mixed row geometries never share a grid. */}
+        <View style={[s.table, { marginTop: 4 }]}>
           <FieldRow pairs={[["Date of Birth", fmtDate(employee.birthday)], ["Place of Birth", employee.placeOfBirth ?? ""]]} />
           <FieldRow pairs={[["Date Hired in RCC", fmtDate(employee.hireDate)], ["Contact Number", employee.phone ?? ""]]} />
           <FieldRow pairs={[["Working Status", `${employee.active ? "Active" : "Inactive"} · ${employee.employmentType} · ${employee.contractType}`], ["Rank", employee.rank ?? ""]]} />
