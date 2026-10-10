@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import {
   ArrowLeft, Save, ChevronDown, ChevronRight, Plus, Trash2,
-  CheckCircle2, Printer, Download,
+  CheckCircle2, Download,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { downloadFile } from "@/lib/download";
@@ -483,13 +483,6 @@ function FpasFormPage({
             <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-rcc-accent/10 text-rcc-accent text-sm font-semibold tabular-nums">
               {totalPoints.toFixed(1)} pts
             </span>
-            <button
-              onClick={() => window.print()}
-              title="Print this FPAS form (Save as PDF for a per-faculty printable file)"
-              className="no-print inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors"
-            >
-              <Printer className="h-4 w-4" /> Print
-            </button>
             <button
               onClick={async () => {
                 if (!existingId) return;

@@ -12,6 +12,7 @@ import {
   Image,
   StyleSheet,
 } from "@react-pdf/renderer";
+import type { ReactNode } from "react";
 import type { PrintableEmployee } from "@/components/profiling/profile-print";
 
 const BODY = "Helvetica";
@@ -73,20 +74,20 @@ function SectionTable({
       <View style={s.table}>
         <View style={s.headRow}>
           {headers.map((h, i) => (
-            <Text key={h} style={[s.headCell, { flex: w[i] ?? 1 }]}>{h}</Text>
+            <Text key={h} style={[s.headCell, i === headers.length - 1 ? stylesNoRight : undefined, { flex: w[i] ?? 1 }]}>{h}</Text>
           ))}
         </View>
         {rows.map((r, i) => (
           <View key={i} style={s.row} wrap={false}>
             {r.map((c, j) => (
-              <Text key={j} style={[s.cell, { flex: w[j] ?? 1 }]}>{c || " "}</Text>
+              <Text key={j} style={[s.cell, j === r.length - 1 ? stylesNoRight : undefined, { flex: w[j] ?? 1 }]}>{c || " "}</Text>
             ))}
           </View>
         ))}
         {Array.from({ length: blanks }).map((_, i) => (
           <View key={`b${i}`} style={s.row}>
             {headers.map((h, j) => (
-              <Text key={j} style={[s.cell, { flex: w[j] ?? 1 }]}> </Text>
+              <Text key={j} style={[s.cell, j === headers.length - 1 ? stylesNoRight : undefined, { flex: w[j] ?? 1 }]}> </Text>
             ))}
           </View>
         ))}
@@ -96,17 +97,32 @@ function SectionTable({
 }
 
 function FieldRow({ pairs }: { pairs: [string, string][] }) {
-  // pairs render as Label : value cells across one 6-col row
-  return (
-    <View style={s.row}>
-      {pairs.flatMap(([label, value], i) => [
-        <Text key={`l${i}`} style={[s.labelCell, { flex: 2 }]}>{label}</Text>,
-        <Text key={`c${i}`} style={[s.cell, { flex: 0.4 }]}>:</Text>,
-        <Text key={`v${i}`} style={[s.cell, { flex: 3 }]}>{value || " "}</Text>,
-      ])}
-    </View>
-  );
+  // Fixed 12-unit grid shared by EVERY row (mirrors the template's
+  // 6-column table): label 3 / colon 1 / value 8 for a lone pair, or
+  // two pairs of label 3 / colon 1 / value 2. Colons always land on
+  // the same x-positions; the table edge supplies the last border.
+  const cells: ReactNode[] = [];
+  if (pairs.length === 1) {
+    const [label, value] = pairs[0];
+    cells.push(
+      <Text key="l0" style={[s.labelCell, { flex: 3 }]}>{label}</Text>,
+      <Text key="c0" style={[s.cell, { flex: 1 }]}>:</Text>,
+      <Text key="v0" style={[s.cell, stylesNoRight, { flex: 8 }]}>{value || " "}</Text>
+    );
+  } else {
+    pairs.forEach(([label, value], i) => {
+      const last = i === pairs.length - 1;
+      cells.push(
+        <Text key={`l${i}`} style={[s.labelCell, { flex: 3 }]}>{label}</Text>,
+        <Text key={`c${i}`} style={[s.cell, { flex: 1 }]}>:</Text>,
+        <Text key={`v${i}`} style={[s.cell, last ? stylesNoRight : undefined, { flex: 2 }]}>{value || " "}</Text>
+      );
+    });
+  }
+  return <View style={s.row}>{cells}</View>;
 }
+
+const stylesNoRight = { borderRightWidth: 0 };
 
 export function ProfilePdfDocument({
   employee,

@@ -7,7 +7,7 @@ import {
   Plus, Search, Pencil, ArrowLeft, ArrowRight, Save, Users as UsersIcon, Upload,
   FileText, Download, Trash2, Eye, X, Lock, Mail, Phone, MapPin, Calendar,
   IdCard, Briefcase, Award, Image as ImageIcon, AlertTriangle, Building2, Settings,
-  Hash, User, DollarSign, Shield, Fingerprint, Printer,
+  Hash, User, DollarSign, Shield, Fingerprint,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { downloadFile } from "@/lib/download";
@@ -1642,9 +1642,6 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
               </div>
             </div>
             <div className="no-print flex items-center gap-2 pb-1">
-              <button onClick={() => window.print()} title="Print this profile (Save as PDF for a printable copy)" className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors">
-                <Printer className="h-3.5 w-3.5" /> Print
-              </button>
               <button
                 onClick={async () => {
                   setDownloadingPdf(true);

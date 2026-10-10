@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, CheckSquare, Download, Printer, Search, Square,
+  ArrowLeft, CheckSquare, Download, Search, Square,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { downloadFile } from "@/lib/download";
@@ -75,13 +75,21 @@ export function FpasExportHub({ groups, onPreviewChange }: { groups: GroupBrief[
   };
 
   const downloadBundle = async (format: "pdf" | "zip") => {
+    if (!docs || docs.length === 0) return;
     setBundleBusy(format);
     setError(null);
     try {
-      const params = new URLSearchParams({ schoolYear, groupCode: deptCode, format });
+      const params = new URLSearchParams({
+        schoolYear,
+        groupCode: deptCode,
+        format,
+        // Exact previewed members — the bundle must contain precisely
+        // what is on screen, never the whole department.
+        submissionIds: docs.map((d) => d.key).join(","),
+      });
       await downloadFile(
         `/api/fpas/export-pdf?${params.toString()}`,
-        `fpas-${schoolYear}-${deptCode}.${format}`
+        `fpas-${schoolYear}-${deptCode}-${docs.length}.${format}`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bundle download failed.");
@@ -213,7 +221,6 @@ export function FpasExportHub({ groups, onPreviewChange }: { groups: GroupBrief[
             <span className="text-xs text-rcc-text-muted">
               {docs.length} document(s) · S.Y. {schoolYear}
               {skipped > 0 ? ` · ${skipped} ticked without a submission were skipped` : ""}
-              {scope === "submitted" ? " · tip: use your browser's Save-as-PDF once per member for per-member files" : ""}
             </span>
             <button
               onClick={() => downloadBundle("pdf")}
@@ -230,12 +237,6 @@ export function FpasExportHub({ groups, onPreviewChange }: { groups: GroupBrief[
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border border-rcc-border text-rcc-text-secondary hover:bg-rcc-bg transition-colors disabled:opacity-50"
             >
               <Download className="h-4 w-4" /> {bundleBusy === "zip" ? "Saving…" : "Download .zip"}
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-rcc-primary text-rcc-primary-foreground hover:bg-rcc-primary/90 transition-colors"
-            >
-              <Printer className="h-4 w-4" /> Print / Save as PDF
             </button>
           </div>
         </div>

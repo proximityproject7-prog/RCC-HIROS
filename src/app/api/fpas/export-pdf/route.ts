@@ -12,6 +12,8 @@ import { createZip } from "@/lib/zip-store";
 // ═══════════════════════════════════════════════════════════════
 // GET /api/fpas/export-pdf — department FPAS bundle (fpas.manage)
 //   ?schoolYear=YYYY-YYYY (required) &groupCode=XXX (optional, ALL)
+//   &submissionIds=id1,id2 (optional, max 100 — exact members, e.g.
+//   the hub's ticked selection; whole scope when omitted)
 //   &format=pdf (one merged file) | zip (one file per member)
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
@@ -23,6 +25,11 @@ export async function GET(request: NextRequest) {
     const schoolYear = searchParams.get("schoolYear")?.trim() || "";
     const groupCode = searchParams.get("groupCode") || "ALL";
     const format = searchParams.get("format") === "zip" ? "zip" : "pdf";
+    const submissionIds = (searchParams.get("submissionIds") || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 100);
 
     if (!schoolYear) {
       return NextResponse.json(
@@ -44,6 +51,7 @@ export async function GET(request: NextRequest) {
       where: {
         schoolYear,
         ...(groupId ? { employee: { groupId } } : {}),
+        ...(submissionIds.length > 0 ? { id: { in: submissionIds } } : {}),
       },
       include: {
         employee: {
@@ -67,7 +75,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const tag = `${safeFilePart(schoolYear)}-${safeFilePart(groupCode)}`;
+    const tag = submissionIds.length > 0
+      ? `${safeFilePart(schoolYear)}-selected-${rows.length}`
+      : `${safeFilePart(schoolYear)}-${safeFilePart(groupCode)}`;
 
     if (format === "zip") {
       const entries: { name: string; data: Uint8Array }[] = [];

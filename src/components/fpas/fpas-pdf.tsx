@@ -52,6 +52,7 @@ const s = StyleSheet.create({
   cell: { borderRightWidth: 1, borderBottomWidth: 0, borderColor: "#000", padding: 3, fontSize: 8.5 },
   headCell: { borderRightWidth: 1, borderColor: "#000", padding: 3, fontSize: 8.5, fontWeight: "bold" },
   subtotal: { fontSize: 9, textAlign: "right", backgroundColor: SAND, padding: 2 },
+  noRight: { borderRightWidth: 0 },
   grand: {
     backgroundColor: BROWN, color: CREAM, borderRadius: 3,
     padding: 6, fontSize: 12, fontWeight: "bold", marginTop: 10, marginBottom: 6,
@@ -237,7 +238,7 @@ function PrintTable({
       <View style={s.table}>
         <View style={s.headRow}>
           {headers.map((h, i) => (
-            <Text key={h} style={[s.headCell, { flex: w[i] ?? 1 }]}>
+            <Text key={h} style={[s.headCell, i === headers.length - 1 ? s.noRight : undefined, { flex: w[i] ?? 1 }]}>
               {h}
             </Text>
           ))}
@@ -245,7 +246,7 @@ function PrintTable({
         {(rows.length === 0 ? [headers.map(() => "")] : rows).map((r, i) => (
           <View key={i} style={s.row} wrap={false}>
             {r.map((c, j) => (
-              <Text key={j} style={[s.cell, { flex: w[j] ?? 1 }]}>
+              <Text key={j} style={[s.cell, j === r.length - 1 ? s.noRight : undefined, { flex: w[j] ?? 1 }]}>
                 {c || " "}
               </Text>
             ))}
